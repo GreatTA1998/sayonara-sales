@@ -69,10 +69,8 @@ async function writeRaw(s: Store) {
   await fs.writeFile(LOCAL, JSON.stringify(s, null, 2));
 }
 
-/** Serialize mutations so claims can't double-book. */
 export function withStore<T>(fn: (s: Store) => T | Promise<T>): Promise<T> {
   const run = chain.then(async () => {
-    // Always re-read so concurrent serverless instances don't stale-claim.
     const s = await readRaw();
     mem = s;
     const result = await fn(s);

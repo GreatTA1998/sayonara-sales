@@ -90,21 +90,12 @@ export default function BuyerPage() {
               aria-label={ok ? item.name : why(item, day)}
               aria-pressed={ok ? on : undefined}
               onClick={() => (ok ? toggle(item.id) : setTip(tip === item.id ? null : item.id))}
-              style={{
-                ...S.cell,
-                opacity: ok ? 1 : 0.55,
-                borderColor: on ? "#ff9900" : "#e5e5e5",
-                background: on ? "#fff8ee" : "#fff",
-              }}
+              style={{ ...S.cell, opacity: ok ? 1 : 0.55, borderColor: on ? "#ff9900" : "#e5e5e5", background: on ? "#fff8ee" : "#fff" }}
             >
               <span style={S.cellTop}>
-                {ok ? (
-                  <span style={{ ...S.check, borderColor: on ? "#ff9900" : "#999", background: on ? "#ff9900" : "#fff" }}>
-                    {on ? "✓" : ""}
-                  </span>
-                ) : (
-                  <span style={S.bang}>!</span>
-                )}
+                {ok
+                  ? <span style={{ ...S.check, borderColor: on ? "#ff9900" : "#999", background: on ? "#ff9900" : "#fff" }}>{on ? "✓" : ""}</span>
+                  : <span style={S.bang}>!</span>}
                 <span style={S.price}>{money(item.price)}</span>
               </span>
               <span style={S.cellName}>{item.name}</span>
@@ -128,7 +119,7 @@ const S: Record<string, React.CSSProperties> = {
   meta: { padding: "8px 12px", color: "#555", fontSize: 13 },
   err: { padding: "6px 12px", color: "#b00020", fontSize: 13 },
   grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))", gap: 8, padding: "0 12px 12px" },
-  cell: { position: "relative", display: "flex", flexDirection: "column", alignItems: "stretch", gap: 4, minHeight: 96, padding: 10, border: "1px solid #e5e5e5", borderRadius: 8, textAlign: "left", cursor: "pointer", font: "inherit", color: "inherit" },
+  cell: { position: "relative", display: "flex", flexDirection: "column", gap: 4, minHeight: 96, padding: 10, border: "1px solid #e5e5e5", borderRadius: 8, textAlign: "left", cursor: "pointer", font: "inherit", color: "inherit" },
   cellTop: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 },
   check: { width: 18, height: 18, borderRadius: 4, border: "1.5px solid #999", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#fff", flexShrink: 0 },
   bang: { width: 18, height: 18, borderRadius: 9, border: "1px solid #999", background: "#f0f0f0", fontSize: 11, lineHeight: "16px", textAlign: "center", flexShrink: 0 },
