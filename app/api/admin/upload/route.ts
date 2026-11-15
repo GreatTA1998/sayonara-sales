@@ -22,10 +22,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Image only" }, { status: 400 });
     }
     const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
-    const blob = await put(`sayonara-photos/${itemId}-${Date.now()}.${ext}`, file, {
-      access: "public",
-      contentType: file.type || "image/jpeg",
-    });
+    // Store may be private (Vercel Blob project default) or public; prefer public URLs for buyer thumbs.
+    let blob;
+    try {
+      blob = await put(`sayonara-photos/${itemId}-${Date.now()}.${ext}`, file, {
+        access: "public",
+        contentType: file.type || "image/jpeg",
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      if (!/private store/i.test(msg)) throw e;
+      blob = await put(`sayonara-photos/${itemId}-${Date.now()}.${ext}`, file, {
+        access: "private",
+        contentType: file.type || "image/jpeg",
+      });
+    }
     const item = await withStore((s) => {
       const it = s.items.find((i) => i.id === itemId);
       if (!it) throw new Error("Not found");
