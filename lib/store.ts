@@ -26,14 +26,10 @@ const seed = (): Store => ({
   address: "Shibuya (approx. neighborhood)",
   capacity: Object.fromEntries(PICKUP_DAYS.map((d) => [d, 20])),
   items: [
-    { id: "i1", name: "IKEA desk", price: 3000 },
-    { id: "i2", name: "Office chair", price: 2000, note: "slight wear" },
-    { id: "i3", name: "Microwave", price: 1500 },
-    { id: "i4", name: "Rice cooker", price: null },
-    { id: "i5", name: "Floor lamp", price: 800, availableAfter: "2026-11-04" },
-    { id: "i6", name: "Bookshelf", price: 1000 },
-    { id: "i7", name: "Hangers (set)", price: null },
-    { id: "i8", name: "Small fridge", price: 5000, note: "needs cleaning" },
+    { id: "i1", name: "IKEA desk", price: 3000 }, { id: "i2", name: "Office chair", price: 2000, note: "slight wear" },
+    { id: "i3", name: "Microwave", price: 1500 }, { id: "i4", name: "Rice cooker", price: null },
+    { id: "i5", name: "Floor lamp", price: 800, availableAfter: "2026-11-04" }, { id: "i6", name: "Bookshelf", price: 1000 },
+    { id: "i7", name: "Hangers (set)", price: null }, { id: "i8", name: "Small fridge", price: 5000, note: "needs cleaning" },
   ],
   claims: [],
 });
@@ -82,7 +78,6 @@ export function withStore<T>(fn: (s: Store) => T | Promise<T>): Promise<T> {
 }
 
 export async function getStore(): Promise<Store> {
-  // Always re-read from Blob so warm instances don't serve stale claims.
   if (useBlob() || !mem) mem = await readRaw();
   return structuredClone(mem!);
 }

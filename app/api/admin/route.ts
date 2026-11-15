@@ -41,15 +41,18 @@ export async function POST(req: Request) {
           if (!PICKUP_DAYS.includes(day)) throw new Error("Bad day");
           s.capacity[day] = Math.max(0, Number(body.limit) || 0); return { capacity: s.capacity };
         }
-        case "cancel": {
-          const claim = s.claims.find((c) => c.id === body.id);
-          if (!claim || claim.status !== "booked") throw new Error("No claim");
-          claim.status = "cancelled";
-          for (const id of claim.itemIds) {
-            const item = s.items.find((i) => i.id === id);
-            if (item && item.claimId === claim.id) item.claimId = null;
+        case "cancel":
+        case "release": {
+          const keep = body.action === "release" ? String(body.keepId || "") : "";
+          const ids = body.action === "cancel" ? [String(body.id)] : s.claims.filter((c) => c.status === "booked" && c.id !== keep).map((c) => c.id);
+          let n = 0;
+          for (const id of ids) {
+            const c = s.claims.find((x) => x.id === id);
+            if (!c || c.status !== "booked") { if (body.action === "cancel") throw new Error("No claim"); continue; }
+            c.status = "cancelled"; n++;
+            for (const iid of c.itemIds) { const it = s.items.find((i) => i.id === iid); if (it && it.claimId === c.id) it.claimId = null; }
           }
-          return claim;
+          return body.action === "cancel" ? s.claims.find((c) => c.id === body.id) : { released: n };
         }
         case "picked_up": {
           const claim = s.claims.find((c) => c.id === body.id);
