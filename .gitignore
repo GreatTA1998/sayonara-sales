@@ -5,3 +5,5 @@ data/store.json
 .env*
 !.env.example
 *.tsbuildinfo
+.deploy-args.json
+.qr-up.json

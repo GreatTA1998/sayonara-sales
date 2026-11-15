@@ -1,8 +1,8 @@
 "use client";
 import { useCallback, useState } from "react";
 
-type Item = { id: string; name: string; price: number | null; claimId?: string | null };
-type Claim = { id: string; code: string; day: string; itemIds: string[]; status: string };
+type Item = { id: string; name: string; price: number | null; claimId?: string | null; photos?: string[]; note?: string };
+type Claim = { id: string; code: string; day: string; slot?: string; contact?: string; contactMethod?: string; itemIds: string[]; status: string };
 type AdminState = { address: string; capacity: Record<string, number>; items: Item[]; claims: Claim[]; days: string[] };
 
 export default function AdminPage() {
@@ -13,6 +13,7 @@ export default function AdminPage() {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [note, setNote] = useState("");
+  const [uploading, setUploading] = useState<string | null>(null);
 
   const load = useCallback(async (pw = password) => {
     const res = await fetch("/api/admin", { headers: { "x-admin-password": pw }, cache: "no-store" });
@@ -29,6 +30,32 @@ export default function AdminPage() {
     const body = await res.json();
     if (!res.ok) { setErr(body.error || "Failed"); return; }
     await load();
+  }
+
+  async function uploadPhoto(itemId: string, file: File) {
+    setUploading(itemId); setErr(null);
+    try {
+      const fd = new FormData();
+      fd.set("file", file);
+      fd.set("itemId", itemId);
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        headers: { "x-admin-password": password },
+        body: fd,
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Upload failed");
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setUploading(null);
+    }
+  }
+
+  async function removePhoto(item: Item, url: string) {
+    const photos = (item.photos || []).filter((p) => p !== url);
+    await act({ action: "edit", id: item.id, photos });
   }
 
   if (!authed) return (
@@ -61,10 +88,30 @@ export default function AdminPage() {
       <section style={S.sec}><div style={S.t}>Items</div>
         <ul style={S.list}>
           {(data?.items || []).map((item) => (
-            <li key={item.id} style={S.item}>
-              <input defaultValue={item.name} onBlur={(e) => e.target.value !== item.name && act({ action: "edit", id: item.id, name: e.target.value })} style={{ flex: 1, padding: 4, minWidth: 0 }} />
-              <input defaultValue={item.price ?? ""} placeholder="Free" onBlur={(e) => act({ action: "edit", id: item.id, price: e.target.value })} style={{ width: 64, padding: 4 }} />
-              <button type="button" onClick={() => act({ action: "remove", id: item.id })}>✕</button>
+            <li key={item.id} style={{ ...S.item, flexWrap: "wrap", alignItems: "flex-start" }}>
+              <div style={{ display: "flex", gap: 6, width: "100%", alignItems: "center" }}>
+                <input defaultValue={item.name} onBlur={(e) => e.target.value !== item.name && act({ action: "edit", id: item.id, name: e.target.value })} style={{ flex: 1, padding: 4, minWidth: 0 }} />
+                <input defaultValue={item.price ?? ""} placeholder="Free" onBlur={(e) => act({ action: "edit", id: item.id, price: e.target.value })} style={{ width: 64, padding: 4 }} />
+                <button type="button" onClick={() => act({ action: "remove", id: item.id })}>✕</button>
+              </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", width: "100%", alignItems: "center", marginTop: 4 }}>
+                {(item.photos || []).map((src) => (
+                  <span key={src} style={{ position: "relative", display: "inline-block" }}>
+                    <img src={src} alt="" style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 4, display: "block", background: "#eee" }} />
+                    <button type="button" title="Remove photo" onClick={() => removePhoto(item, src)}
+                      style={{ position: "absolute", top: -4, right: -4, width: 18, height: 18, borderRadius: 9, border: 0, background: "#111", color: "#fff", fontSize: 11, lineHeight: "18px", padding: 0 }}>×</button>
+                  </span>
+                ))}
+                <label style={{ fontSize: 12, padding: "6px 8px", border: "1px dashed #bbb", borderRadius: 4, cursor: uploading === item.id ? "wait" : "pointer", opacity: uploading === item.id ? 0.6 : 1 }}>
+                  {uploading === item.id ? "Uploading…" : "+ Photo"}
+                  <input type="file" accept="image/*" hidden disabled={uploading === item.id}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      e.target.value = "";
+                      if (f) uploadPhoto(item.id, f);
+                    }} />
+                </label>
+              </div>
             </li>
           ))}
         </ul>
@@ -83,8 +130,8 @@ export default function AdminPage() {
         <ul style={S.list}>
           {(data?.claims || []).map((c) => (
             <li key={c.id} style={{ padding: "8px 0", borderBottom: "1px solid #eee", fontSize: 13 }}>
-              <div><b>{c.code}</b> · {c.day.slice(5)} · {c.status}</div>
-              <div style={{ color: "#555" }}>{c.itemIds.map((id) => data?.items.find((i) => i.id === id)?.name || id).join(", ")}</div>
+              <div><b>{c.code}</b> · {c.day.slice(5)}{c.slot ? ` · ${c.slot}` : ""} · {c.status}</div>
+              <div style={{ color: "#555" }}>{c.itemIds.map((id) => data?.items.find((i) => i.id === id)?.name || id).join(", ")}{c.contactMethod ? ` · ${c.contactMethod}` : ""}{c.contact ? ` · ${c.contact}` : ""}</div>
               {c.status === "booked" && (
                 <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
                   <button type="button" onClick={() => act({ action: "cancel", id: c.id })}>Cancel</button>

@@ -3,19 +3,20 @@ import path from "path";
 import { put, get } from "@vercel/blob";
 
 export type Item = { id: string; name: string; price: number | null; note?: string; claimId?: string | null; photos?: string[]; availableFrom?: string; availableTo?: string };
-export type Claim = { id: string; code: string; day: string; itemIds: string[]; status: "booked" | "picked_up" | "cancelled"; createdAt: string };
+export type Claim = { id: string; code: string; day: string; slot: string; itemIds: string[]; contact?: string; contactMethod?: "line" | "phone"; status: "booked" | "picked_up" | "cancelled"; createdAt: string };
 export type Store = { address: string; capacity: Record<string, number>; items: Item[]; claims: Claim[] };
 
 export const PICKUP_DAYS = [
   "2026-11-01","2026-11-02","2026-11-03","2026-11-04",
   "2026-11-05","2026-11-06","2026-11-07","2026-11-08",
 ];
+export const PICKUP_SLOTS = ["10:00–12:00", "12:00–14:00", "14:00–16:00", "16:00–18:00"];
 
 const BLOB = "sayonara-store.json";
 const LOCAL = path.join(process.cwd(), "data", "store.json");
 
 const seed = (): Store => ({
-  address: "Shibuya (approx. neighborhood)",
+  address: "目黒駅・不動前駅あたりで引き取り",
   capacity: Object.fromEntries(PICKUP_DAYS.map((d) => [d, 20])),
   items: [
     { id: "i1", name: "IKEA desk", price: 3000, photos: ["https://picsum.photos/seed/desk/600/400"] },
@@ -80,6 +81,10 @@ function scrub(s: Store) {
 export async function getStore(): Promise<Store> {
   if (useBlob() || !mem) mem = scrub(await readRaw());
   return structuredClone(mem!);
+}
+
+export function takenSlots(s: Store, day: string): string[] {
+  return s.claims.filter((c) => c.day === day && c.status === "booked" && c.slot).map((c) => c.slot);
 }
 
 export const uid = (p: string) => `${p}${Math.random().toString(36).slice(2, 8)}`;
