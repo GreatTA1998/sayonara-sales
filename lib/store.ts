@@ -63,7 +63,7 @@ async function writeRaw(s: Store) {
 
 export function withStore<T>(fn: (s: Store) => T | Promise<T>): Promise<T> {
   const run = chain.then(async () => {
-    const s = await readRaw();
+    const s = scrub(await readRaw());
     mem = s;
     const result = await fn(s);
     await writeRaw(s);
@@ -73,8 +73,13 @@ export function withStore<T>(fn: (s: Store) => T | Promise<T>): Promise<T> {
   return run;
 }
 
+function scrub(s: Store) {
+  for (const it of s.items) delete (it as { availableAfter?: string }).availableAfter;
+  return s;
+}
+
 export async function getStore(): Promise<Store> {
-  if (useBlob() || !mem) mem = await readRaw();
+  if (useBlob() || !mem) mem = scrub(await readRaw());
   return structuredClone(mem!);
 }
 
