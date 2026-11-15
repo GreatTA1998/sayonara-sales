@@ -77,7 +77,6 @@ function scrub(s: Store) {
   for (const it of s.items) delete (it as { availableAfter?: string }).availableAfter;
   return s;
 }
-
 export async function getStore(): Promise<Store> {
   if (useBlob() || !mem) mem = scrub(await readRaw());
   return structuredClone(mem!);
