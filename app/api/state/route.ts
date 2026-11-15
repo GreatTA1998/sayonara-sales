@@ -9,13 +9,15 @@ export async function GET() {
     address: s.address,
     capacity: s.capacity,
     days: PICKUP_DAYS,
-    items: s.items.map(({ id, name, price, note, availableAfter, claimId }) => ({
-      id,
-      name,
-      price,
-      note,
-      availableAfter,
-      taken: !!claimId,
-    })),
+    items: [...s.items]
+      .sort((a, b) => (b.price ?? -1) - (a.price ?? -1))
+      .map(({ id, name, price, note, availableAfter, claimId }) => ({
+        id,
+        name,
+        price,
+        note,
+        availableAfter,
+        taken: !!claimId,
+      })),
   });
 }

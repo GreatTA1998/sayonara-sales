@@ -82,9 +82,9 @@ export function withStore<T>(fn: (s: Store) => T | Promise<T>): Promise<T> {
 }
 
 export async function getStore(): Promise<Store> {
-  if (mem) return structuredClone(mem);
-  mem = await readRaw();
-  return structuredClone(mem);
+  // Always re-read from Blob so warm instances don't serve stale claims.
+  if (useBlob() || !mem) mem = await readRaw();
+  return structuredClone(mem!);
 }
 
 export const uid = (p: string) => `${p}${Math.random().toString(36).slice(2, 8)}`;
