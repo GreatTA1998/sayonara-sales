@@ -2,7 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { put, get } from "@vercel/blob";
 
-export type Item = { id: string; name: string; price: number | null; note?: string; availableAfter?: string; claimId?: string | null };
+export type Item = { id: string; name: string; price: number | null; note?: string; availableAfter?: string; claimId?: string | null; photos?: string[] };
 export type Claim = { id: string; code: string; day: string; itemIds: string[]; status: "booked" | "picked_up" | "cancelled"; createdAt: string };
 export type Store = { address: string; capacity: Record<string, number>; items: Item[]; claims: Claim[] };
 
@@ -18,10 +18,14 @@ const seed = (): Store => ({
   address: "Shibuya (approx. neighborhood)",
   capacity: Object.fromEntries(PICKUP_DAYS.map((d) => [d, 20])),
   items: [
-    { id: "i1", name: "IKEA desk", price: 3000 }, { id: "i2", name: "Office chair", price: 2000, note: "slight wear" },
-    { id: "i3", name: "Microwave", price: 1500 }, { id: "i4", name: "Rice cooker", price: null },
-    { id: "i5", name: "Floor lamp", price: 800, availableAfter: "2026-11-04" }, { id: "i6", name: "Bookshelf", price: 1000 },
-    { id: "i7", name: "Hangers (set)", price: null }, { id: "i8", name: "Small fridge", price: 5000, note: "needs cleaning" },
+    { id: "i1", name: "IKEA desk", price: 3000, photos: ["https://picsum.photos/seed/desk/600/400"] },
+    { id: "i2", name: "Office chair", price: 2000, note: "slight wear" },
+    { id: "i3", name: "Microwave", price: 1500 },
+    { id: "i4", name: "Rice cooker", price: null },
+    { id: "i5", name: "Floor lamp", price: 800, availableAfter: "2026-11-04" },
+    { id: "i6", name: "Bookshelf", price: 1000, photos: ["https://picsum.photos/seed/shelf1/400/400", "https://picsum.photos/seed/shelf2/400/400"] },
+    { id: "i7", name: "Hangers (set)", price: null },
+    { id: "i8", name: "Small fridge", price: 5000, note: "needs cleaning", photos: ["https://picsum.photos/seed/fridge/600/400"] },
   ],
   claims: [],
 });

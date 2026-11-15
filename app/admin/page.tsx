@@ -44,14 +44,12 @@ export default function AdminPage() {
     <main style={S.wrap}>
       <h1 style={S.h}>Admin</h1>
       {err && <p style={S.err}>{err}</p>}
-
       <Sec title="Address (approx.)">
         <div style={S.row}>
           <input value={data?.address || ""} onChange={(e) => setData((d) => d && { ...d, address: e.target.value })} style={{ flex: 1, padding: 8 }} />
           <button type="button" onClick={() => act({ action: "address", address: data?.address })}>Save</button>
         </div>
       </Sec>
-
       <Sec title="Add item">
         <div style={{ ...S.row, flexWrap: "wrap" }}>
           <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} style={{ flex: "1 1 120px", padding: 8 }} />
@@ -60,7 +58,6 @@ export default function AdminPage() {
           <button type="button" onClick={async () => { await act({ action: "add", name, price, note }); setName(""); setPrice(""); setNote(""); }}>Add</button>
         </div>
       </Sec>
-
       <Sec title="Items">
         <ul style={S.list}>
           {(data?.items || []).map((item) => (
@@ -72,7 +69,6 @@ export default function AdminPage() {
           ))}
         </ul>
       </Sec>
-
       <Sec title="Capacity (Nov 1–8)">
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
           {(data?.days || []).map((d) => (
@@ -83,7 +79,6 @@ export default function AdminPage() {
           ))}
         </div>
       </Sec>
-
       <Sec title="Claims">
         <ul style={S.list}>
           {(data?.claims || []).map((c) => (
@@ -110,12 +105,9 @@ function Sec({ title, children }: { title: string; children: React.ReactNode }) 
 }
 
 const S: Record<string, React.CSSProperties> = {
-  wrap: { padding: 12, maxWidth: 560, margin: "0 auto" },
-  h: { fontSize: 18, margin: "0 0 8px" },
-  err: { color: "#b00020", margin: "0 0 8px" },
-  full: { width: "100%", padding: 10, marginBottom: 8 },
+  wrap: { padding: 12, maxWidth: 560, margin: "0 auto" }, h: { fontSize: 18, margin: "0 0 8px" },
+  err: { color: "#b00020", margin: "0 0 8px" }, full: { width: "100%", padding: 10, marginBottom: 8 },
   enter: { width: "100%", padding: 10, background: "#111", color: "#fff", border: 0, borderRadius: 6 },
-  row: { display: "flex", gap: 6 },
-  list: { listStyle: "none", margin: 0, padding: 0 },
+  row: { display: "flex", gap: 6 }, list: { listStyle: "none", margin: 0, padding: 0 },
   item: { display: "flex", gap: 6, alignItems: "center", padding: "6px 0", borderBottom: "1px solid #eee", fontSize: 13 },
 };

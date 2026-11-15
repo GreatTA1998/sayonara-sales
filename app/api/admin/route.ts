@@ -30,6 +30,7 @@ export async function POST(req: Request) {
           if ("price" in body) item.price = numOrNull(body.price);
           if ("note" in body) item.note = body.note ? String(body.note) : undefined;
           if ("availableAfter" in body) item.availableAfter = body.availableAfter || undefined;
+          if ("photos" in body) item.photos = Array.isArray(body.photos) ? body.photos.map(String).filter(Boolean).slice(0, 2) : undefined;
           return item;
         }
         case "remove":
