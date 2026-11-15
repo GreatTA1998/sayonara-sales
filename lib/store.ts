@@ -2,17 +2,9 @@ import { promises as fs } from "fs";
 import path from "path";
 import { put, get } from "@vercel/blob";
 
-export type Item = {
-  id: string; name: string; price: number | null; note?: string;
-  availableAfter?: string; claimId?: string | null;
-};
-export type Claim = {
-  id: string; code: string; day: string; itemIds: string[];
-  status: "booked" | "picked_up" | "cancelled"; createdAt: string;
-};
-export type Store = {
-  address: string; capacity: Record<string, number>; items: Item[]; claims: Claim[];
-};
+export type Item = { id: string; name: string; price: number | null; note?: string; availableAfter?: string; claimId?: string | null };
+export type Claim = { id: string; code: string; day: string; itemIds: string[]; status: "booked" | "picked_up" | "cancelled"; createdAt: string };
+export type Store = { address: string; capacity: Record<string, number>; items: Item[]; claims: Claim[] };
 
 export const PICKUP_DAYS = [
   "2026-11-01","2026-11-02","2026-11-03","2026-11-04",

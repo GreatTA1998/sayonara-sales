@@ -50,7 +50,7 @@ export async function POST(req: Request) {
             const c = s.claims.find((x) => x.id === id);
             if (!c || c.status !== "booked") { if (body.action === "cancel") throw new Error("No claim"); continue; }
             c.status = "cancelled"; n++;
-            for (const iid of c.itemIds) { const it = s.items.find((i) => i.id === iid); if (it && it.claimId === c.id) it.claimId = null; }
+            for (const iid of c.itemIds) { const it = s.items.find((i) => i.id === iid); if (it?.claimId === c.id) it.claimId = null; }
           }
           return body.action === "cancel" ? s.claims.find((c) => c.id === body.id) : { released: n };
         }
