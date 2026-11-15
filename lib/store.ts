@@ -37,7 +37,8 @@ const useBlob = () => !!process.env.BLOB_READ_WRITE_TOKEN;
 
 async function readRaw(): Promise<Store> {
   if (useBlob()) {
-    const res = await get(BLOB, { access: "private" });
+    // Public Blob store (needed so admin photo uploads are buyer-visible).
+    const res = await get(BLOB, { access: "public" });
     if (!res) return seed();
     return (await new Response(res.stream).json()) as Store;
   }
@@ -54,7 +55,7 @@ async function writeRaw(s: Store) {
   mem = s;
   if (useBlob()) {
     await put(BLOB, JSON.stringify(s), {
-      access: "private", addRandomSuffix: false, allowOverwrite: true, contentType: "application/json",
+      access: "public", addRandomSuffix: false, allowOverwrite: true, contentType: "application/json",
     });
     return;
   }
