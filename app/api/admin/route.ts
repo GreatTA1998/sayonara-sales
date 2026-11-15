@@ -31,7 +31,7 @@ export async function POST(req: Request) {
           if ("note" in body) item.note = body.note ? String(body.note) : undefined;
           if ("availableFrom" in body) item.availableFrom = body.availableFrom || undefined;
           if ("availableTo" in body) item.availableTo = body.availableTo || undefined;
-          if ("photos" in body) item.photos = Array.isArray(body.photos) ? body.photos.map(String).filter(Boolean).slice(0, 2) : undefined;
+          if ("photos" in body) item.photos = Array.isArray(body.photos) ? body.photos.map(String).filter(Boolean) : undefined;
           return item;
         }
         case "remove":

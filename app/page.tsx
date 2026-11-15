@@ -7,8 +7,6 @@ type Receipt = { code: string; day: string; address: string; items: string[] };
 
 const money = (p: number | null) => (p == null ? "Free" : `¥${p.toLocaleString()}`);
 const dayLbl = (d: string) => `Nov ${Number(d.slice(8))}`;
-const pics = (i: Item) => (i.photos || []).slice(0, 2);
-const span = (n: number) => (n === 0 ? 1 : n === 1 ? 2 : 3);
 const rangeLbl = (from?: string, to?: string) => {
   if (!from && !to) return "";
   if (from && to && from.slice(0, 7) === to.slice(0, 7)) return `Nov ${Number(from.slice(8))}–${Number(to.slice(8))}`;
@@ -77,7 +75,7 @@ export default function BuyerPage() {
 
   const okOpen = open ? available.has(open.id) : false;
   const onOpen = open ? picked.has(open.id) : false;
-  const openPics = open ? pics(open) : [];
+  const openPics = open?.photos || [];
   const openRange = open ? rangeLbl(open.availableFrom, open.availableTo) : "";
 
   return (
@@ -97,21 +95,18 @@ export default function BuyerPage() {
         {(state?.items || []).map((item) => {
           const ok = available.has(item.id);
           const on = picked.has(item.id);
-          const ph = pics(item);
-          const n = ph.length;
+          const ph = item.photos || [];
           return (
             <button key={item.id} type="button" aria-label={item.name} onClick={() => setOpen(item)}
-              className={`cell ${n ? "photo" : "text"}${on ? " on" : ""}${ok ? "" : " dim"}`}
-              style={{ gridColumn: `span ${span(n)}` }}>
-              {n > 0 && (
-                <span className="photos" style={{ gridTemplateColumns: n === 2 ? "1fr 1fr" : "1fr" }}>
+              className={`cell${on ? " on" : ""}${ok ? "" : " dim"}`}>
+              {ph.length > 0 && (
+                <span className="thumbs">
                   {ph.map((src) => <img key={src} src={src} alt="" />)}
                 </span>
               )}
-              <span className={`cap${n ? " on" : ""}`}>
+              <span className="cap">
                 <span className="price">{money(item.price)}</span>
                 <span className="name">{item.name}</span>
-                {!n && item.note ? <span className="note">{item.note}</span> : null}
               </span>
             </button>
           );
@@ -122,7 +117,7 @@ export default function BuyerPage() {
         <div className="mask" role="dialog" aria-modal="true" aria-label={open.name} onClick={() => setOpen(null)}>
           <div className="sheet" onClick={(e) => e.stopPropagation()}>
             {openPics.length > 0 && (
-              <div className="pics" style={{ gridTemplateColumns: openPics.length === 2 ? "1fr 1fr" : "1fr" }}>
+              <div className="pics">
                 {openPics.map((src) => <img key={src} src={src} alt="" />)}
               </div>
             )}

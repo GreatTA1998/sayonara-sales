@@ -13,7 +13,7 @@ export async function GET() {
       .sort((a, b) => (b.price ?? -1) - (a.price ?? -1))
       .map(({ id, name, price, note, availableFrom, availableTo, claimId, photos }) => ({
         id, name, price, note, availableFrom, availableTo, taken: !!claimId,
-        photos: (photos || []).slice(0, 2),
+        photos: photos || [],
       })),
   });
 }
