@@ -55,9 +55,12 @@ export default function BuyerPage() {
 
   if (receipt) return (
     <main style={S.wrap}>
-      <h1 style={S.h}>Booked</h1>
+      <h1 style={S.h}>Request sent</h1>
+      <p style={{ margin: "0 0 10px", color: "#333", lineHeight: 1.4 }}>
+        Sent to Elton — not confirmed yet. Wait for him to confirm before coming.
+      </p>
       <p>Code: <b>{receipt.code}</b></p>
-      <p>Pickup: {dayLbl(receipt.day)}</p>
+      <p>Day: {dayLbl(receipt.day)}</p>
       <p>Area: {receipt.address}</p>
       <ul>{receipt.items.map((n) => <li key={n}>{n}</li>)}</ul>
       <button type="button" style={S.darkBtn} onClick={() => setReceipt(null)}>Back to list</button>
@@ -68,10 +71,10 @@ export default function BuyerPage() {
     <main style={{ maxWidth: 480, margin: "0 auto", paddingBottom: 24 }}>
       <header style={S.bar}>
         <select value={day} onChange={(e) => { setDay(e.target.value); setPicked(new Set()); }} style={S.select}>
-          {(state?.days || []).map((d) => <option key={d} value={d}>Pickup {dayLbl(d)}</option>)}
+          {(state?.days || []).map((d) => <option key={d} value={d}>{dayLbl(d)}</option>)}
         </select>
         <button type="button" disabled={busy || !picked.size} onClick={book} style={{ ...S.book, background: picked.size ? "#ff9900" : "#ccc" }}>
-          Book pickup{picked.size ? ` (${picked.size})` : ""}
+          Request pickup{picked.size ? ` (${picked.size})` : ""}
         </button>
       </header>
       <div style={S.meta}>{state?.address || "…"} · Asia/Tokyo</div>
