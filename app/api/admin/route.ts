@@ -61,6 +61,15 @@ export async function POST(req: Request) {
           if (!claim || claim.status !== "booked") throw new Error("No claim");
           claim.status = "picked_up"; return claim;
         }
+        case "restore": {
+          const store = body.store as { address?: string; capacity?: Record<string, number>; items?: unknown[]; claims?: unknown[] } | undefined;
+          if (!store || !Array.isArray(store.items) || !Array.isArray(store.claims)) throw new Error("Bad store");
+          s.address = String(store.address || s.address);
+          if (store.capacity && typeof store.capacity === "object") s.capacity = store.capacity as typeof s.capacity;
+          s.items = store.items as typeof s.items;
+          s.claims = store.claims as typeof s.claims;
+          return { ok: true, items: s.items.length, claims: s.claims.length };
+        }
         default: throw new Error("Unknown action");
       }
     });
