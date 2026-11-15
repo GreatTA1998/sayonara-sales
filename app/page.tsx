@@ -98,7 +98,7 @@ export default function BuyerPage() {
           const ph = item.photos || [];
           return (
             <button key={item.id} type="button" aria-label={item.name} onClick={() => setOpen(item)}
-              className={`cell${on ? " on" : ""}${ok ? "" : " dim"}`}>
+              className={`cell${ph.length ? " has-photo" : ""}${on ? " on" : ""}${ok ? "" : " dim"}`}>
               {ph.length > 0 && (
                 <span className="thumbs">
                   {ph.map((src) => <img key={src} src={src} alt="" />)}
