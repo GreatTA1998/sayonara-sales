@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useState } from "react";
 
-type Item = { id: string; name: string; price: number | null; note?: string; claimId?: string | null };
+type Item = { id: string; name: string; price: number | null; claimId?: string | null };
 type Claim = { id: string; code: string; day: string; itemIds: string[]; status: string };
 type AdminState = { address: string; capacity: Record<string, number>; items: Item[]; claims: Claim[]; days: string[] };
 
@@ -44,21 +44,21 @@ export default function AdminPage() {
     <main style={S.wrap}>
       <h1 style={S.h}>Admin</h1>
       {err && <p style={S.err}>{err}</p>}
-      <Sec title="Address (approx.)">
+      <section style={S.sec}><div style={S.t}>Address</div>
         <div style={S.row}>
           <input value={data?.address || ""} onChange={(e) => setData((d) => d && { ...d, address: e.target.value })} style={{ flex: 1, padding: 8 }} />
           <button type="button" onClick={() => act({ action: "address", address: data?.address })}>Save</button>
         </div>
-      </Sec>
-      <Sec title="Add item">
+      </section>
+      <section style={S.sec}><div style={S.t}>Add item</div>
         <div style={{ ...S.row, flexWrap: "wrap" }}>
           <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} style={{ flex: "1 1 120px", padding: 8 }} />
           <input placeholder="Price (blank=Free)" value={price} onChange={(e) => setPrice(e.target.value)} style={{ width: 120, padding: 8 }} />
           <input placeholder="Note" value={note} onChange={(e) => setNote(e.target.value)} style={{ flex: "1 1 100px", padding: 8 }} />
           <button type="button" onClick={async () => { await act({ action: "add", name, price, note }); setName(""); setPrice(""); setNote(""); }}>Add</button>
         </div>
-      </Sec>
-      <Sec title="Items">
+      </section>
+      <section style={S.sec}><div style={S.t}>Items</div>
         <ul style={S.list}>
           {(data?.items || []).map((item) => (
             <li key={item.id} style={S.item}>
@@ -68,8 +68,8 @@ export default function AdminPage() {
             </li>
           ))}
         </ul>
-      </Sec>
-      <Sec title="Capacity (Nov 1–8)">
+      </section>
+      <section style={S.sec}><div style={S.t}>Capacity</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
           {(data?.days || []).map((d) => (
             <label key={d} style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}>
@@ -78,8 +78,8 @@ export default function AdminPage() {
             </label>
           ))}
         </div>
-      </Sec>
-      <Sec title="Claims">
+      </section>
+      <section style={S.sec}><div style={S.t}>Claims</div>
         <ul style={S.list}>
           {(data?.claims || []).map((c) => (
             <li key={c.id} style={{ padding: "8px 0", borderBottom: "1px solid #eee", fontSize: 13 }}>
@@ -95,13 +95,9 @@ export default function AdminPage() {
           ))}
           {!data?.claims?.length && <li style={{ color: "#777" }}>No claims yet</li>}
         </ul>
-      </Sec>
+      </section>
     </main>
   );
-}
-
-function Sec({ title, children }: { title: string; children: React.ReactNode }) {
-  return <section style={{ marginBottom: 16 }}><div style={{ fontWeight: 600, marginBottom: 6 }}>{title}</div>{children}</section>;
 }
 
 const S: Record<string, React.CSSProperties> = {
@@ -110,4 +106,5 @@ const S: Record<string, React.CSSProperties> = {
   enter: { width: "100%", padding: 10, background: "#111", color: "#fff", border: 0, borderRadius: 6 },
   row: { display: "flex", gap: 6 }, list: { listStyle: "none", margin: 0, padding: 0 },
   item: { display: "flex", gap: 6, alignItems: "center", padding: "6px 0", borderBottom: "1px solid #eee", fontSize: 13 },
+  sec: { marginBottom: 16 }, t: { fontWeight: 600, marginBottom: 6 },
 };

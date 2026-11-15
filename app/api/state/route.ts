@@ -11,8 +11,8 @@ export async function GET() {
     days: PICKUP_DAYS,
     items: [...s.items]
       .sort((a, b) => (b.price ?? -1) - (a.price ?? -1))
-      .map(({ id, name, price, note, availableAfter, claimId, photos }) => ({
-        id, name, price, note, availableAfter, taken: !!claimId,
+      .map(({ id, name, price, note, availableFrom, availableTo, claimId, photos }) => ({
+        id, name, price, note, availableFrom, availableTo, taken: !!claimId,
         photos: (photos || []).slice(0, 2),
       })),
   });

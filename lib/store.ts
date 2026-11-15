@@ -2,7 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { put, get } from "@vercel/blob";
 
-export type Item = { id: string; name: string; price: number | null; note?: string; availableAfter?: string; claimId?: string | null; photos?: string[] };
+export type Item = { id: string; name: string; price: number | null; note?: string; claimId?: string | null; photos?: string[]; availableFrom?: string; availableTo?: string };
 export type Claim = { id: string; code: string; day: string; itemIds: string[]; status: "booked" | "picked_up" | "cancelled"; createdAt: string };
 export type Store = { address: string; capacity: Record<string, number>; items: Item[]; claims: Claim[] };
 
@@ -22,7 +22,7 @@ const seed = (): Store => ({
     { id: "i2", name: "Office chair", price: 2000, note: "slight wear" },
     { id: "i3", name: "Microwave", price: 1500 },
     { id: "i4", name: "Rice cooker", price: null },
-    { id: "i5", name: "Floor lamp", price: 800, availableAfter: "2026-11-04" },
+    { id: "i5", name: "Floor lamp", price: 800 },
     { id: "i6", name: "Bookshelf", price: 1000, photos: ["https://picsum.photos/seed/shelf1/400/400", "https://picsum.photos/seed/shelf2/400/400"] },
     { id: "i7", name: "Hangers (set)", price: null },
     { id: "i8", name: "Small fridge", price: 5000, note: "needs cleaning", photos: ["https://picsum.photos/seed/fridge/600/400"] },
@@ -81,9 +81,16 @@ export async function getStore(): Promise<Store> {
 export const uid = (p: string) => `${p}${Math.random().toString(36).slice(2, 8)}`;
 export const shortCode = () => Math.random().toString(36).slice(2, 6).toUpperCase();
 
+export function rangeLbl(from?: string, to?: string) {
+  if (!from && !to) return "";
+  if (from && to && from.slice(0, 7) === to.slice(0, 7)) return `Nov ${Number(from.slice(8))}–${Number(to.slice(8))}`;
+  if (from && to) return `Nov ${Number(from.slice(8))}–Nov ${Number(to.slice(8))}`;
+  return from ? `from Nov ${Number(from.slice(8))}` : `until Nov ${Number(to!.slice(8))}`;
+}
+
 export function itemStatus(item: Item, day: string) {
   if (item.claimId) return { ok: false as const, reason: "Already booked — wait for cancel." };
-  if (item.availableAfter && day < item.availableAfter)
-    return { ok: false as const, reason: `Only available after ${item.availableAfter.slice(5).replace("-", "/")}.` };
+  const bad = (item.availableFrom && day < item.availableFrom) || (item.availableTo && day > item.availableTo);
+  if (bad) return { ok: false as const, reason: `Only available ${rangeLbl(item.availableFrom, item.availableTo)}.` };
   return { ok: true as const };
 }
