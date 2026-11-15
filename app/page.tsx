@@ -79,23 +79,41 @@ export default function BuyerPage() {
       </header>
       <div style={S.meta}>{state?.address || "…"} · Asia/Tokyo</div>
       {err && <div style={S.err}>{err}</div>}
-      <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+      <div style={S.grid}>
         {(state?.items || []).map((item) => {
           const ok = available.has(item.id);
+          const on = picked.has(item.id);
           return (
-            <li key={item.id} style={{ ...S.row, opacity: ok ? 1 : 0.55 }}>
-              {ok ? (
-                <input type="checkbox" checked={picked.has(item.id)} onChange={() => toggle(item.id)} aria-label={item.name} />
-              ) : (
-                <button type="button" aria-label="Why unavailable" onClick={() => setTip(tip === item.id ? null : item.id)} style={S.bang}>!</button>
-              )}
-              <span style={S.name}>{item.name}{item.note ? ` · ${item.note}` : ""}</span>
-              <span>{money(item.price)}</span>
-              {tip === item.id && <div style={S.tip}>{why(item, day)}</div>}
-            </li>
+            <button
+              key={item.id}
+              type="button"
+              aria-label={ok ? item.name : why(item, day)}
+              aria-pressed={ok ? on : undefined}
+              onClick={() => (ok ? toggle(item.id) : setTip(tip === item.id ? null : item.id))}
+              style={{
+                ...S.cell,
+                opacity: ok ? 1 : 0.55,
+                borderColor: on ? "#ff9900" : "#e5e5e5",
+                background: on ? "#fff8ee" : "#fff",
+              }}
+            >
+              <span style={S.cellTop}>
+                {ok ? (
+                  <span style={{ ...S.check, borderColor: on ? "#ff9900" : "#999", background: on ? "#ff9900" : "#fff" }}>
+                    {on ? "✓" : ""}
+                  </span>
+                ) : (
+                  <span style={S.bang}>!</span>
+                )}
+                <span style={S.price}>{money(item.price)}</span>
+              </span>
+              <span style={S.cellName}>{item.name}</span>
+              {item.note ? <span style={S.note}>{item.note}</span> : null}
+              {tip === item.id && !ok && <span style={S.tip}>{why(item, day)}</span>}
+            </button>
           );
         })}
-      </ul>
+      </div>
       {!state && <p style={{ padding: 12 }}>Loading…</p>}
     </main>
   );
@@ -109,9 +127,14 @@ const S: Record<string, React.CSSProperties> = {
   book: { padding: "10px 12px", color: "#111", border: 0, borderRadius: 6, fontWeight: 700, whiteSpace: "nowrap" },
   meta: { padding: "8px 12px", color: "#555", fontSize: 13 },
   err: { padding: "6px 12px", color: "#b00020", fontSize: 13 },
-  row: { position: "relative", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderBottom: "1px solid #eee", background: "#fff" },
-  bang: { width: 18, height: 18, borderRadius: 9, border: "1px solid #999", background: "#f0f0f0", fontSize: 11, lineHeight: "16px", padding: 0 },
-  name: { flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
-  tip: { position: "absolute", left: 40, right: 12, top: "100%", padding: "8px 10px", background: "#111", color: "#fff", borderRadius: 6, fontSize: 12, zIndex: 5 },
+  grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))", gap: 8, padding: "0 12px 12px" },
+  cell: { position: "relative", display: "flex", flexDirection: "column", alignItems: "stretch", gap: 4, minHeight: 96, padding: 10, border: "1px solid #e5e5e5", borderRadius: 8, textAlign: "left", cursor: "pointer", font: "inherit", color: "inherit" },
+  cellTop: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 },
+  check: { width: 18, height: 18, borderRadius: 4, border: "1.5px solid #999", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#fff", flexShrink: 0 },
+  bang: { width: 18, height: 18, borderRadius: 9, border: "1px solid #999", background: "#f0f0f0", fontSize: 11, lineHeight: "16px", textAlign: "center", flexShrink: 0 },
+  price: { fontSize: 12, fontVariantNumeric: "tabular-nums", color: "#333" },
+  cellName: { fontSize: 13, fontWeight: 600, lineHeight: 1.25, wordBreak: "break-word" },
+  note: { fontSize: 11, color: "#777", lineHeight: 1.2 },
+  tip: { position: "absolute", left: 6, right: 6, bottom: 6, padding: "6px 8px", background: "#111", color: "#fff", borderRadius: 6, fontSize: 11, zIndex: 5, lineHeight: 1.3 },
   darkBtn: { marginTop: 12, padding: "10px 14px", background: "#111", color: "#fff", border: 0, borderRadius: 6 },
 };
