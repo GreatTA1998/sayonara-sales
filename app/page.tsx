@@ -29,9 +29,9 @@ const why = (i: Item, day: string) =>
 function LineBlock({ url }: { url: string }) {
   return (
     <div className="linebox">
-      <a className="linelink" href={url} target="_blank" rel="noopener noreferrer">EltonのLINEを開く</a>
+      <p className="linesub">リンクを開くか、QRコードを読み取って追加してください。</p>
+      <a className="linelink" href={url} target="_blank" rel="noopener noreferrer">line invite link</a>
       <img className="lineqr" src="/line-qr.jpg" alt="LINE QR" />
-      <p className="hint">QRを読み取るか、上のリンクから追加。</p>
     </div>
   );
 }
