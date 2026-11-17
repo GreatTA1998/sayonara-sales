@@ -17,8 +17,12 @@ export default function AdminPage() {
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const { snack, show } = useSnack();
+  const [addrDraft, setAddrDraft] = useState("");
+  const addrDraftRef = useRef("");
   const addrTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const addrSaved = useRef("");
+  const addrDirty = useRef(false);
+  const addrReq = useRef(0);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin", { cache: "no-store" });
@@ -27,6 +31,11 @@ export default function AdminPage() {
     const body = await res.json();
     setData(body);
     addrSaved.current = body.address || "";
+    // Never clobber an in-progress draft from a reload.
+    if (!addrDirty.current) {
+      addrDraftRef.current = body.address || "";
+      setAddrDraft(body.address || "");
+    }
   }, [show]);
 
   useEffect(() => { load(); }, [load]);
@@ -46,7 +55,6 @@ export default function AdminPage() {
         return { ...d, items: d.items.map((i) => (i.id === next.id ? { ...i, ...next } : i)) };
       }
       if (action === "remove") return { ...d, items: d.items.filter((i) => i.id !== payload.id) };
-      if (action === "address") return { ...d, address: String(body.address ?? d.address) };
       if (action === "cancel" || action === "picked_up") {
         const next = body as unknown as Claim;
         const items = action === "cancel"
@@ -75,15 +83,37 @@ export default function AdminPage() {
     return body;
   }
 
+  async function saveAddress(raw: string) {
+    const next = raw.trim();
+    if (next === addrSaved.current) return;
+    const req = ++addrReq.current;
+    setErr(null);
+    const res = await fetch("/api/admin", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "address", address: next }),
+    });
+    const body = await res.json();
+    if (!res.ok) {
+      if (req !== addrReq.current) return;
+      const msg = body.error || "Failed";
+      setErr(msg); show(msg, "err");
+      return;
+    }
+    // Stale response: keep latest draft; never rewrite the input from the server.
+    if (req !== addrReq.current) return;
+    const saved = String(body.address ?? next);
+    addrSaved.current = saved;
+    setData((d) => d && { ...d, address: saved });
+    if (addrDraftRef.current.trim() === saved) addrDirty.current = false;
+    show("Saved", "ok");
+  }
+
   function onAddressChange(value: string) {
-    setData((d) => d && { ...d, address: value });
+    addrDirty.current = true;
+    addrDraftRef.current = value;
+    setAddrDraft(value);
     if (addrTimer.current) clearTimeout(addrTimer.current);
-    addrTimer.current = setTimeout(async () => {
-      const next = value.trim();
-      if (next === addrSaved.current) return;
-      const ok = await act({ action: "address", address: next }, "Saved");
-      if (ok) addrSaved.current = String(ok.address ?? next);
-    }, 450);
+    addrTimer.current = setTimeout(() => { void saveAddress(value); }, 450);
   }
 
   async function uploadPhoto(itemId: string, file: File) {
@@ -141,8 +171,8 @@ export default function AdminPage() {
       {err && <p style={S.err}>{err}</p>}
       {!data && !err && <p style={{ color: "#555" }}>Loading…</p>}
       <section style={S.sec}><div style={S.t}>Address</div>
-        <input value={data?.address || ""} onChange={(e) => onAddressChange(e.target.value)}
-          style={{ width: "100%", padding: 8 }} />
+        <input value={addrDraft} onChange={(e) => onAddressChange(e.target.value)}
+          disabled={!data} style={{ width: "100%", padding: 8 }} />
       </section>
       <section style={S.sec}><div style={S.t}>Add item</div>
         <div style={S.row}>
