@@ -180,7 +180,7 @@ export default function BuyerPage() {
           {(state?.days || []).map((d) => <option key={d} value={d}>{dayLbl(d)}</option>)}
         </select>
         <button type="button" className="req" disabled={!picked.size}
-          onClick={() => { setSlot(null); setMethod(null); setContact(""); setErr(null); setCheckout(true); }}
+          onClick={() => { setSlot(null); setMethod(null); setErr(null); setCheckout(true); }}
           style={{ background: picked.size ? "#ff9900" : "#ccc" }}>
           {`引き取りを依頼${picked.size ? ` (${picked.size})` : ""}`}
         </button>
