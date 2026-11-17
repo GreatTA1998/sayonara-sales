@@ -182,7 +182,7 @@ export default function BuyerPage() {
         </select>
         <button type="button" className="req"
           onClick={() => { setSlot(null); setMethod("line"); setErr(null); setCheckout(true); }}>
-          {picked.size ? `依頼 (${picked.size})` : "依頼"}
+          {picked.size ? `引き取りを依頼 (${picked.size})` : "引き取りを依頼"}
         </button>
       </header>
       {err && <div className="err">{err}</div>}
