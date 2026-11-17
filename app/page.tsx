@@ -199,7 +199,7 @@ export default function BuyerPage() {
         return (
           <>
             {withPh.length > 0 && (
-              <div className="grid">
+              <div className="grid photos">
                 {withPh.map((item) => (
                   <button key={item.id} type="button" aria-label={item.name} onClick={() => setOpen(item)}
                     className={cls(item, " has-photo")}>
