@@ -182,10 +182,13 @@ export default function BuyerPage() {
         <button type="button" className="req" disabled={!picked.size}
           onClick={() => { setSlot(null); setMethod(null); setErr(null); setCheckout(true); }}
           style={{ background: picked.size ? "#ff9900" : "#ccc" }}>
-          {`引き取りを依頼${picked.size ? ` (${picked.size})` : ""}`}
+          {(() => {
+            const area = (state?.address || "").trim() || "引き取り";
+            const stem = /を?依頼$/.test(area) ? area : /引き取り/.test(area) ? `${area}を依頼` : `${area}で引き取りを依頼`;
+            return `${stem}${picked.size ? ` (${picked.size})` : ""}`;
+          })()}
         </button>
       </header>
-      <div className="meta">{state?.address || "…"}</div>
       {err && <div className="err">{err}</div>}
       {(() => {
         const all = state?.items || [];
