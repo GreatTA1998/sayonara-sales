@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
-import { PICKUP_DAYS, getStore, uid, withStore } from "@/lib/store";
+import { getStore, uid, withStore } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
-const numOrNull = (v: unknown) =>
-  v === "" || v == null || Number.isNaN(Number(v)) ? null : Number(v);
+const numPrice = (v: unknown) => {
+  if (v === "" || v == null || Number.isNaN(Number(v))) return 0;
+  return Math.max(0, Number(v));
+};
 
 export async function GET() {
-  return NextResponse.json({ ...(await getStore()), days: PICKUP_DAYS });
+  const s = await getStore();
+  return NextResponse.json({ address: s.address, items: s.items, claims: s.claims });
 }
 
 export async function POST(req: Request) {
@@ -15,7 +18,11 @@ export async function POST(req: Request) {
     const result = await withStore((s) => {
       switch (body.action as string) {
         case "add": {
-          const item = { id: uid("i"), name: String(body.name || "").trim(), price: numOrNull(body.price), note: body.note ? String(body.note) : undefined };
+          const item = {
+            id: uid("i"),
+            name: String(body.name || "").trim(),
+            price: numPrice(body.price),
+          };
           if (!item.name) throw new Error("Name required");
           s.items.push(item); return item;
         }
@@ -23,7 +30,7 @@ export async function POST(req: Request) {
           const item = s.items.find((i) => i.id === body.id);
           if (!item) throw new Error("Not found");
           if (body.name != null) item.name = String(body.name).trim();
-          if ("price" in body) item.price = numOrNull(body.price);
+          if ("price" in body) item.price = numPrice(body.price);
           if ("note" in body) item.note = body.note ? String(body.note) : undefined;
           if ("availableFrom" in body) item.availableFrom = body.availableFrom || undefined;
           if ("availableTo" in body) item.availableTo = body.availableTo || undefined;
@@ -34,11 +41,6 @@ export async function POST(req: Request) {
           s.items = s.items.filter((i) => i.id !== body.id); return { ok: true };
         case "address":
           s.address = String(body.address || "").trim(); return { address: s.address };
-        case "capacity": {
-          const day = String(body.day);
-          if (!PICKUP_DAYS.includes(day)) throw new Error("Bad day");
-          s.capacity[day] = Math.max(0, Number(body.limit) || 0); return { capacity: s.capacity };
-        }
         case "cancel":
         case "release": {
           const keep = body.action === "release" ? String(body.keepId || "") : "";
@@ -58,10 +60,9 @@ export async function POST(req: Request) {
           claim.status = "picked_up"; return claim;
         }
         case "restore": {
-          const store = body.store as { address?: string; capacity?: Record<string, number>; items?: unknown[]; claims?: unknown[] } | undefined;
+          const store = body.store as { address?: string; items?: unknown[]; claims?: unknown[] } | undefined;
           if (!store || !Array.isArray(store.items) || !Array.isArray(store.claims)) throw new Error("Bad store");
           s.address = String(store.address || s.address);
-          if (store.capacity && typeof store.capacity === "object") s.capacity = store.capacity as typeof s.capacity;
           s.items = store.items as typeof s.items;
           s.claims = store.claims as typeof s.claims;
           return { ok: true, items: s.items.length, claims: s.claims.length };

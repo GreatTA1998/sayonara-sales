@@ -17,8 +17,6 @@ export async function POST(req: Request) {
   try {
     const result = await withStore((s) => {
       if (takenSlots(s, day).includes(slot)) throw new Error("その時間帯は埋まっています");
-      const used = s.claims.filter((c) => c.day === day && c.status === "booked").length;
-      if (used >= (s.capacity[day] ?? 20)) throw new Error("その日は満員です");
       for (const id of itemIds) {
         const item = s.items.find((i) => i.id === id);
         if (!item) throw new Error("品目が見つかりません");

@@ -10,7 +10,6 @@ export async function GET() {
   const lineInviteUrl = (process.env.LINE_INVITE_URL || "https://line.me/ti/p/yBg2x2X_ut").trim();
   return NextResponse.json({
     address: s.address,
-    capacity: s.capacity,
     days: PICKUP_DAYS,
     slots: PICKUP_SLOTS,
     taken,

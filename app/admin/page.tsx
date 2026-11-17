@@ -1,10 +1,10 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Snack, useSnack } from "./snack";
 
 type Item = { id: string; name: string; price: number | null; claimId?: string | null; photos?: string[]; note?: string };
 type Claim = { id: string; code: string; day: string; slot?: string; contact?: string; contactMethod?: string; itemIds: string[]; status: string };
-type AdminState = { address: string; capacity: Record<string, number>; items: Item[]; claims: Claim[]; days: string[] };
+type AdminState = { address: string; items: Item[]; claims: Claim[] };
 
 const byPriceDesc = (a: Item, b: Item) => (b.price ?? -1) - (a.price ?? -1);
 
@@ -12,27 +12,31 @@ export default function AdminPage() {
   const [data, setData] = useState<AdminState | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [name, setName] = useState("");
-  const [price, setPrice] = useState("");
-  const [note, setNote] = useState("");
+  const [price, setPrice] = useState("0");
   const [uploading, setUploading] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const { snack, show } = useSnack();
+  const addrTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const addrSaved = useRef("");
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin", { cache: "no-store" });
-    if (!res.ok) { setErr("Failed to load"); return; }
-    setErr(null); setData(await res.json());
-  }, []);
+    if (!res.ok) { setErr("Failed to load"); show("Failed to load", "err"); return; }
+    setErr(null);
+    const body = await res.json();
+    setData(body);
+    addrSaved.current = body.address || "";
+  }, [show]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => () => { if (addrTimer.current) clearTimeout(addrTimer.current); }, []);
 
   const items = useMemo(
     () => [...(data?.items || [])].sort(byPriceDesc),
     [data?.items],
   );
 
-  /** Apply mutation result locally — never wait on a Blob re-read. */
   function apply(action: string, payload: Record<string, unknown>, body: Record<string, unknown>) {
     setData((d) => {
       if (!d) return d;
@@ -43,7 +47,6 @@ export default function AdminPage() {
       }
       if (action === "remove") return { ...d, items: d.items.filter((i) => i.id !== payload.id) };
       if (action === "address") return { ...d, address: String(body.address ?? d.address) };
-      if (action === "capacity" && body.capacity) return { ...d, capacity: body.capacity as AdminState["capacity"] };
       if (action === "cancel" || action === "picked_up") {
         const next = body as unknown as Claim;
         const items = action === "cancel"
@@ -55,16 +58,32 @@ export default function AdminPage() {
     });
   }
 
-  async function act(payload: Record<string, unknown>) {
+  async function act(payload: Record<string, unknown>, okMsg?: string) {
     setErr(null);
     const res = await fetch("/api/admin", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     const body = await res.json();
-    if (!res.ok) { setErr(body.error || "Failed"); return null; }
+    if (!res.ok) {
+      const msg = body.error || "Failed";
+      setErr(msg); show(msg, "err");
+      return null;
+    }
     apply(String(payload.action), payload, body);
+    if (okMsg) show(okMsg, "ok");
     return body;
+  }
+
+  function onAddressChange(value: string) {
+    setData((d) => d && { ...d, address: value });
+    if (addrTimer.current) clearTimeout(addrTimer.current);
+    addrTimer.current = setTimeout(async () => {
+      const next = value.trim();
+      if (next === addrSaved.current) return;
+      const ok = await act({ action: "address", address: next }, "Saved");
+      if (ok) addrSaved.current = String(ok.address ?? next);
+    }, 450);
   }
 
   async function uploadPhoto(itemId: string, file: File) {
@@ -88,6 +107,13 @@ export default function AdminPage() {
     } finally {
       setUploading(null);
     }
+  }
+
+  async function editNote(item: Item) {
+    setMenuFor(null);
+    const next = window.prompt("Note", item.note || "");
+    if (next == null) return;
+    await act({ action: "edit", id: item.id, note: next.trim() }, "Saved");
   }
 
   async function deleteItem(item: Item) {
@@ -115,20 +141,16 @@ export default function AdminPage() {
       {err && <p style={S.err}>{err}</p>}
       {!data && !err && <p style={{ color: "#555" }}>Loading…</p>}
       <section style={S.sec}><div style={S.t}>Address</div>
-        <div style={S.row}>
-          <input value={data?.address || ""} onChange={(e) => setData((d) => d && { ...d, address: e.target.value })} style={{ flex: 1, padding: 8 }} />
-          <button type="button" onClick={() => act({ action: "address", address: data?.address })}>Save</button>
-        </div>
+        <input value={data?.address || ""} onChange={(e) => onAddressChange(e.target.value)}
+          style={{ width: "100%", padding: 8 }} />
       </section>
       <section style={S.sec}><div style={S.t}>Add item</div>
-        <div style={{ ...S.row, flexWrap: "wrap" }}>
-          <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} style={{ flex: "1 1 120px", padding: 8 }} />
-          <input placeholder="Price (blank=Free)" value={price} onChange={(e) => setPrice(e.target.value)} style={{ width: 120, padding: 8 }} />
-          <input placeholder="Note" value={note} onChange={(e) => setNote(e.target.value)} style={{ flex: "1 1 100px", padding: 8 }} />
+        <div style={S.row}>
+          <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} style={{ flex: 1, padding: 8, minWidth: 0 }} />
+          <input type="number" min={0} inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value)} style={{ width: 72, padding: 8 }} />
           <button type="button" onClick={async () => {
-            const ok = await act({ action: "add", name, price, note });
-            if (ok) { setName(""); setPrice(""); setNote(""); show("Item added", "ok"); }
-            else show("Add failed", "err");
+            const ok = await act({ action: "add", name, price: price === "" ? 0 : Number(price) }, "Item added");
+            if (ok) { setName(""); setPrice("0"); }
           }}>Add</button>
         </div>
       </section>
@@ -141,10 +163,17 @@ export default function AdminPage() {
             <li key={item.id} style={{ ...S.item, flexWrap: "wrap", alignItems: "flex-start", opacity: busy ? 0.55 : 1 }}>
               <div style={{ display: "flex", gap: 6, width: "100%", alignItems: "center" }}>
                 <input key={`n-${item.id}-${item.name}`} defaultValue={item.name} disabled={busy}
-                  onBlur={(e) => e.target.value !== item.name && act({ action: "edit", id: item.id, name: e.target.value })}
+                  onBlur={(e) => {
+                    const v = e.target.value;
+                    if (v !== item.name) act({ action: "edit", id: item.id, name: v }, "Saved");
+                  }}
                   style={{ flex: 1, padding: 4, minWidth: 0 }} />
-                <input key={`p-${item.id}-${item.price ?? ""}`} defaultValue={item.price ?? ""} placeholder="Free" disabled={busy}
-                  onBlur={(e) => act({ action: "edit", id: item.id, price: e.target.value })}
+                <input key={`p-${item.id}-${item.price ?? 0}`} type="number" min={0} inputMode="numeric"
+                  defaultValue={item.price ?? 0} disabled={busy}
+                  onBlur={(e) => {
+                    const v = e.target.value === "" ? 0 : Number(e.target.value);
+                    if (v !== (item.price ?? 0)) act({ action: "edit", id: item.id, price: v }, "Saved");
+                  }}
                   style={{ width: 64, padding: 4 }} />
                 <label style={{ flex: "0 0 auto", fontSize: 12, padding: "4px 6px", border: "1px dashed #bbb", borderRadius: 4, cursor: uploading === item.id || busy ? "wait" : "pointer", opacity: uploading === item.id || busy ? 0.6 : 1, whiteSpace: "nowrap" }}>
                   {uploading === item.id ? "…" : "+Photo"}
@@ -163,6 +192,10 @@ export default function AdminPage() {
                   </button>
                   {menuFor === item.id && !busy && (
                     <div style={{ position: "absolute", right: 0, top: "100%", zIndex: 5, marginTop: 2, minWidth: 140, background: "#fff", border: "1px solid #ccc", borderRadius: 6, boxShadow: "0 4px 12px rgba(0,0,0,.12)", overflow: "hidden" }}>
+                      <button type="button" onClick={() => editNote(item)}
+                        style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 10px", border: 0, background: "#fff", borderBottom: "1px solid #eee" }}>
+                        Edit note
+                      </button>
                       {photos.map((src, i) => (
                         <button key={src} type="button" onClick={() => deletePhoto(item, src, i + 1)}
                           style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 10px", border: 0, background: "#fff", borderBottom: "1px solid #eee" }}>
@@ -177,6 +210,7 @@ export default function AdminPage() {
                   )}
                 </div>
               </div>
+              {item.note ? <div style={{ width: "100%", fontSize: 12, color: "#555", marginTop: 2 }}>{item.note}</div> : null}
               {photos.length > 0 && (
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", width: "100%", alignItems: "center", marginTop: 4 }}>
                   {photos.map((src) => (
@@ -189,16 +223,6 @@ export default function AdminPage() {
           })}
         </ul>
       </section>
-      <section style={S.sec}><div style={S.t}>Capacity</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-          {(data?.days || []).map((d) => (
-            <label key={d} style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}>
-              <span style={{ width: 56 }}>Nov {Number(d.slice(8))}</span>
-              <input type="number" defaultValue={data?.capacity[d] ?? 20} onBlur={(e) => act({ action: "capacity", day: d, limit: Number(e.target.value) })} style={{ width: 64, padding: 4 }} />
-            </label>
-          ))}
-        </div>
-      </section>
       <section style={S.sec}><div style={S.t}>Claims</div>
         <ul style={S.list}>
           {(data?.claims || []).map((c) => (
@@ -207,8 +231,8 @@ export default function AdminPage() {
               <div style={{ color: "#555" }}>{c.itemIds.map((id) => data?.items.find((i) => i.id === id)?.name || id).join(", ")}{c.contactMethod ? ` · ${c.contactMethod}` : ""}{c.contact ? ` · ${c.contact}` : ""}</div>
               {c.status === "booked" && (
                 <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-                  <button type="button" onClick={() => act({ action: "cancel", id: c.id })}>Cancel</button>
-                  <button type="button" onClick={() => act({ action: "picked_up", id: c.id })}>Picked up</button>
+                  <button type="button" onClick={() => act({ action: "cancel", id: c.id }, "Saved")}>Cancel</button>
+                  <button type="button" onClick={() => act({ action: "picked_up", id: c.id }, "Saved")}>Picked up</button>
                 </div>
               )}
             </li>

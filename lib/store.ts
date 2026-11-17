@@ -4,7 +4,7 @@ import { put, get } from "@vercel/blob";
 
 export type Item = { id: string; name: string; price: number | null; note?: string; claimId?: string | null; photos?: string[]; availableFrom?: string; availableTo?: string };
 export type Claim = { id: string; code: string; day: string; slot: string; itemIds: string[]; contact?: string; contactMethod?: "line" | "phone"; status: "booked" | "picked_up" | "cancelled"; createdAt: string };
-export type Store = { address: string; capacity: Record<string, number>; items: Item[]; claims: Claim[] };
+export type Store = { address: string; items: Item[]; claims: Claim[] };
 
 export const PICKUP_DAYS = [
   "2026-11-01","2026-11-02","2026-11-03","2026-11-04",
@@ -17,7 +17,6 @@ const LOCAL = path.join(process.cwd(), "data", "store.json");
 
 const seed = (): Store => ({
   address: "目黒駅・不動前駅あたりで引き取り",
-  capacity: Object.fromEntries(PICKUP_DAYS.map((d) => [d, 20])),
   items: [
     { id: "i1", name: "IKEA desk", price: 3000, photos: ["https://picsum.photos/seed/desk/600/400"] },
     { id: "i2", name: "Office chair", price: 2000, note: "slight wear" },
@@ -76,6 +75,7 @@ export function withStore<T>(fn: (s: Store) => T | Promise<T>): Promise<T> {
 }
 
 function scrub(s: Store) {
+  delete (s as { capacity?: unknown }).capacity;
   for (const it of s.items) delete (it as { availableAfter?: string }).availableAfter;
   return s;
 }
