@@ -187,8 +187,11 @@ export default function BuyerPage() {
       </header>
       <div className="meta">{state?.address || "…"}</div>
       {err && <div className="err">{err}</div>}
-      <div className="grid">
-        {(state?.items || []).map((item) => {
+      {(() => {
+        const all = state?.items || [];
+        const withPh = all.filter((i) => (i.photos || []).length > 0);
+        const noPh = all.filter((i) => !(i.photos || []).length);
+        const tile = (item: Item) => {
           const ok = available.has(item.id);
           const on = picked.has(item.id);
           const ph = item.photos || [];
@@ -199,8 +202,14 @@ export default function BuyerPage() {
               {ph.length > 0 && <span className="thumbs">{ph.slice(0, 2).map((src) => <img key={src} src={src} alt="" />)}</span>}
             </button>
           );
-        })}
-      </div>
+        };
+        return (
+          <>
+            {withPh.length > 0 && <div className="grid">{withPh.map(tile)}</div>}
+            {noPh.length > 0 && <div className="grid">{noPh.map(tile)}</div>}
+          </>
+        );
+      })()}
       {!state && <p style={{ padding: 12 }}>読み込み中…</p>}
       {open && (
         <div className="mask" role="dialog" aria-modal="true" aria-label={open.name} onClick={() => setOpen(null)}>
