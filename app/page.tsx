@@ -207,10 +207,7 @@ export default function BuyerPage() {
                   <button key={item.id} type="button" aria-label={item.name} onClick={() => setOpen(item)}
                     className={cls(item, " has-photo")}>
                     <img className="hero" src={(item.photos || [])[0]} alt="" />
-                    <span className="chips">
-                      <span className="chip price">{money(item.price)}</span>
-                      <span className="chip name">{item.name}</span>
-                    </span>
+                    <span className="chip price">{money(item.price)}</span>
                   </button>
                 ))}
               </div>
