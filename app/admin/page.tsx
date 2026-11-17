@@ -87,23 +87,15 @@ export default function AdminPage() {
       </section>
       <section style={S.sec}><div style={S.t}>Items</div>
         <ul style={S.list}>
-          {(data?.items || []).map((item) => (
+          {(data?.items || []).map((item) => {
+            const photos = item.photos || [];
+            return (
             <li key={item.id} style={{ ...S.item, flexWrap: "wrap", alignItems: "flex-start" }}>
               <div style={{ display: "flex", gap: 6, width: "100%", alignItems: "center" }}>
                 <input defaultValue={item.name} onBlur={(e) => e.target.value !== item.name && act({ action: "edit", id: item.id, name: e.target.value })} style={{ flex: 1, padding: 4, minWidth: 0 }} />
                 <input defaultValue={item.price ?? ""} placeholder="Free" onBlur={(e) => act({ action: "edit", id: item.id, price: e.target.value })} style={{ width: 64, padding: 4 }} />
-                <button type="button" onClick={() => act({ action: "remove", id: item.id })}>✕</button>
-              </div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", width: "100%", alignItems: "center", marginTop: 4 }}>
-                {(item.photos || []).map((src) => (
-                  <span key={src} style={{ position: "relative", display: "inline-block" }}>
-                    <img src={src} alt="" style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 4, display: "block", background: "#eee" }} />
-                    <button type="button" title="Remove photo" onClick={() => removePhoto(item, src)}
-                      style={{ position: "absolute", top: -4, right: -4, width: 18, height: 18, borderRadius: 9, border: 0, background: "#111", color: "#fff", fontSize: 11, lineHeight: "18px", padding: 0 }}>×</button>
-                  </span>
-                ))}
-                <label style={{ fontSize: 12, padding: "6px 8px", border: "1px dashed #bbb", borderRadius: 4, cursor: uploading === item.id ? "wait" : "pointer", opacity: uploading === item.id ? 0.6 : 1 }}>
-                  {uploading === item.id ? "Uploading…" : "+ Photo"}
+                <label style={{ flex: "0 0 auto", fontSize: 12, padding: "4px 6px", border: "1px dashed #bbb", borderRadius: 4, cursor: uploading === item.id ? "wait" : "pointer", opacity: uploading === item.id ? 0.6 : 1, whiteSpace: "nowrap" }}>
+                  {uploading === item.id ? "…" : "+Photo"}
                   <input type="file" accept="image/*" hidden disabled={uploading === item.id}
                     onChange={(e) => {
                       const f = e.target.files?.[0];
@@ -111,9 +103,22 @@ export default function AdminPage() {
                       if (f) uploadPhoto(item.id, f);
                     }} />
                 </label>
+                <button type="button" onClick={() => act({ action: "remove", id: item.id })}>✕</button>
               </div>
+              {photos.length > 0 && (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", width: "100%", alignItems: "center", marginTop: 4 }}>
+                  {photos.map((src) => (
+                    <span key={src} style={{ position: "relative", display: "inline-block" }}>
+                      <img src={src} alt="" style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 4, display: "block", background: "#eee" }} />
+                      <button type="button" title="Remove photo" onClick={() => removePhoto(item, src)}
+                        style={{ position: "absolute", top: -4, right: -4, width: 18, height: 18, borderRadius: 9, border: 0, background: "#111", color: "#fff", fontSize: 11, lineHeight: "18px", padding: 0 }}>×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </li>
-          ))}
+            );
+          })}
         </ul>
       </section>
       <section style={S.sec}><div style={S.t}>Capacity</div>
