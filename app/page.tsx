@@ -30,7 +30,7 @@ function LineBlock({ url }: { url: string }) {
   return (
     <div className="linebox">
       <p className="linesub">リンクを開くか、QRコードを読み取って追加してください。</p>
-      <a className="linelink" href={url} target="_blank" rel="noopener noreferrer">line invite link</a>
+      <a className="linelink" href={url} target="_blank" rel="noopener noreferrer">LINE招待リンク</a>
       <img className="lineqr" src="/line-qr.jpg" alt="LINE QR" />
     </div>
   );
