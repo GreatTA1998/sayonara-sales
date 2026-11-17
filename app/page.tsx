@@ -191,22 +191,37 @@ export default function BuyerPage() {
         const all = state?.items || [];
         const withPh = all.filter((i) => (i.photos || []).length > 0);
         const noPh = all.filter((i) => !(i.photos || []).length);
-        const tile = (item: Item) => {
+        const cls = (item: Item, extra = "") => {
           const ok = available.has(item.id);
           const on = picked.has(item.id);
-          const ph = item.photos || [];
-          return (
-            <button key={item.id} type="button" aria-label={item.name} onClick={() => setOpen(item)}
-              className={`cell${ph.length ? " has-photo" : ""}${on ? " on" : ""}${ok ? "" : " dim"}`}>
-              <span className="cap"><span className="price">{money(item.price)}</span><span className="name">{item.name}</span></span>
-              {ph.length > 0 && <span className="thumbs">{ph.slice(0, 2).map((src) => <img key={src} src={src} alt="" />)}</span>}
-            </button>
-          );
+          return `cell${extra}${on ? " on" : ""}${ok ? "" : " dim"}`;
         };
         return (
           <>
-            {withPh.length > 0 && <div className="grid">{withPh.map(tile)}</div>}
-            {noPh.length > 0 && <div className="grid">{noPh.map(tile)}</div>}
+            {withPh.length > 0 && (
+              <div className="grid">
+                {withPh.map((item) => (
+                  <button key={item.id} type="button" aria-label={item.name} onClick={() => setOpen(item)}
+                    className={cls(item, " has-photo")}>
+                    <img className="hero" src={(item.photos || [])[0]} alt="" />
+                    <span className="chips">
+                      <span className="chip price">{money(item.price)}</span>
+                      <span className="chip name">{item.name}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {noPh.length > 0 && (
+              <div className="grid">
+                {noPh.map((item) => (
+                  <button key={item.id} type="button" aria-label={item.name} onClick={() => setOpen(item)}
+                    className={cls(item)}>
+                    <span className="cap"><span className="price">{money(item.price)}</span><span className="name">{item.name}</span></span>
+                  </button>
+                ))}
+              </div>
+            )}
           </>
         );
       })()}
