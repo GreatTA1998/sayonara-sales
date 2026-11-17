@@ -12,8 +12,6 @@ export async function POST(req: Request) {
   const itemIds: string[] = Array.isArray(body.itemIds) ? body.itemIds.map(String) : [];
   if (!PICKUP_DAYS.includes(day) || !PICKUP_SLOTS.includes(slot) || !itemIds.length || !contactMethod)
     return NextResponse.json({ error: "日付・時間・連絡方法・品目を確認してください" }, { status: 400 });
-  if (contactMethod === "phone" && !contact)
-    return NextResponse.json({ error: "電話番号を入力してください" }, { status: 400 });
   try {
     const result = await withStore((s) => {
       if (takenSlots(s, day).includes(slot)) throw new Error("その時間帯は埋まっています");
@@ -25,7 +23,8 @@ export async function POST(req: Request) {
       }
       const claim = {
         id: uid("c"), code: shortCode(), day, slot, itemIds: [...itemIds],
-        contactMethod, contact: contactMethod === "line" ? "LINE" : contact,
+        contactMethod,
+        contact: contactMethod === "line" ? "LINE" : (contact || "080-4919-2027"),
         status: "booked" as const, createdAt: new Date().toISOString(),
       };
       for (const id of itemIds) s.items.find((i) => i.id === id)!.claimId = claim.id;

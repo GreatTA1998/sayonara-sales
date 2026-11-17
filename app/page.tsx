@@ -7,6 +7,8 @@ type Receipt = { code: string; day: string; slot: string; address: string; items
 type Method = "line" | "phone";
 
 const LINE_FALLBACK = "https://line.me/ti/p/yBg2x2X_ut";
+const PHONE_DISPLAY = "080-4919-2027";
+const PHONE_TEL = "tel:+818049192027";
 const money = (p: number | null) => (p == null ? "無料" : `¥${p.toLocaleString()}`);
 const WK = "月火水木金土日";
 const youbi = (d: string) => {
@@ -34,6 +36,15 @@ function LineBlock({ url }: { url: string }) {
   );
 }
 
+function PhoneBlock() {
+  return (
+    <div className="linebox">
+      <a className="linelink" href={PHONE_TEL}>{PHONE_DISPLAY}</a>
+      <p className="hint">Eltonの電話番号です。タップで発信できます。</p>
+    </div>
+  );
+}
+
 export default function BuyerPage() {
   const [state, setState] = useState<State | null>(null);
   const [day, setDay] = useState("2026-11-01");
@@ -42,7 +53,6 @@ export default function BuyerPage() {
   const [checkout, setCheckout] = useState(false);
   const [slot, setSlot] = useState<string | null>(null);
   const [method, setMethod] = useState<Method | null>(null);
-  const [contact, setContact] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
@@ -72,20 +82,19 @@ export default function BuyerPage() {
 
   async function book() {
     if (!picked.size || !slot || !method || busy) return;
-    if (method === "phone" && !contact.trim()) { setErr("電話番号を入力してください"); return; }
     setBusy(true); setErr(null);
     try {
       const res = await fetch("/api/book", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           day, slot, itemIds: [...picked], contactMethod: method,
-          contact: method === "phone" ? contact.trim() : "LINE",
+          contact: method === "phone" ? PHONE_DISPLAY : "LINE",
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "失敗しました");
       setCheckout(false); setOpen(null); setReceipt({ ...data, contactMethod: method });
-      setPicked(new Set()); setSlot(null); setContact(""); setMethod(null); await load();
+      setPicked(new Set()); setSlot(null); setMethod(null); await load();
     } catch (e) { setErr(e instanceof Error ? e.message : "失敗しました"); await load(); }
     finally { setBusy(false); }
   }
@@ -106,7 +115,7 @@ export default function BuyerPage() {
         {viaLine ? (
           <section className="field"><span>連絡：LINE</span><LineBlock url={lineUrl} /></section>
         ) : (
-          <p>連絡先（電話）: {receipt.contact}</p>
+          <section className="field"><span>連絡：電話</span><PhoneBlock /></section>
         )}
         <button type="button" className="dark" onClick={() => setReceipt(null)}>一覧に戻る</button>
       </main>
@@ -115,7 +124,7 @@ export default function BuyerPage() {
 
   if (checkout) {
     const names = (state?.items || []).filter((i) => picked.has(i.id));
-    const canSend = !!slot && !!method && picked.size > 0 && (method === "line" || !!contact.trim());
+    const canSend = !!slot && !!method && picked.size > 0;
     return (
       <main className="wrap checkout">
         <button type="button" className="back" onClick={() => { setCheckout(false); setErr(null); }}>← 戻る</button>
@@ -150,13 +159,7 @@ export default function BuyerPage() {
             <button type="button" className={method === "phone" ? "slot on" : "slot"} onClick={() => setMethod("phone")}>電話</button>
           </div>
           {method === "line" && <LineBlock url={lineUrl} />}
-          {method === "phone" && (
-            <label className="field" style={{ marginTop: 8 }}>
-              <span>電話番号</span>
-              <input className="cin" value={contact} onChange={(e) => setContact(e.target.value)}
-                placeholder="電話番号を推奨" autoComplete="tel" inputMode="tel" />
-            </label>
-          )}
+          {method === "phone" && <PhoneBlock />}
         </div>
         {err && <div className="err">{err}</div>}
         <button type="button" className="cta" disabled={busy || !canSend} onClick={book}
