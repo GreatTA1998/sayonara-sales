@@ -80,7 +80,8 @@ function scrub(s: Store) {
   return s;
 }
 export async function getStore(): Promise<Store> {
-  if (useBlob() || !mem) mem = scrub(await readRaw());
+  // Prefer in-memory store after writes so admin photo edits show without a reload race.
+  if (!mem) mem = scrub(await readRaw());
   return structuredClone(mem!);
 }
 

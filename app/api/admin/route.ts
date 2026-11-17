@@ -1,20 +1,16 @@
 import { NextResponse } from "next/server";
-import { checkAdmin } from "@/lib/auth";
 import { PICKUP_DAYS, getStore, uid, withStore } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
-const unauth = () => NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 const numOrNull = (v: unknown) =>
   v === "" || v == null || Number.isNaN(Number(v)) ? null : Number(v);
 
-export async function GET(req: Request) {
-  if (!checkAdmin(req.headers.get("x-admin-password"))) return unauth();
+export async function GET() {
   return NextResponse.json({ ...(await getStore()), days: PICKUP_DAYS });
 }
 
 export async function POST(req: Request) {
   const body = await req.json();
-  if (!checkAdmin(body.password)) return unauth();
   try {
     const result = await withStore((s) => {
       switch (body.action as string) {

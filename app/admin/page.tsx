@@ -1,13 +1,14 @@
 "use client";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Snack, useSnack } from "./snack";
 
 type Item = { id: string; name: string; price: number | null; claimId?: string | null; photos?: string[]; note?: string };
 type Claim = { id: string; code: string; day: string; slot?: string; contact?: string; contactMethod?: string; itemIds: string[]; status: string };
 type AdminState = { address: string; capacity: Record<string, number>; items: Item[]; claims: Claim[]; days: string[] };
 
+const byPriceDesc = (a: Item, b: Item) => (b.price ?? -1) - (a.price ?? -1);
+
 export default function AdminPage() {
-  const [password, setPassword] = useState("");
-  const [authed, setAuthed] = useState(false);
   const [data, setData] = useState<AdminState | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -16,41 +17,54 @@ export default function AdminPage() {
   const [uploading, setUploading] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const { snack, show } = useSnack();
 
-  const load = useCallback(async (pw = password) => {
-    const res = await fetch("/api/admin", { headers: { "x-admin-password": pw }, cache: "no-store" });
-    if (!res.ok) { setAuthed(false); setErr("Bad password"); return; }
-    setAuthed(true); setErr(null); setData(await res.json());
-  }, [password]);
+  const load = useCallback(async () => {
+    const res = await fetch("/api/admin", { cache: "no-store" });
+    if (!res.ok) { setErr("Failed to load"); return; }
+    setErr(null); setData(await res.json());
+  }, []);
 
-  async function act(payload: Record<string, unknown>) {
+  useEffect(() => { load(); }, [load]);
+
+  const items = useMemo(
+    () => [...(data?.items || [])].sort(byPriceDesc),
+    [data?.items],
+  );
+
+  function setItemPhotos(id: string, photos: string[]) {
+    setData((d) => d && {
+      ...d,
+      items: d.items.map((i) => (i.id === id ? { ...i, photos } : i)),
+    });
+  }
+
+  async function act(payload: Record<string, unknown>, refresh = true) {
     setErr(null);
     const res = await fetch("/api/admin", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password, ...payload }),
+      body: JSON.stringify(payload),
     });
     const body = await res.json();
-    if (!res.ok) { setErr(body.error || "Failed"); return false; }
-    await load();
-    return true;
+    if (!res.ok) { setErr(body.error || "Failed"); return null; }
+    if (refresh) await load();
+    return body;
   }
 
   async function uploadPhoto(itemId: string, file: File) {
-    setUploading(itemId); setErr(null);
+    setUploading(itemId); setErr(null); show("Uploading…", "busy");
     try {
       const fd = new FormData();
       fd.set("file", file);
       fd.set("itemId", itemId);
-      const res = await fetch("/api/admin/upload", {
-        method: "POST",
-        headers: { "x-admin-password": password },
-        body: fd,
-      });
+      const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || "Upload failed");
-      await load();
+      setItemPhotos(itemId, Array.isArray(body.photos) ? body.photos.map(String) : []);
+      show("Photo uploaded", "ok");
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Upload failed");
+      const msg = e instanceof Error ? e.message : "Upload failed";
+      setErr(msg); show(msg, "err");
     } finally {
       setUploading(null);
     }
@@ -58,32 +72,32 @@ export default function AdminPage() {
 
   async function deleteItem(item: Item) {
     if (!confirm(`Delete "${item.name || "item"}"?`)) return;
-    setMenuFor(null); setDeleting(item.id);
-    try { await act({ action: "remove", id: item.id }); }
-    finally { setDeleting(null); }
+    setMenuFor(null); setDeleting(item.id); show("Deleting…", "busy");
+    try {
+      const ok = await act({ action: "remove", id: item.id }, false);
+      if (ok) {
+        setData((d) => d && { ...d, items: d.items.filter((i) => i.id !== item.id) });
+        show("Item deleted", "ok");
+      } else show("Delete failed", "err");
+    } finally { setDeleting(null); }
   }
 
   async function deletePhoto(item: Item, url: string, n: number) {
     if (!confirm(`Remove photo ${n} from "${item.name || "item"}"?`)) return;
-    setMenuFor(null); setDeleting(item.id);
+    const photos = (item.photos || []).filter((p) => p !== url);
+    setMenuFor(null); setDeleting(item.id); show("Deleting…", "busy");
     try {
-      await act({ action: "edit", id: item.id, photos: (item.photos || []).filter((p) => p !== url) });
+      const ok = await act({ action: "edit", id: item.id, photos }, false);
+      if (ok) { setItemPhotos(item.id, photos); show("Photo removed", "ok"); }
+      else show("Delete failed", "err");
     } finally { setDeleting(null); }
   }
-
-  if (!authed) return (
-    <main style={S.wrap}>
-      <h1 style={S.h}>Admin</h1>
-      <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} style={S.full} />
-      <button type="button" onClick={() => load()} style={S.enter}>Enter</button>
-      {err && <p style={S.err}>{err}</p>}
-    </main>
-  );
 
   return (
     <main style={S.wrap} onClick={() => menuFor && setMenuFor(null)}>
       <h1 style={S.h}>Admin</h1>
       {err && <p style={S.err}>{err}</p>}
+      {!data && !err && <p style={{ color: "#555" }}>Loading…</p>}
       <section style={S.sec}><div style={S.t}>Address</div>
         <div style={S.row}>
           <input value={data?.address || ""} onChange={(e) => setData((d) => d && { ...d, address: e.target.value })} style={{ flex: 1, padding: 8 }} />
@@ -100,7 +114,7 @@ export default function AdminPage() {
       </section>
       <section style={S.sec}><div style={S.t}>Items</div>
         <ul style={S.list}>
-          {(data?.items || []).map((item) => {
+          {items.map((item) => {
             const photos = item.photos || [];
             const busy = deleting === item.id;
             return (
@@ -139,7 +153,6 @@ export default function AdminPage() {
                   )}
                 </div>
               </div>
-              {busy && <div style={{ width: "100%", fontSize: 12, color: "#555", marginTop: 2 }}>Deleting…</div>}
               {photos.length > 0 && (
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", width: "100%", alignItems: "center", marginTop: 4 }}>
                   {photos.map((src) => (
@@ -179,14 +192,14 @@ export default function AdminPage() {
           {!data?.claims?.length && <li style={{ color: "#777" }}>No claims yet</li>}
         </ul>
       </section>
+      <Snack snack={snack} />
     </main>
   );
 }
 
 const S: Record<string, React.CSSProperties> = {
   wrap: { padding: 12, maxWidth: 560, margin: "0 auto" }, h: { fontSize: 18, margin: "0 0 8px" },
-  err: { color: "#b00020", margin: "0 0 8px" }, full: { width: "100%", padding: 10, marginBottom: 8 },
-  enter: { width: "100%", padding: 10, background: "#111", color: "#fff", border: 0, borderRadius: 6 },
+  err: { color: "#b00020", margin: "0 0 8px" },
   row: { display: "flex", gap: 6 }, list: { listStyle: "none", margin: 0, padding: 0 },
   item: { display: "flex", gap: 6, alignItems: "center", padding: "6px 0", borderBottom: "1px solid #eee", fontSize: 13 },
   sec: { marginBottom: 16 }, t: { fontWeight: 600, marginBottom: 6 },

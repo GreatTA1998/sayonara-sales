@@ -4,8 +4,8 @@ Phone-first move-out sale: buyer claims at `/`, admin at `/admin`.
 
 ## Env
 
-- `ADMIN_PASSWORD` — server-checked admin password (default local/preview: `admin`)
 - `BLOB_READ_WRITE_TOKEN` — set automatically when a Vercel Blob store is linked (production persistence)
+- `LINE_INVITE_URL` — optional LINE invite override for checkout
 
 ## Dev
 
