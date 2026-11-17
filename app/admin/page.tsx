@@ -32,14 +32,30 @@ export default function AdminPage() {
     [data?.items],
   );
 
-  function setItemPhotos(id: string, photos: string[]) {
-    setData((d) => d && {
-      ...d,
-      items: d.items.map((i) => (i.id === id ? { ...i, photos } : i)),
+  /** Apply mutation result locally — never wait on a Blob re-read. */
+  function apply(action: string, payload: Record<string, unknown>, body: Record<string, unknown>) {
+    setData((d) => {
+      if (!d) return d;
+      if (action === "add") return { ...d, items: [...d.items, body as unknown as Item] };
+      if (action === "edit") {
+        const next = body as unknown as Item;
+        return { ...d, items: d.items.map((i) => (i.id === next.id ? { ...i, ...next } : i)) };
+      }
+      if (action === "remove") return { ...d, items: d.items.filter((i) => i.id !== payload.id) };
+      if (action === "address") return { ...d, address: String(body.address ?? d.address) };
+      if (action === "capacity" && body.capacity) return { ...d, capacity: body.capacity as AdminState["capacity"] };
+      if (action === "cancel" || action === "picked_up") {
+        const next = body as unknown as Claim;
+        const items = action === "cancel"
+          ? d.items.map((i) => (i.claimId === next.id ? { ...i, claimId: null } : i))
+          : d.items;
+        return { ...d, items, claims: d.claims.map((c) => (c.id === next.id ? { ...c, ...next } : c)) };
+      }
+      return d;
     });
   }
 
-  async function act(payload: Record<string, unknown>, refresh = true) {
+  async function act(payload: Record<string, unknown>) {
     setErr(null);
     const res = await fetch("/api/admin", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -47,7 +63,7 @@ export default function AdminPage() {
     });
     const body = await res.json();
     if (!res.ok) { setErr(body.error || "Failed"); return null; }
-    if (refresh) await load();
+    apply(String(payload.action), payload, body);
     return body;
   }
 
@@ -60,7 +76,11 @@ export default function AdminPage() {
       const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || "Upload failed");
-      setItemPhotos(itemId, Array.isArray(body.photos) ? body.photos.map(String) : []);
+      const photos = Array.isArray(body.photos) ? body.photos.map(String) : [];
+      setData((d) => d && {
+        ...d,
+        items: d.items.map((i) => (i.id === itemId ? { ...i, photos } : i)),
+      });
       show("Photo uploaded", "ok");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Upload failed";
@@ -74,11 +94,8 @@ export default function AdminPage() {
     if (!confirm(`Delete "${item.name || "item"}"?`)) return;
     setMenuFor(null); setDeleting(item.id); show("Deleting…", "busy");
     try {
-      const ok = await act({ action: "remove", id: item.id }, false);
-      if (ok) {
-        setData((d) => d && { ...d, items: d.items.filter((i) => i.id !== item.id) });
-        show("Item deleted", "ok");
-      } else show("Delete failed", "err");
+      const ok = await act({ action: "remove", id: item.id });
+      show(ok ? "Item deleted" : "Delete failed", ok ? "ok" : "err");
     } finally { setDeleting(null); }
   }
 
@@ -87,9 +104,8 @@ export default function AdminPage() {
     const photos = (item.photos || []).filter((p) => p !== url);
     setMenuFor(null); setDeleting(item.id); show("Deleting…", "busy");
     try {
-      const ok = await act({ action: "edit", id: item.id, photos }, false);
-      if (ok) { setItemPhotos(item.id, photos); show("Photo removed", "ok"); }
-      else show("Delete failed", "err");
+      const ok = await act({ action: "edit", id: item.id, photos });
+      show(ok ? "Photo removed" : "Delete failed", ok ? "ok" : "err");
     } finally { setDeleting(null); }
   }
 
@@ -109,7 +125,11 @@ export default function AdminPage() {
           <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} style={{ flex: "1 1 120px", padding: 8 }} />
           <input placeholder="Price (blank=Free)" value={price} onChange={(e) => setPrice(e.target.value)} style={{ width: 120, padding: 8 }} />
           <input placeholder="Note" value={note} onChange={(e) => setNote(e.target.value)} style={{ flex: "1 1 100px", padding: 8 }} />
-          <button type="button" onClick={async () => { await act({ action: "add", name, price, note }); setName(""); setPrice(""); setNote(""); }}>Add</button>
+          <button type="button" onClick={async () => {
+            const ok = await act({ action: "add", name, price, note });
+            if (ok) { setName(""); setPrice(""); setNote(""); show("Item added", "ok"); }
+            else show("Add failed", "err");
+          }}>Add</button>
         </div>
       </section>
       <section style={S.sec}><div style={S.t}>Items</div>
@@ -120,8 +140,12 @@ export default function AdminPage() {
             return (
             <li key={item.id} style={{ ...S.item, flexWrap: "wrap", alignItems: "flex-start", opacity: busy ? 0.55 : 1 }}>
               <div style={{ display: "flex", gap: 6, width: "100%", alignItems: "center" }}>
-                <input defaultValue={item.name} disabled={busy} onBlur={(e) => e.target.value !== item.name && act({ action: "edit", id: item.id, name: e.target.value })} style={{ flex: 1, padding: 4, minWidth: 0 }} />
-                <input defaultValue={item.price ?? ""} placeholder="Free" disabled={busy} onBlur={(e) => act({ action: "edit", id: item.id, price: e.target.value })} style={{ width: 64, padding: 4 }} />
+                <input key={`n-${item.id}-${item.name}`} defaultValue={item.name} disabled={busy}
+                  onBlur={(e) => e.target.value !== item.name && act({ action: "edit", id: item.id, name: e.target.value })}
+                  style={{ flex: 1, padding: 4, minWidth: 0 }} />
+                <input key={`p-${item.id}-${item.price ?? ""}`} defaultValue={item.price ?? ""} placeholder="Free" disabled={busy}
+                  onBlur={(e) => act({ action: "edit", id: item.id, price: e.target.value })}
+                  style={{ width: 64, padding: 4 }} />
                 <label style={{ flex: "0 0 auto", fontSize: 12, padding: "4px 6px", border: "1px dashed #bbb", borderRadius: 4, cursor: uploading === item.id || busy ? "wait" : "pointer", opacity: uploading === item.id || busy ? 0.6 : 1, whiteSpace: "nowrap" }}>
                   {uploading === item.id ? "…" : "+Photo"}
                   <input type="file" accept="image/*" hidden disabled={uploading === item.id || busy}
