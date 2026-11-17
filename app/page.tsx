@@ -176,17 +176,13 @@ export default function BuyerPage() {
   return (
     <main className="buy">
       <header className="bar">
+        <span className="area">{(state?.address || "").trim() || "エリア"}</span>
         <select className="day" value={day} onChange={(e) => { setDay(e.target.value); setPicked(new Set()); }}>
           {(state?.days || []).map((d) => <option key={d} value={d}>{dayLbl(d)}</option>)}
         </select>
-        <button type="button" className="req" disabled={!picked.size}
-          onClick={() => { setSlot(null); setMethod("line"); setErr(null); setCheckout(true); }}
-          style={{ background: picked.size ? "#ff9900" : "#ccc" }}>
-          {(() => {
-            const area = (state?.address || "").trim() || "引き取り";
-            const stem = /を?依頼$/.test(area) ? area : /引き取り/.test(area) ? `${area}を依頼` : `${area}で引き取りを依頼`;
-            return `${stem}${picked.size ? ` (${picked.size})` : ""}`;
-          })()}
+        <button type="button" className="req"
+          onClick={() => { setSlot(null); setMethod("line"); setErr(null); setCheckout(true); }}>
+          {picked.size ? `依頼 (${picked.size})` : "依頼"}
         </button>
       </header>
       {err && <div className="err">{err}</div>}
