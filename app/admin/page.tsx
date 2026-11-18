@@ -12,6 +12,12 @@ type AdminState = { address: string; items: Item[]; claims: Claim[] };
 const IMG_ACCEPT = "image/jpeg,image/png,image/heic,image/heif,image/webp,image/gif,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif";
 
 const byPriceDesc = (a: Item, b: Item) => (b.price ?? -1) - (a.price ?? -1);
+const WK = "月火水木金土日";
+const dayLbl = (d: string) => {
+  const [y, m, day] = d.split("-").map(Number);
+  const w = WK[(new Date(Date.UTC(y, m - 1, day)).getUTCDay() + 6) % 7];
+  return `${m}月${day}日（${w}）`;
+};
 const statusJa = (s: string) =>
   s === "booked" ? "予約済" : s === "picked_up" ? "受取済" : s === "cancelled" ? "キャンセル" : s;
 const methodJa = (m?: string) => (m === "phone" ? "電話" : m === "line" ? "LINE" : m || "");
@@ -232,7 +238,9 @@ export default function AdminPage() {
       <header className="bar admin-bar">
         <span className="admin-lab" aria-label="管理ページ">管理</span>
         <input className="area-in" value={addrDraft} disabled={!data}
+          size={Math.max((addrDraft || "下目黒").length + 1, 3)}
           onChange={(e) => onAddressChange(e.target.value)} aria-label="エリア" placeholder="下目黒" />
+        <span className="spacer" aria-hidden="true" />
         <IconBtn name="plus" label="品目を追加" size={22}
           disabled={!data || uploading === "batch"}
           onClick={() => setAddOpen(true)} className="solid" />
@@ -247,22 +255,34 @@ export default function AdminPage() {
       <section style={{ padding: "12px 8px 24px" }}>
         <div style={{ fontWeight: 600, marginBottom: 6 }}>予約</div>
         <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-          {(data?.claims || []).map((c) => (
-            <li key={c.id} style={{ padding: "8px 0", borderBottom: "1px solid #eee", fontSize: 13 }}>
-              <div><b>{c.code}</b> · {c.day.slice(5)}{c.slot ? ` · ${c.slot}` : ""} · {statusJa(c.status)}</div>
-              <div style={{ color: "#555" }}>
-                {c.itemIds.map((id) => data?.items.find((i) => i.id === id)?.name || id).join("、")}
-                {c.contactMethod ? ` · ${methodJa(c.contactMethod)}` : ""}
-                {c.contact && c.contact !== "LINE" ? ` · ${c.contact}` : ""}
-              </div>
-              {c.status === "booked" && (
-                <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-                  <button type="button" onClick={() => act({ action: "cancel", id: c.id }, "保存しました")}>キャンセル</button>
-                  <button type="button" onClick={() => act({ action: "picked_up", id: c.id }, "保存しました")}>受取済み</button>
+          {(data?.claims || []).map((c) => {
+            const names = c.itemIds
+              .map((id) => data?.items.find((i) => i.id === id)?.name?.trim() || "無題")
+              .join("、");
+            const contact = [
+              methodJa(c.contactMethod),
+              c.contact && c.contact !== "LINE" ? c.contact : "",
+            ].filter(Boolean).join(" · ");
+            return (
+              <li key={c.id} style={{ padding: "8px 0", borderBottom: "1px solid #eee", fontSize: 13 }}>
+                <div>
+                  <b>{dayLbl(c.day)}</b>
+                  {c.slot ? ` · ${c.slot}` : ""}
+                  {names ? ` · ${names}` : ""}
                 </div>
-              )}
-            </li>
-          ))}
+                <div style={{ color: "#888", fontSize: 12, marginTop: 2 }}>
+                  {statusJa(c.status)}
+                  {contact ? ` · ${contact}` : ""}
+                </div>
+                {c.status === "booked" && (
+                  <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                    <button type="button" onClick={() => act({ action: "cancel", id: c.id }, "保存しました")}>キャンセル</button>
+                    <button type="button" onClick={() => act({ action: "picked_up", id: c.id }, "保存しました")}>受取済み</button>
+                  </div>
+                )}
+              </li>
+            );
+          })}
           {!data?.claims?.length && <li style={{ color: "#777" }}>予約はまだありません</li>}
         </ul>
       </section>
