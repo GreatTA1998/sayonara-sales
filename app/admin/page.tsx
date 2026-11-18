@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon, IconBtn } from "@/components/icons";
-import { PhotoGrid, PhotoLayoutFooter, money, usePhotoLayout, type PhotoItem } from "@/components/photo-listing";
+import { DenseToggle, PhotoGrid, money, useDense, type PhotoItem } from "@/components/photo-listing";
 import { Snack, useSnack } from "./snack";
 
 type Item = PhotoItem & { claimId?: string | null; note?: string };
@@ -29,7 +29,7 @@ export default function AdminPage() {
   const addrDirty = useRef(false);
   const addrReq = useRef(0);
   const addInputRef = useRef<HTMLInputElement | null>(null);
-  const layout = usePhotoLayout();
+  const { dense, toggle: toggleDense } = useDense();
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin", { cache: "no-store" });
@@ -252,8 +252,11 @@ export default function AdminPage() {
   );
 
   return (
-    <main className="admin-xpad" style={S.wrap} onClick={() => menuFor && setMenuFor(null)}>
-      <h1 style={S.h}>Admin</h1>
+    <main style={S.wrap} onClick={() => menuFor && setMenuFor(null)}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
+        <h1 style={{ ...S.h, margin: 0 }}>Admin</h1>
+        <DenseToggle dense={dense} onToggle={toggleDense} />
+      </div>
       {err && <p style={S.err}>{err}</p>}
       {!data && !err && <p style={{ color: "#555" }}>Loading…</p>}
       <section style={S.sec}><div style={S.t}>Address</div>
@@ -273,7 +276,7 @@ export default function AdminPage() {
               if (list.length) void addFromPhotos(list);
             }} />
         </div>
-        <PhotoGrid items={withPh} mode={layout.mode} radius={layout.radius} cols={layout.cols}
+        <PhotoGrid items={withPh} dense={dense}
           onSelect={openDetail}
           disabledFor={(it) => deleting === it.id}
           classNameFor={(it) => (deleting === it.id ? "dim" : "")} />
@@ -385,7 +388,6 @@ export default function AdminPage() {
         );
       })()}
       <Snack snack={snack} />
-      <PhotoLayoutFooter {...layout} />
     </main>
   );
 }
