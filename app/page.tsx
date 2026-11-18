@@ -179,8 +179,8 @@ export default function BuyerPage() {
       <main className="wrap checkout">
         <button type="button" className="back" onClick={() => { setCheckout(false); setErr(null); }}>← 戻る</button>
         <h1>引き取り日程</h1>
-        <label className="field"><span>日付</span>
-          <select value={day} onChange={(e) => {
+        <div className="when">
+          <select value={day} aria-label="日付" onChange={(e) => {
             const nd = e.target.value; setDay(nd); setSlot(null);
             setPicked((p) => new Set([...p].filter((id) => {
               const it = state?.items.find((i) => i.id === id);
@@ -189,17 +189,21 @@ export default function BuyerPage() {
           }}>
             {(state?.days || []).map((d) => <option key={d} value={d}>{dayLbl(d)}</option>)}
           </select>
-        </label>
+          <div className="slots trio" role="group" aria-label="時間帯">
+            {(state?.slots || []).map((s) => {
+              const free = freeSlots.includes(s);
+              return (
+                <button key={s} type="button" disabled={!free}
+                  className={slot === s ? "slot on" : "slot"}
+                  onClick={() => free && setSlot(s)}>{s}</button>
+              );
+            })}
+          </div>
+        </div>
         {blocked.length > 0 && (
           <p className="sw">後半のみの品目があります。日付を{rangeLbl(blocked[0].availableFrom, state?.days?.[state.days.length - 1])}以降にしてください。</p>
         )}
-        <div className="field"><span>時間帯</span>
-          {freeSlots.length ? (
-            <div className="slots">{freeSlots.map((s) => (
-              <button key={s} type="button" className={slot === s ? "slot on" : "slot"} onClick={() => setSlot(s)}>{s}</button>
-            ))}</div>
-          ) : <p className="sw">この日は空きがありません。</p>}
-        </div>
+        {!freeSlots.length && <p className="sw">この日は空きがありません。</p>}
         <div className="field"><span>品目（{names.length}）</span>
           <ul className="clist">{names.map((i) => (
             <li key={i.id}>{i.name} · {money(i.price)}{i.lateOnly ? " · 後半のみ" : ""}</li>
