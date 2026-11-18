@@ -18,12 +18,12 @@ export async function POST(req: Request) {
     const result = await withStore((s) => {
       switch (body.action as string) {
         case "add": {
+          // Untitled items are allowed (photo-first create from admin +).
           const item = {
             id: uid("i"),
             name: String(body.name || "").trim(),
             price: numPrice(body.price),
           };
-          if (!item.name) throw new Error("Name required");
           s.items.push(item); return item;
         }
         case "edit": {
