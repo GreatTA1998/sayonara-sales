@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { PhotoGrid, money } from "@/components/photo-listing";
+import { PhotoGrid, PhotoLayoutFooter, money, usePhotoLayout } from "@/components/photo-listing";
 
 type Item = { id: string; name: string; price: number | null; note?: string; taken: boolean; photos?: string[]; availableFrom?: string; availableTo?: string };
 type State = { address: string; days: string[]; slots: string[]; taken: Record<string, string[]>; lineInviteUrl?: string | null; items: Item[] };
@@ -56,6 +56,7 @@ export default function BuyerPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const layout = usePhotoLayout();
 
   const lineUrl = state?.lineInviteUrl || LINE_FALLBACK;
 
@@ -174,7 +175,7 @@ export default function BuyerPage() {
   const openRange = open ? rangeLbl(open.availableFrom, open.availableTo) : "";
 
   return (
-    <main className="buy">
+    <main className="buy xpad">
       <header className="bar">
         <span className="area">{(state?.address || "").trim() || "エリア"}</span>
         <select className="day" value={day} onChange={(e) => { setDay(e.target.value); setPicked(new Set()); }}>
@@ -193,7 +194,8 @@ export default function BuyerPage() {
         const cellCls = (item: Item) => `${picked.has(item.id) ? "on" : ""}${available.has(item.id) ? "" : " dim"}`.trim();
         return (
           <>
-            <PhotoGrid items={withPh} onSelect={setOpen} classNameFor={cellCls} />
+            <PhotoGrid items={withPh} mode={layout.mode} radius={layout.radius}
+              onSelect={setOpen} classNameFor={cellCls} />
             {noPh.length > 0 && (
               <div className="grid">
                 {noPh.map((item) => (
@@ -223,6 +225,7 @@ export default function BuyerPage() {
           </div>
         </div>
       )}
+      <PhotoLayoutFooter {...layout} />
     </main>
   );
 }

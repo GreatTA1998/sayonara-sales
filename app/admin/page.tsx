@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon, IconBtn } from "@/components/icons";
-import { PhotoGrid, money, type PhotoItem } from "@/components/photo-listing";
+import { PhotoGrid, PhotoLayoutFooter, money, usePhotoLayout, type PhotoItem } from "@/components/photo-listing";
 import { Snack, useSnack } from "./snack";
 
 type Item = PhotoItem & { claimId?: string | null; note?: string };
@@ -29,6 +29,7 @@ export default function AdminPage() {
   const addrDirty = useRef(false);
   const addrReq = useRef(0);
   const addInputRef = useRef<HTMLInputElement | null>(null);
+  const layout = usePhotoLayout();
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin", { cache: "no-store" });
@@ -251,7 +252,7 @@ export default function AdminPage() {
   );
 
   return (
-    <main style={S.wrap} onClick={() => menuFor && setMenuFor(null)}>
+    <main className="admin-xpad" style={S.wrap} onClick={() => menuFor && setMenuFor(null)}>
       <h1 style={S.h}>Admin</h1>
       {err && <p style={S.err}>{err}</p>}
       {!data && !err && <p style={{ color: "#555" }}>Loading…</p>}
@@ -272,7 +273,8 @@ export default function AdminPage() {
               if (list.length) void addFromPhotos(list);
             }} />
         </div>
-        <PhotoGrid items={withPh} onSelect={openDetail}
+        <PhotoGrid items={withPh} mode={layout.mode} radius={layout.radius}
+          onSelect={openDetail}
           disabledFor={(it) => deleting === it.id}
           classNameFor={(it) => (deleting === it.id ? "dim" : "")} />
         <ul style={S.list}>
@@ -383,6 +385,7 @@ export default function AdminPage() {
         );
       })()}
       <Snack snack={snack} />
+      <PhotoLayoutFooter {...layout} />
     </main>
   );
 }
