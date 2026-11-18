@@ -1,13 +1,6 @@
-/* Shared photo listings — B card (default) + Dense */
+/* Shared photo listings — B card @ 16px */
 .xgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:0 6px 8px;align-items:stretch}
-.xgrid.dense{grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:2px;padding:0 2px 8px}
-.xtile{position:relative;display:block;width:100%;padding:0;border:0;overflow:hidden;background:#111;border-radius:0;aspect-ratio:1/1;cursor:pointer;font:inherit;color:inherit;text-align:left}
-.xtile img{display:block;width:100%;height:100%;object-fit:cover}
 .xmore{position:absolute;right:5px;bottom:5px;z-index:1;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;background:rgba(0,0,0,.42);color:#fff;pointer-events:none}
-.xgrid.dense .xmore{right:3px;bottom:3px;width:16px;height:16px;border-radius:3px}
-.xgrid.dense .xmore svg{width:10px;height:10px}
-.xtile.on{outline:2px solid #ff9900;outline-offset:-2px}
-.xtile.dim{opacity:.5}
 .xcard{display:flex;flex-direction:column;height:100%;padding:0;border:1px solid #e5e5e5;border-radius:16px;background:#fff;overflow:hidden;cursor:pointer;font:inherit;color:inherit;text-align:left}
 .xcard.on{border-color:#ff9900;background:#fff8ee}
 .xcard.dim{opacity:.5}
@@ -24,8 +17,6 @@
 .xtxt .xprice{font-size:12px;font-variant-numeric:tabular-nums;color:#333}
 .xtxt .xname{font-size:13px;font-weight:700;line-height:1.25;word-break:break-word;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .xtxt .xname.empty{font-weight:500;color:#999}
-.dense-tog{flex:0 0 auto;height:28px;padding:0 10px;border:1px solid #ccc;border-radius:6px;background:#fff;font-size:12px;font-weight:700;cursor:pointer;color:#333}
-.dense-tog.on{background:#111;color:#fff;border-color:#111}
-.bar .dense-tog{height:36px}
 .admin-bar .area-in{flex:1;min-width:0;height:36px;padding:0 8px;border:1px solid #ccc;border-radius:6px;font:inherit}
-@media(max-width:420px){.xgrid:not(.dense):not(.text){grid-template-columns:repeat(2,minmax(0,1fr))}}
+.admin-bar .admin-lab{flex:0 0 auto;font-size:13px;font-weight:800;letter-spacing:.02em;color:#111;padding:0 4px;white-space:nowrap}
+@media(max-width:420px){.xgrid:not(.text){grid-template-columns:repeat(2,minmax(0,1fr))}}

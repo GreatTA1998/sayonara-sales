@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon, IconBtn } from "@/components/icons";
-import { DenseToggle, Listings, useDense, type PhotoItem } from "@/components/photo-listing";
+import { Listings, type PhotoItem } from "@/components/photo-listing";
 import { Snack, useSnack } from "./snack";
 
 type Item = PhotoItem & { claimId?: string | null; note?: string };
@@ -28,8 +28,6 @@ export default function AdminPage() {
   const addrDirty = useRef(false);
   const addrReq = useRef(0);
   const addInputRef = useRef<HTMLInputElement | null>(null);
-  const { dense, toggle: toggleDense } = useDense();
-
   const load = useCallback(async () => {
     const res = await fetch("/api/admin", { cache: "no-store" });
     if (!res.ok) { setErr("Failed to load"); show("Failed to load", "err"); return; }
@@ -225,9 +223,9 @@ export default function AdminPage() {
   return (
     <main className="buy">
       <header className="bar admin-bar">
+        <span className="admin-lab" aria-label="Admin page">Admin</span>
         <input className="area-in" value={addrDraft} disabled={!data}
           onChange={(e) => onAddressChange(e.target.value)} aria-label="Address" placeholder="Address" />
-        <DenseToggle dense={dense} onToggle={toggleDense} />
         <IconBtn name="stackPlus" label="Add photos as items" size={22}
           disabled={!data || uploading === "batch"}
           onClick={() => setAddOpen(true)} className="solid" />
@@ -238,9 +236,10 @@ export default function AdminPage() {
             if (list.length) void addFromPhotos(list);
           }} />
       </header>
+      <p style={{ margin: "6px 8px 4px", fontSize: 12, color: "#666" }}>Admin page — tap a listing to edit</p>
       {err && <div className="err">{err}</div>}
       {!data && !err && <p style={{ padding: 12, color: "#555" }}>Loading…</p>}
-      <Listings items={items} dense={dense} onSelect={openDetail}
+      <Listings items={items} onSelect={openDetail}
         disabledFor={(it) => deleting === it.id}
         classNameFor={(it) => (deleting === it.id ? "dim" : "")} />
       {!items.length && data && <p style={{ padding: 12, color: "#777" }}>No items yet</p>}
