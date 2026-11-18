@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { dayLbl, pickupSpan, rangeLbl } from "@/lib/days";
+import { SHOP_NAME } from "@/lib/sale";
 import { Listings, money } from "@/components/photo-listing";
 
 type Item = {
@@ -9,19 +10,17 @@ type Item = {
 };
 type State = {
   address: string; days: string[]; slots: string[]; taken: Record<string, string[]>;
-  lineInviteUrl?: string | null; lineLogin?: boolean; items: Item[];
+  lineInviteUrl?: string | null; items: Item[];
 };
 type Receipt = {
   code: string; day: string; slot: string; address: string; items: string[];
-  total?: number; contact?: string; contactMethod?: string; lineLinked?: boolean;
+  total?: number; contact?: string; contactMethod?: string;
 };
 type Method = "line" | "phone";
-type Auth = { linked: boolean; displayName: string | null; lineLogin: boolean };
 
 const LINE_FALLBACK = "https://line.me/ti/p/yBg2x2X_ut";
 const PHONE_DISPLAY = "080-4919-2027";
 const PHONE_TEL = "tel:+818049192027";
-const DRAFT_KEY = "ss_draft";
 
 const dayOk = (i: Item, day: string) =>
   !(i.availableFrom && day < i.availableFrom) && !(i.availableTo && day > i.availableTo);
@@ -49,20 +48,8 @@ function PhoneBlock() {
   );
 }
 
-function saveDraft(day: string, picked: string[]) {
-  try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ day, picked })); } catch { /* ignore */ }
-}
-
-function readDraft(): { day?: string; picked?: string[] } | null {
-  try {
-    const raw = sessionStorage.getItem(DRAFT_KEY);
-    return raw ? JSON.parse(raw) as { day?: string; picked?: string[] } : null;
-  } catch { return null; }
-}
-
 export default function BuyerPage() {
   const [state, setState] = useState<State | null>(null);
-  const [auth, setAuth] = useState<Auth>({ linked: false, displayName: null, lineLogin: true });
   const [day, setDay] = useState("");
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<Item | null>(null);
@@ -75,32 +62,12 @@ export default function BuyerPage() {
   const lineUrl = state?.lineInviteUrl || LINE_FALLBACK;
   const span = pickupSpan(state?.days || []);
 
-  const loadAuth = useCallback(async () => {
-    const a = await fetch("/api/auth/me", { cache: "no-store" }).then((r) => r.json()) as Auth & { displayName?: string | null };
-    setAuth({ linked: !!a.linked, displayName: a.displayName || null, lineLogin: a.lineLogin !== false });
-  }, []);
-
   const load = useCallback(async () => {
     const data = (await fetch("/api/state", { cache: "no-store" }).then((r) => r.json())) as State;
     setState(data);
     setDay((d) => d && data.days?.includes(d) ? d : (data.days?.[0] || ""));
   }, []);
-
-  useEffect(() => {
-    void load();
-    void loadAuth();
-    const q = new URLSearchParams(window.location.search);
-    if (q.get("line") === "ok") {
-      const draft = readDraft();
-      if (draft?.picked?.length) setPicked(new Set(draft.picked));
-      if (draft?.day) setDay(draft.day);
-      try { sessionStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
-      window.history.replaceState({}, "", "/");
-    } else if (q.get("line") === "err") {
-      setErr("LINE連携に失敗しました");
-      window.history.replaceState({}, "", "/");
-    }
-  }, [load, loadAuth]);
+  useEffect(() => { void load(); }, [load]);
 
   const freeSlots = useMemo(() => {
     const taken = new Set(state?.taken?.[day] || []);
@@ -114,23 +81,10 @@ export default function BuyerPage() {
     setPicked((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
 
-  function startLineLink() {
-    saveDraft(day, [...picked]);
-    window.location.href = "/api/auth/line";
-  }
-
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    await loadAuth();
-  }
-
   async function book() {
     if (!picked.size || !slot || !method || busy) return;
     const bad = [...picked].map((id) => state?.items.find((i) => i.id === id)).find((i) => i && !dayOk(i, day));
-    if (bad) {
-      setErr(`${bad.name}: ${why(bad, day)}`);
-      return;
-    }
+    if (bad) { setErr(`${bad.name}: ${why(bad, day)}`); return; }
     setBusy(true); setErr(null);
     try {
       const res = await fetch("/api/book", {
@@ -219,13 +173,6 @@ export default function BuyerPage() {
           {method === "line" && <LineBlock url={lineUrl} />}
           {method === "phone" && <PhoneBlock />}
         </div>
-        {auth.lineLogin && (
-          <p className="hint">
-            {auth.linked
-              ? <>LINE連携中（{auth.displayName}） · <button type="button" className="back" style={{ margin: 0 }} onClick={() => void logout()}>解除</button></>
-              : <button type="button" className="back" style={{ margin: 0 }} onClick={startLineLink}>LINEで進捗を保存（任意）</button>}
-          </p>
-        )}
         {err && <div className="err">{err}</div>}
         <button type="button" className="cta" disabled={busy || !canSend} onClick={book}
           style={{ background: canSend ? "#ff9900" : "#ccc" }}>{busy ? "送信中…" : "依頼を送信"}</button>
@@ -243,9 +190,7 @@ export default function BuyerPage() {
   return (
     <main className="buy">
       <header className="bar">
-        {auth.linked && auth.displayName
-          ? <span className="shop">{auth.displayName}</span>
-          : <span className="area">{(state?.address || "").trim() || "エリア"}</span>}
+        <span className="shop">{SHOP_NAME}</span>
         <span className="span">{span}</span>
         <button type="button" className="req"
           onClick={() => { setSlot(null); setMethod("line"); setErr(null); setCheckout(true); }}>

@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { lineConfigured } from "@/lib/line";
 import { getStore, isLateOnly, PICKUP_DAYS, PICKUP_SLOTS, takenSlots } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -15,8 +14,6 @@ export async function GET() {
     slots: PICKUP_SLOTS,
     taken,
     lineInviteUrl,
-    lineLogin: true,
-    lineConfigured: lineConfigured(),
     items: [...s.items]
       .sort((a, b) => (b.price ?? -1) - (a.price ?? -1))
       .map(({ id, name, price, note, availableFrom, availableTo, claimId, photos }) => ({

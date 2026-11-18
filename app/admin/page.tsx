@@ -3,15 +3,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon, IconBtn } from "@/components/icons";
 import { Listings, type PhotoItem } from "@/components/photo-listing";
 import { dayLbl, isLateOnly } from "@/lib/days";
+import { SHOP_NAME } from "@/lib/sale";
 import { Snack, useSnack } from "./snack";
 
 type Item = PhotoItem & { claimId?: string | null; note?: string; availableFrom?: string; availableTo?: string };
 type Claim = {
   id: string; code: string; day: string; slot?: string; contact?: string; contactMethod?: string;
-  lineUserId?: string; itemIds: string[]; status: string;
+  itemIds: string[]; status: string;
 };
 type AdminState = { address: string; items: Item[]; claims: Claim[] };
-type Auth = { linked: boolean; displayName: string | null };
 
 /** Library-first: no capture (capture forces camera). Specific types bias Photos over Files. */
 const IMG_ACCEPT = "image/jpeg,image/png,image/heic,image/heif,image/webp,image/gif,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif";
@@ -34,17 +34,12 @@ export default function AdminPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [sheetMenu, setSheetMenu] = useState<string | null>(null); // "item" | photo url
   const { snack, show } = useSnack();
-  const [auth, setAuth] = useState<Auth>({ linked: false, displayName: null });
   const [addrDraft, setAddrDraft] = useState("");
   const addrDraftRef = useRef("");
   const addrTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const addrSaved = useRef("");
   const addrDirty = useRef(false);
   const addrReq = useRef(0);
-  const loadAuth = useCallback(async () => {
-    const a = await fetch("/api/auth/me", { cache: "no-store" }).then((r) => r.json());
-    setAuth({ linked: !!a.linked, displayName: a.displayName || null });
-  }, []);
   const load = useCallback(async () => {
     const res = await fetch("/api/admin", { cache: "no-store" });
     if (!res.ok) { setErr("読み込みに失敗しました"); show("読み込みに失敗しました", "err"); return; }
@@ -58,7 +53,7 @@ export default function AdminPage() {
     }
   }, [show]);
 
-  useEffect(() => { void load(); void loadAuth(); }, [load, loadAuth]);
+  useEffect(() => { void load(); }, [load]);
   useEffect(() => () => { if (addrTimer.current) clearTimeout(addrTimer.current); }, []);
 
   const items = useMemo(() => [...(data?.items || [])].sort(byPriceDesc), [data?.items]);
@@ -244,9 +239,7 @@ export default function AdminPage() {
   return (
     <main className="buy">
       <header className="bar admin-bar">
-        {auth.linked && auth.displayName
-          ? <span className="shop" aria-label="ショップ名">{auth.displayName}</span>
-          : <span className="admin-lab" aria-label="管理ページ">管理</span>}
+        <span className="shop" aria-label="ショップ名">{SHOP_NAME}</span>
         <label className="area-float">
           <span>区</span>
           <input value={addrDraft} disabled={!data}
@@ -254,11 +247,6 @@ export default function AdminPage() {
             placeholder="目黒区" autoComplete="address-level2" />
         </label>
         <span className="spacer" aria-hidden="true" />
-        {!auth.linked ? (
-          <a className="line-link" href="/api/auth/line?next=admin">LINE</a>
-        ) : (
-          <button type="button" className="line-link ghost" onClick={() => void fetch("/api/auth/logout", { method: "POST" }).then(loadAuth)}>解除</button>
-        )}
         <IconBtn name="plus" label="品目を追加" size={22}
           disabled={!data || uploading === "batch"}
           onClick={() => setAddOpen(true)} className="solid" />
@@ -280,7 +268,6 @@ export default function AdminPage() {
             const contact = [
               methodJa(c.contactMethod),
               c.contact && c.contact !== "LINE" ? c.contact : "",
-              c.lineUserId ? "LINE連携" : "",
             ].filter(Boolean).join(" · ");
             return (
               <li key={c.id} style={{ padding: "8px 0", borderBottom: "1px solid #eee", fontSize: 13 }}>
