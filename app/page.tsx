@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { PhotoGrid, money } from "@/components/photo-listing";
 
 type Item = { id: string; name: string; price: number | null; note?: string; taken: boolean; photos?: string[]; availableFrom?: string; availableTo?: string };
 type State = { address: string; days: string[]; slots: string[]; taken: Record<string, string[]>; lineInviteUrl?: string | null; items: Item[] };
@@ -9,7 +10,6 @@ type Method = "line" | "phone";
 const LINE_FALLBACK = "https://line.me/ti/p/yBg2x2X_ut";
 const PHONE_DISPLAY = "080-4919-2027";
 const PHONE_TEL = "tel:+818049192027";
-const money = (p: number | null) => (p == null ? "無料" : `¥${p.toLocaleString()}`);
 const WK = "月火水木金土日";
 const youbi = (d: string) => {
   const [y, m, day] = d.split("-").map(Number);
@@ -190,29 +190,15 @@ export default function BuyerPage() {
         const all = state?.items || [];
         const withPh = all.filter((i) => (i.photos || []).length > 0);
         const noPh = all.filter((i) => !(i.photos || []).length);
-        const cls = (item: Item, extra = "") => {
-          const ok = available.has(item.id);
-          const on = picked.has(item.id);
-          return `cell${extra}${on ? " on" : ""}${ok ? "" : " dim"}`;
-        };
+        const cellCls = (item: Item) => `${picked.has(item.id) ? "on" : ""}${available.has(item.id) ? "" : " dim"}`.trim();
         return (
           <>
-            {withPh.length > 0 && (
-              <div className="grid photos">
-                {withPh.map((item) => (
-                  <button key={item.id} type="button" aria-label={item.name} onClick={() => setOpen(item)}
-                    className={cls(item, " has-photo")}>
-                    <img className="hero" src={(item.photos || [])[0]} alt="" loading="lazy" decoding="async" />
-                    <span className="chip price">{money(item.price)}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+            <PhotoGrid items={withPh} onSelect={setOpen} classNameFor={cellCls} />
             {noPh.length > 0 && (
               <div className="grid">
                 {noPh.map((item) => (
                   <button key={item.id} type="button" aria-label={item.name} onClick={() => setOpen(item)}
-                    className={cls(item)}>
+                    className={`cell${picked.has(item.id) ? " on" : ""}${available.has(item.id) ? "" : " dim"}`}>
                     <span className="cap"><span className="price">{money(item.price)}</span><span className="name">{item.name}</span></span>
                   </button>
                 ))}
