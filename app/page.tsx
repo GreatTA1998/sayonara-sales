@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { dayLbl, pickupSpan, rangeLbl } from "@/lib/days";
+import { SHOP_NAME } from "@/lib/sale";
 import { Listings, money } from "@/components/photo-listing";
 
 type Item = {
@@ -191,7 +192,10 @@ export default function BuyerPage() {
   return (
     <main className="buy">
       <header className="bar">
-        <span className="area">{(state?.address || "").trim() || "区"}</span>
+        <span className="who">
+          <span className="shop">{SHOP_NAME}</span>
+          <span className="area">{(state?.address || "").trim() || "区"}</span>
+        </span>
         <span className="span">{span}</span>
         <button type="button" className="req"
           onClick={() => { setSlot(null); setMethod("line"); setErr(null); setCheckout(true); }}>
