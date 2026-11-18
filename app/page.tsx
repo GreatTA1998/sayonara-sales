@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getName, setName, slugify } from "@/lib/shop";
+import { getId, openShop } from "@/lib/shop";
 
 const DIR = [{ slug: "elton", name: "エルトン", area: "目黒区" }];
 
@@ -11,12 +11,12 @@ export default function HubPage() {
   const [near, setNear] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => { const n = getName(); if (n) router.replace(`/s/${slugify(n)}`); }, [router]);
+  useEffect(() => { const id = getId(); if (id) router.replace(`/s/${id}`); }, [router]);
 
   function go(e: { preventDefault(): void }) {
     e.preventDefault();
-    const n = setName(name);
-    if (n) router.push(`/s/${slugify(n)}`);
+    const id = openShop(name);
+    if (id) router.push(`/s/${id}`);
   }
 
   function askNear() {

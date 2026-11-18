@@ -1,6 +1,6 @@
 # Sayonara Sales
 
-Phone-first move-out sale: hub at `/`, Elton buyer at `/s/elton`, Elton admin at `/admin`. Independent shops: `/s/{line-name}` (+ `/admin` stub).
+Phone-first move-out sale: hub at `/`, Elton buyer at `/s/elton`, Elton admin at `/admin`. Independent shops: `/s/{5-digit-id}` (+ `/admin` stub); LINE名→id in localStorage.
 
 ## Env (Vercel)
 
