@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { PhotoGrid, PhotoLayoutFooter, money, usePhotoLayout } from "@/components/photo-listing";
+import { DenseToggle, PhotoGrid, money, useDense } from "@/components/photo-listing";
 
 type Item = { id: string; name: string; price: number | null; note?: string; taken: boolean; photos?: string[]; availableFrom?: string; availableTo?: string };
 type State = { address: string; days: string[]; slots: string[]; taken: Record<string, string[]>; lineInviteUrl?: string | null; items: Item[] };
@@ -56,7 +56,7 @@ export default function BuyerPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
-  const layout = usePhotoLayout();
+  const { dense, toggle: toggleDense } = useDense();
 
   const lineUrl = state?.lineInviteUrl || LINE_FALLBACK;
 
@@ -175,12 +175,13 @@ export default function BuyerPage() {
   const openRange = open ? rangeLbl(open.availableFrom, open.availableTo) : "";
 
   return (
-    <main className="buy xpad">
+    <main className="buy">
       <header className="bar">
         <span className="area">{(state?.address || "").trim() || "エリア"}</span>
         <select className="day" value={day} onChange={(e) => { setDay(e.target.value); setPicked(new Set()); }}>
           {(state?.days || []).map((d) => <option key={d} value={d}>{dayLbl(d)}</option>)}
         </select>
+        <DenseToggle dense={dense} onToggle={toggleDense} />
         <button type="button" className="req"
           onClick={() => { setSlot(null); setMethod("line"); setErr(null); setCheckout(true); }}>
           {picked.size ? `引き取りを依頼 (${picked.size})` : "引き取りを依頼"}
@@ -194,7 +195,7 @@ export default function BuyerPage() {
         const cellCls = (item: Item) => `${picked.has(item.id) ? "on" : ""}${available.has(item.id) ? "" : " dim"}`.trim();
         return (
           <>
-            <PhotoGrid items={withPh} mode={layout.mode} radius={layout.radius} cols={layout.cols}
+            <PhotoGrid items={withPh} dense={dense}
               onSelect={setOpen} classNameFor={cellCls} />
             {noPh.length > 0 && (
               <div className="grid">
@@ -225,7 +226,6 @@ export default function BuyerPage() {
           </div>
         </div>
       )}
-      <PhotoLayoutFooter {...layout} />
     </main>
   );
 }
