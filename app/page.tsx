@@ -205,7 +205,7 @@ export default function BuyerPage() {
       {err && <div className="err">{err}</div>}
       <Listings items={state?.items || []} onSelect={setOpen}
         classNameFor={(item) => `${picked.has(item.id) ? "on" : ""}${item.taken ? " dim" : ""}`.trim()} />
-      {!state && <p style={{ padding: 12 }}>読み込み中…</p>}
+      {!state && <p className="text-sm text-muted" style={{ padding: 12 }}>読み込み中…</p>}
       {open && (
         <div className="mask" role="dialog" aria-modal="true" aria-label={open.name} onClick={() => setOpen(null)}>
           <div className="sheet" onClick={(e) => e.stopPropagation()}>

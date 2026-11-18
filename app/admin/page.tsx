@@ -252,15 +252,15 @@ export default function AdminPage() {
           onClick={() => setAddOpen(true)} className="solid" />
       </header>
       {err && <div className="err">{err}</div>}
-      {!data && !err && <p style={{ padding: 12, color: "#555" }}>読み込み中…</p>}
+      {!data && !err && <p className="text-sm text-muted" style={{ padding: 12 }}>読み込み中…</p>}
       <Listings items={items} onSelect={openDetail}
         disabledFor={(it) => deleting === it.id}
         classNameFor={(it) => (deleting === it.id ? "dim" : "")} />
-      {!items.length && data && <p style={{ padding: 12, color: "#777" }}>品目がありません</p>}
+      {!items.length && data && <p className="text-sm text-muted" style={{ padding: 12 }}>品目がありません</p>}
 
-      <section style={{ padding: "12px 8px 24px" }}>
-        <div style={{ fontWeight: 600, marginBottom: 6 }}>予約</div>
-        <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+      <section className="claims">
+        <div className="claims-h">予約</div>
+        <ul>
           {(data?.claims || []).map((c) => {
             const names = c.itemIds
               .map((id) => data?.items.find((i) => i.id === id)?.name?.trim() || "無題")
@@ -270,18 +270,18 @@ export default function AdminPage() {
               c.contact && c.contact !== "LINE" ? c.contact : "",
             ].filter(Boolean).join(" · ");
             return (
-              <li key={c.id} style={{ padding: "8px 0", borderBottom: "1px solid #eee", fontSize: 13 }}>
-                <div>
+              <li key={c.id} className="claim">
+                <div className="text-base">
                   <b>{dayLbl(c.day)}</b>
                   {c.slot ? ` · ${c.slot}` : ""}
                   {names ? ` · ${names}` : ""}
                 </div>
-                <div style={{ color: "#888", fontSize: 12, marginTop: 2 }}>
+                <div className="text-sm text-muted claim-meta">
                   {statusJa(c.status)}
                   {contact ? ` · ${contact}` : ""}
                 </div>
                 {c.status === "booked" && (
-                  <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                  <div className="claim-acts">
                     <button type="button" onClick={() => act({ action: "cancel", id: c.id }, "保存しました")}>キャンセル</button>
                     <button type="button" onClick={() => act({ action: "picked_up", id: c.id }, "保存しました")}>受取済み</button>
                   </div>
@@ -289,7 +289,7 @@ export default function AdminPage() {
               </li>
             );
           })}
-          {!data?.claims?.length && <li style={{ color: "#777" }}>予約はまだありません</li>}
+          {!data?.claims?.length && <li className="text-sm text-muted">予約はまだありません</li>}
         </ul>
       </section>
 
@@ -317,7 +317,7 @@ export default function AdminPage() {
           <div className="sheet" onClick={(e) => { e.stopPropagation(); if (sheetMenu) setSheetMenu(null); }}
             style={{ maxHeight: "90vh", overflowY: "auto" }}>
             <div className="add-head">
-              <h2 style={{ margin: 0, fontSize: 18 }}>編集</h2>
+              <h2>編集</h2>
               <IconBtn name="close" label="閉じる" disabled={busyOpen} onClick={() => setOpenId(null)} className="ghost-border" />
             </div>
             <div className="pics">
