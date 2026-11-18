@@ -169,9 +169,9 @@ export default function BuyerPage() {
         </div>
       )}
       {checkout && (
-        <div className="mask pop" role="dialog" aria-modal="true" aria-label="引き取り日程"
+        <div className="mask" role="dialog" aria-modal="true" aria-label="引き取り日程"
           onClick={() => { setCheckout(false); setErr(null); }}>
-          <div className="sheet pop checkout" onClick={(e) => e.stopPropagation()}>
+          <div className="sheet checkout" onClick={(e) => e.stopPropagation()}>
             <h2>引き取り日程</h2>
             <div className="when">
               <select value={day} aria-label="日付" onChange={(e) => {
