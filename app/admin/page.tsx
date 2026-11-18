@@ -1,13 +1,14 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Icon, IconBtn } from "@/components/icons";
+import { PhotoGrid, money, type PhotoItem } from "@/components/photo-listing";
 import { Snack, useSnack } from "./snack";
 
-type Item = { id: string; name: string; price: number | null; claimId?: string | null; photos?: string[]; note?: string };
+type Item = PhotoItem & { claimId?: string | null; note?: string };
 type Claim = { id: string; code: string; day: string; slot?: string; contact?: string; contactMethod?: string; itemIds: string[]; status: string };
 type AdminState = { address: string; items: Item[]; claims: Claim[] };
 
 const byPriceDesc = (a: Item, b: Item) => (b.price ?? -1) - (a.price ?? -1);
-const money = (p: number | null) => (p == null ? "無料" : `¥${p.toLocaleString()}`);
 
 export default function AdminPage() {
   const [data, setData] = useState<AdminState | null>(null);
@@ -19,6 +20,7 @@ export default function AdminPage() {
   const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState("0");
   const [editNote, setEditNote] = useState("");
+  const [addOpen, setAddOpen] = useState(false);
   const { snack, show } = useSnack();
   const [addrDraft, setAddrDraft] = useState("");
   const addrDraftRef = useRef("");
@@ -150,9 +152,8 @@ export default function AdminPage() {
     });
   }
 
-  async function uploadPhoto(itemId: string, file: File, quiet = false) {
-    setUploading(itemId); setErr(null);
-    if (!quiet) show("Uploading…", "busy");
+  async function uploadPhoto(itemId: string, file: File) {
+    setUploading(itemId); setErr(null); show("Uploading…", "busy");
     try {
       const fd = new FormData();
       fd.set("file", file);
@@ -168,21 +169,20 @@ export default function AdminPage() {
           items: d.items.map((i) => (i.id === itemId ? { ...i, photos } : i)),
         });
       }
-      if (!quiet) show("Photo uploaded", "ok");
-      return true;
+      show("Photo uploaded", "ok");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Upload failed";
       setErr(msg); show(msg, "err");
-      return false;
     } finally {
       setUploading(null);
     }
   }
 
-  /** + button: each selected photo becomes an untitled listing (WebP via upload API). */
+  /** Each selected photo becomes an untitled listing. */
   async function addFromPhotos(files: File[]) {
     const images = files.filter((f) => f.type.startsWith("image/"));
     if (!images.length) return;
+    setAddOpen(false);
     setUploading("batch"); setErr(null);
     let ok = 0;
     show(`Uploading 0/${images.length}…`, "busy");
@@ -227,19 +227,13 @@ export default function AdminPage() {
 
   const menuBtn = (item: Item, busy: boolean) => (
     <div style={{ position: "relative", flex: "0 0 auto" }} onClick={(e) => e.stopPropagation()}>
-      <button type="button" disabled={busy} aria-label="Item menu"
-        onClick={() => setMenuFor(menuFor === item.id ? null : item.id)}
-        style={{ padding: "2px 8px", border: "1px solid #ccc", borderRadius: 4, background: "#fff", minWidth: 32 }}>
-        {busy || uploading === item.id ? "…" : "⋮"}
-      </button>
+      <IconBtn name="more" label="Item menu" disabled={busy || uploading === item.id}
+        onClick={() => setMenuFor(menuFor === item.id ? null : item.id)} className="ghost-border" />
       {menuFor === item.id && !busy && (
-        <div style={{ position: "absolute", right: 0, top: "100%", zIndex: 5, marginTop: 2, minWidth: 140, background: "#fff", border: "1px solid #ccc", borderRadius: 6, boxShadow: "0 4px 12px rgba(0,0,0,.12)", overflow: "hidden" }}>
-          <button type="button" onClick={() => openDetail(item)}
-            style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 10px", border: 0, background: "#fff", borderBottom: "1px solid #eee" }}>
-            Edit
-          </button>
-          <label style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 10px", borderBottom: "1px solid #eee", cursor: uploading === item.id ? "wait" : "pointer", opacity: uploading === item.id ? 0.6 : 1 }}>
-            {uploading === item.id ? "Uploading…" : "Add photo"}
+        <div className="menu-pop">
+          <button type="button" onClick={() => openDetail(item)}>Edit</button>
+          <label className={uploading === item.id ? "busy" : ""}>
+            <Icon name="photo" size={16} /> {uploading === item.id ? "Uploading…" : "Add photo"}
             <input type="file" accept="image/*" hidden disabled={uploading === item.id}
               onChange={(e) => {
                 const f = e.target.files?.[0];
@@ -248,9 +242,8 @@ export default function AdminPage() {
                 if (f) uploadPhoto(item.id, f);
               }} />
           </label>
-          <button type="button" onClick={() => deleteItem(item)}
-            style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 10px", border: 0, background: "#fff", color: "#b00020" }}>
-            Delete item
+          <button type="button" className="danger" onClick={() => deleteItem(item)}>
+            <Icon name="trash" size={16} /> Delete
           </button>
         </div>
       )}
@@ -269,15 +262,9 @@ export default function AdminPage() {
       <section style={S.sec}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
           <div style={{ ...S.t, marginBottom: 0 }}>Items</div>
-          <button type="button" aria-label="Add photos" disabled={!data || uploading === "batch"}
-            onClick={() => addInputRef.current?.click()}
-            style={{
-              width: 40, height: 40, borderRadius: "50%", border: 0, background: "#111", color: "#fff",
-              fontSize: 28, lineHeight: 1, fontWeight: 400, cursor: uploading === "batch" ? "wait" : "pointer",
-              opacity: !data || uploading === "batch" ? 0.5 : 1,
-            }}>
-            {uploading === "batch" ? "…" : "+"}
-          </button>
+          <IconBtn name="stackPlus" label="Add photos as items" size={22}
+            disabled={!data || uploading === "batch"}
+            onClick={() => setAddOpen(true)} className="solid" />
           <input ref={addInputRef} type="file" accept="image/*" multiple hidden
             onChange={(e) => {
               const list = e.target.files ? Array.from(e.target.files) : [];
@@ -285,23 +272,9 @@ export default function AdminPage() {
               if (list.length) void addFromPhotos(list);
             }} />
         </div>
-        {withPh.length > 0 && (
-          <div className="grid photos">
-            {withPh.map((item) => {
-              const busy = deleting === item.id;
-              return (
-                <button key={item.id} type="button" aria-label={item.name || "Item"}
-                  disabled={busy}
-                  onClick={() => openDetail(item)}
-                  className="cell has-photo"
-                  style={{ opacity: busy ? 0.55 : 1 }}>
-                  <img className="hero" src={(item.photos || [])[0]} alt="" loading="lazy" decoding="async" />
-                  <span className="chip price">{money(item.price)}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
+        <PhotoGrid items={withPh} onSelect={openDetail}
+          disabledFor={(it) => deleting === it.id}
+          classNameFor={(it) => (deleting === it.id ? "dim" : "")} />
         <ul style={S.list}>
           {noPh.map((item) => {
             const busy = deleting === item.id;
@@ -340,6 +313,27 @@ export default function AdminPage() {
           {!data?.claims?.length && <li style={{ color: "#777" }}>No claims yet</li>}
         </ul>
       </section>
+
+      {addOpen && (
+        <div className="mask" role="dialog" aria-modal="true" aria-label="Add photos"
+          onClick={() => setAddOpen(false)}>
+          <div className="sheet add-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="add-head">
+              <h2>Add items</h2>
+              <IconBtn name="close" label="Close" onClick={() => setAddOpen(false)} className="ghost-border" />
+            </div>
+            <div className="thumb-strip" aria-hidden="true">
+              <span /><span /><span />
+            </div>
+            <p className="add-cue">Each photo becomes its own item.</p>
+            <button type="button" className="cta" style={{ background: "#111", color: "#fff" }}
+              onClick={() => addInputRef.current?.click()}>
+              Add photos
+            </button>
+          </div>
+        </div>
+      )}
+
       {open && (() => {
         const busy = deleting === open.id;
         const pics = open.photos || [];
@@ -347,17 +341,17 @@ export default function AdminPage() {
           <div className="mask" role="dialog" aria-modal="true" aria-label="Edit item"
             onClick={() => !busy && setOpenId(null)}>
             <div className="sheet" onClick={(e) => e.stopPropagation()} style={{ maxHeight: "90vh", overflowY: "auto" }}>
+              <div className="add-head">
+                <h2 style={{ margin: 0, fontSize: 18 }}>Edit</h2>
+                <IconBtn name="close" label="Close" disabled={busy} onClick={() => setOpenId(null)} className="ghost-border" />
+              </div>
               {pics.length > 0 && (
                 <div className="pics">
                   {pics.map((src) => (
-                    <div key={src} style={{ position: "relative", width: "calc(50% - 3px)" }}>
-                      <img src={src} alt="" loading="lazy" decoding="async"
-                        style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 8, display: "block", background: "#eee" }} />
-                      <button type="button" disabled={busy}
-                        onClick={() => deletePhoto(open, src)}
-                        style={{ position: "absolute", right: 6, bottom: 6, padding: "4px 8px", border: 0, borderRadius: 6, background: "rgba(176,0,32,.92)", color: "#fff", fontSize: 12, fontWeight: 600 }}>
-                        Delete
-                      </button>
+                    <div key={src} className="pic-wrap">
+                      <img src={src} alt="" loading="lazy" decoding="async" />
+                      <IconBtn name="trash" label="Delete photo" disabled={busy} size={16}
+                        className="danger abs" onClick={() => deletePhoto(open, src)} />
                     </div>
                   ))}
                 </div>
@@ -373,8 +367,8 @@ export default function AdminPage() {
                 style={{ width: "100%", padding: 10, marginBottom: 12, border: "1px solid #ccc", borderRadius: 8, resize: "vertical", font: "inherit" }} />
               <button type="button" className="cta" disabled={busy} onClick={() => void saveDetail()}
                 style={{ background: "#111", color: "#fff", marginBottom: 8 }}>Save</button>
-              <label style={{ display: "block", width: "100%", textAlign: "center", padding: 12, border: "1px solid #ddd", borderRadius: 8, marginBottom: 8, cursor: uploading === open.id ? "wait" : "pointer", opacity: uploading === open.id || busy ? 0.6 : 1 }}>
-                {uploading === open.id ? "Uploading…" : "Add photo"}
+              <label className={`icon-row${uploading === open.id || busy ? " busy" : ""}`}>
+                <Icon name="photo" size={18} /> {uploading === open.id ? "Uploading…" : "Add photo"}
                 <input type="file" accept="image/*" hidden disabled={busy || uploading === open.id}
                   onChange={(e) => {
                     const f = e.target.files?.[0];
@@ -382,10 +376,8 @@ export default function AdminPage() {
                     if (f) uploadPhoto(open.id, f);
                   }} />
               </label>
-              <button type="button" disabled={busy} onClick={() => deleteItem(open)}
-                style={{ width: "100%", padding: 12, border: 0, borderRadius: 8, background: "#b00020", color: "#fff", fontWeight: 600 }}>
-                {busy ? "…" : "Delete item"}
-              </button>
+              <IconBtn name="trash" label="Delete item" disabled={busy} className="danger block"
+                onClick={() => deleteItem(open)} />
             </div>
           </div>
         );
