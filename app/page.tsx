@@ -1,7 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { dayLbl, pickupSpan, rangeLbl } from "@/lib/days";
-import { SHOP_NAME } from "@/lib/sale";
 import { Listings, money } from "@/components/photo-listing";
 
 type Item = {
@@ -162,8 +161,10 @@ export default function BuyerPage() {
           <ul className="clist">{names.map((i) => (
             <li key={i.id}>{i.name} · {money(i.price)}{i.lateOnly ? " · 後半のみ" : ""}</li>
           ))}</ul>
-          <p className="total">合計 {money(names.reduce((n, i) => n + (i.price ?? 0), 0))}</p>
-          <p className="hint">お支払いは現金またはWise。</p>
+          <p className="total-row">
+            <span className="total">合計 {money(names.reduce((n, i) => n + (i.price ?? 0), 0))}</span>
+            <span className="pay-hint">お支払いは現金またはWise。</span>
+          </p>
         </div>
         <div className="field"><span>連絡方法</span>
           <div className="slots pair">
@@ -190,7 +191,7 @@ export default function BuyerPage() {
   return (
     <main className="buy">
       <header className="bar">
-        <span className="shop">{SHOP_NAME}</span>
+        <span className="area">{(state?.address || "").trim() || "区"}</span>
         <span className="span">{span}</span>
         <button type="button" className="req"
           onClick={() => { setSlot(null); setMethod("line"); setErr(null); setCheckout(true); }}>
