@@ -194,7 +194,7 @@ export default function BuyerPage() {
         const cellCls = (item: Item) => `${picked.has(item.id) ? "on" : ""}${available.has(item.id) ? "" : " dim"}`.trim();
         return (
           <>
-            <PhotoGrid items={withPh} mode={layout.mode} radius={layout.radius}
+            <PhotoGrid items={withPh} mode={layout.mode} radius={layout.radius} cols={layout.cols}
               onSelect={setOpen} classNameFor={cellCls} />
             {noPh.length > 0 && (
               <div className="grid">

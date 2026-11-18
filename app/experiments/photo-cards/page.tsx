@@ -51,7 +51,7 @@ export default function PhotoCardsExperiment() {
       <p style={{ margin: "8px 12px", fontSize: 12, color: "#666" }}>
         {HINT[layout.mode]} · {live ? "live listings" : "fixtures"}
       </p>
-      <PhotoGrid items={items} mode={layout.mode} radius={layout.radius} />
+      <PhotoGrid items={items} mode={layout.mode} radius={layout.radius} cols={layout.cols} />
       <PhotoLayoutFooter {...layout} />
     </main>
   );
