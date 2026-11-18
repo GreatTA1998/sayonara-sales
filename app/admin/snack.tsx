@@ -22,10 +22,6 @@ export function Snack({ snack }: { snack: SnackState }) {
   if (!snack) return null;
   const bg = snack.kind === "err" ? "#b00020" : snack.kind === "busy" ? "#333" : "#111";
   return (
-    <div role="status" style={{
-      position: "fixed", left: 12, right: 12, bottom: 16, zIndex: 60,
-      padding: "10px 14px", borderRadius: 8, background: bg, color: "#fff",
-      fontSize: 14, textAlign: "center", boxShadow: "0 4px 16px rgba(0,0,0,.2)",
-    }}>{snack.msg}</div>
+    <div role="status" className="snack text-base" style={{ background: bg }}>{snack.msg}</div>
   );
 }
