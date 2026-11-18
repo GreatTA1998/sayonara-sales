@@ -227,7 +227,6 @@ export default function BuyerPage() {
           </p>
         )}
         {err && <div className="err">{err}</div>}
-        <p className="hint send-note">送信後もEltonの確認が必要です。</p>
         <button type="button" className="cta" disabled={busy || !canSend} onClick={book}
           style={{ background: canSend ? "#ff9900" : "#ccc" }}>{busy ? "送信中…" : "依頼を送信"}</button>
       </main>
