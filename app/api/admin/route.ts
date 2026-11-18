@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getStore, uid, withStore } from "@/lib/store";
+import { getStore, setLateOnly, uid, withStore } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 const numPrice = (v: unknown) => {
@@ -32,8 +32,11 @@ export async function POST(req: Request) {
           if (body.name != null) item.name = String(body.name).trim();
           if ("price" in body) item.price = numPrice(body.price);
           if ("note" in body) item.note = body.note ? String(body.note) : undefined;
-          if ("availableFrom" in body) item.availableFrom = body.availableFrom || undefined;
-          if ("availableTo" in body) item.availableTo = body.availableTo || undefined;
+          if ("lateOnly" in body) setLateOnly(item, !!body.lateOnly);
+          else {
+            if ("availableFrom" in body) item.availableFrom = body.availableFrom || undefined;
+            if ("availableTo" in body) item.availableTo = body.availableTo || undefined;
+          }
           if ("photos" in body) item.photos = Array.isArray(body.photos) ? body.photos.map(String).filter(Boolean) : undefined;
           return item;
         }

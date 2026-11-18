@@ -1,30 +1,34 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { dayLbl, pickupSpan, rangeLbl } from "@/lib/days";
 import { Listings, money } from "@/components/photo-listing";
 
-type Item = { id: string; name: string; price: number | null; note?: string; taken: boolean; photos?: string[]; availableFrom?: string; availableTo?: string };
-type State = { address: string; days: string[]; slots: string[]; taken: Record<string, string[]>; lineInviteUrl?: string | null; items: Item[] };
-type Receipt = { code: string; day: string; slot: string; address: string; items: string[]; total?: number; contact?: string; contactMethod?: string };
+type Item = {
+  id: string; name: string; price: number | null; note?: string; taken: boolean;
+  photos?: string[]; availableFrom?: string; availableTo?: string; lateOnly?: boolean;
+};
+type State = {
+  address: string; days: string[]; slots: string[]; taken: Record<string, string[]>;
+  lineInviteUrl?: string | null; lineLogin?: boolean; items: Item[];
+};
+type Receipt = {
+  code: string; day: string; slot: string; address: string; items: string[];
+  total?: number; contact?: string; contactMethod?: string; lineLinked?: boolean;
+};
 type Method = "line" | "phone";
+type Auth = { linked: boolean; displayName: string | null; lineLogin: boolean };
 
 const LINE_FALLBACK = "https://line.me/ti/p/yBg2x2X_ut";
 const PHONE_DISPLAY = "080-4919-2027";
 const PHONE_TEL = "tel:+818049192027";
-const WK = "月火水木金土日";
-const youbi = (d: string) => {
-  const [y, m, day] = d.split("-").map(Number);
-  return WK[(new Date(Date.UTC(y, m - 1, day)).getUTCDay() + 6) % 7];
-};
-const dayLbl = (d: string) => `11月${Number(d.slice(8))}日（${youbi(d)}）`;
-const rangeLbl = (from?: string, to?: string) => {
-  if (!from && !to) return "";
-  if (from && to && from.slice(0, 7) === to.slice(0, 7)) return `11月${Number(from.slice(8))}–${Number(to.slice(8))}日`;
-  if (from && to) return `${dayLbl(from)}–${dayLbl(to)}`;
-  return from ? `${dayLbl(from)}以降` : `${dayLbl(to!)}まで`;
-};
-const dayOk = (i: Item, day: string) => !(i.availableFrom && day < i.availableFrom) && !(i.availableTo && day > i.availableTo);
+const DRAFT_KEY = "ss_draft";
+
+const dayOk = (i: Item, day: string) =>
+  !(i.availableFrom && day < i.availableFrom) && !(i.availableTo && day > i.availableTo);
 const why = (i: Item, day: string) =>
-  i.taken ? "予約済み — キャンセル待ち" : !dayOk(i, day) ? `受け取り可能：${rangeLbl(i.availableFrom, i.availableTo)}` : "受け取り不可";
+  i.taken ? "予約済み — キャンセル待ち"
+    : !dayOk(i, day) ? `受け取り可能：${rangeLbl(i.availableFrom, i.availableTo)}`
+    : "受け取り不可";
 
 function LineBlock({ url }: { url: string }) {
   return (
@@ -45,9 +49,21 @@ function PhoneBlock() {
   );
 }
 
+function saveDraft(day: string, picked: string[]) {
+  try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ day, picked })); } catch { /* ignore */ }
+}
+
+function readDraft(): { day?: string; picked?: string[] } | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    return raw ? JSON.parse(raw) as { day?: string; picked?: string[] } : null;
+  } catch { return null; }
+}
+
 export default function BuyerPage() {
   const [state, setState] = useState<State | null>(null);
-  const [day, setDay] = useState("2026-11-01");
+  const [auth, setAuth] = useState<Auth>({ linked: false, displayName: null, lineLogin: true });
+  const [day, setDay] = useState("");
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<Item | null>(null);
   const [checkout, setCheckout] = useState(false);
@@ -57,17 +73,35 @@ export default function BuyerPage() {
   const [err, setErr] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const lineUrl = state?.lineInviteUrl || LINE_FALLBACK;
+  const span = pickupSpan(state?.days || []);
+
+  const loadAuth = useCallback(async () => {
+    const a = await fetch("/api/auth/me", { cache: "no-store" }).then((r) => r.json()) as Auth & { displayName?: string | null };
+    setAuth({ linked: !!a.linked, displayName: a.displayName || null, lineLogin: a.lineLogin !== false });
+  }, []);
 
   const load = useCallback(async () => {
     const data = (await fetch("/api/state", { cache: "no-store" }).then((r) => r.json())) as State;
     setState(data);
-    if (data.days?.length && !data.days.includes(day)) setDay(data.days[0]);
-  }, [day]);
-  useEffect(() => { load(); }, [load]);
+    setDay((d) => d && data.days?.includes(d) ? d : (data.days?.[0] || ""));
+  }, []);
 
-  const available = useMemo(() => new Set(
-    (state?.items || []).filter((i) => !i.taken && dayOk(i, day)).map((i) => i.id)
-  ), [state, day]);
+  useEffect(() => {
+    void load();
+    void loadAuth();
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("line") === "ok") {
+      const draft = readDraft();
+      if (draft?.picked?.length) setPicked(new Set(draft.picked));
+      if (draft?.day) setDay(draft.day);
+      try { sessionStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+      window.history.replaceState({}, "", "/");
+    } else if (q.get("line") === "err") {
+      setErr("LINE連携に失敗しました");
+      window.history.replaceState({}, "", "/");
+    }
+  }, [load, loadAuth]);
+
   const freeSlots = useMemo(() => {
     const taken = new Set(state?.taken?.[day] || []);
     return (state?.slots || []).filter((s) => !taken.has(s));
@@ -75,12 +109,28 @@ export default function BuyerPage() {
   useEffect(() => { if (slot && !freeSlots.includes(slot)) setSlot(null); }, [freeSlots, slot]);
 
   function toggle(id: string) {
-    if (!available.has(id)) return;
+    const it = state?.items.find((i) => i.id === id);
+    if (!it || it.taken) return;
     setPicked((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
+
+  function startLineLink() {
+    saveDraft(day, [...picked]);
+    window.location.href = "/api/auth/line";
+  }
+
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    await loadAuth();
   }
 
   async function book() {
     if (!picked.size || !slot || !method || busy) return;
+    const bad = [...picked].map((id) => state?.items.find((i) => i.id === id)).find((i) => i && !dayOk(i, day));
+    if (bad) {
+      setErr(`${bad.name}: ${why(bad, day)}`);
+      return;
+    }
     setBusy(true); setErr(null);
     try {
       const res = await fetch("/api/book", {
@@ -123,7 +173,8 @@ export default function BuyerPage() {
 
   if (checkout) {
     const names = (state?.items || []).filter((i) => picked.has(i.id));
-    const canSend = !!slot && !!method && picked.size > 0;
+    const blocked = names.filter((i) => !dayOk(i, day));
+    const canSend = !!slot && !!method && picked.size > 0 && !blocked.length;
     return (
       <main className="wrap checkout">
         <button type="button" className="back" onClick={() => { setCheckout(false); setErr(null); }}>← 戻る</button>
@@ -139,6 +190,9 @@ export default function BuyerPage() {
             {(state?.days || []).map((d) => <option key={d} value={d}>{dayLbl(d)}</option>)}
           </select>
         </label>
+        {blocked.length > 0 && (
+          <p className="sw">後半のみの品目があります。日付を{rangeLbl(blocked[0].availableFrom, state?.days?.[state.days.length - 1])}以降にしてください。</p>
+        )}
         <div className="field"><span>時間帯</span>
           {freeSlots.length ? (
             <div className="slots">{freeSlots.map((s) => (
@@ -147,7 +201,9 @@ export default function BuyerPage() {
           ) : <p className="sw">この日は空きがありません。</p>}
         </div>
         <div className="field"><span>品目（{names.length}）</span>
-          <ul className="clist">{names.map((i) => <li key={i.id}>{i.name} · {money(i.price)}</li>)}</ul>
+          <ul className="clist">{names.map((i) => (
+            <li key={i.id}>{i.name} · {money(i.price)}{i.lateOnly ? " · 後半のみ" : ""}</li>
+          ))}</ul>
           <p className="total">合計 {money(names.reduce((n, i) => n + (i.price ?? 0), 0))}</p>
           <p className="hint">お支払いは現金またはWise。</p>
         </div>
@@ -159,6 +215,13 @@ export default function BuyerPage() {
           {method === "line" && <LineBlock url={lineUrl} />}
           {method === "phone" && <PhoneBlock />}
         </div>
+        {auth.lineLogin && (
+          <p className="hint">
+            {auth.linked
+              ? <>LINE連携中（{auth.displayName}） · <button type="button" className="back" style={{ margin: 0 }} onClick={() => void logout()}>解除</button></>
+              : <button type="button" className="back" style={{ margin: 0 }} onClick={startLineLink}>LINEで進捗を保存（任意）</button>}
+          </p>
+        )}
         {err && <div className="err">{err}</div>}
         <p className="hint send-note">送信後もEltonの確認が必要です。</p>
         <button type="button" className="cta" disabled={busy || !canSend} onClick={book}
@@ -167,18 +230,20 @@ export default function BuyerPage() {
     );
   }
 
-  const okOpen = open ? available.has(open.id) : false;
+  const okOpen = open ? !open.taken : false;
   const onOpen = open ? picked.has(open.id) : false;
   const openPics = open?.photos || [];
-  const openRange = open ? rangeLbl(open.availableFrom, open.availableTo) : "";
+  const openAvail = open?.lateOnly
+    ? `後半のみ（${rangeLbl(open.availableFrom, state?.days?.[state.days.length - 1])}）`
+    : open ? rangeLbl(open.availableFrom, open.availableTo) : "";
 
   return (
     <main className="buy">
       <header className="bar">
-        <span className="area">{(state?.address || "").trim() || "エリア"}</span>
-        <select className="day" value={day} onChange={(e) => { setDay(e.target.value); setPicked(new Set()); }}>
-          {(state?.days || []).map((d) => <option key={d} value={d}>{dayLbl(d)}</option>)}
-        </select>
+        {auth.linked && auth.displayName
+          ? <span className="shop">{auth.displayName}</span>
+          : <span className="area">{(state?.address || "").trim() || "エリア"}</span>}
+        <span className="span">{span}</span>
         <button type="button" className="req"
           onClick={() => { setSlot(null); setMethod("line"); setErr(null); setCheckout(true); }}>
           {picked.size ? `引き取りを依頼 (${picked.size})` : "引き取りを依頼"}
@@ -186,7 +251,7 @@ export default function BuyerPage() {
       </header>
       {err && <div className="err">{err}</div>}
       <Listings items={state?.items || []} onSelect={setOpen}
-        classNameFor={(item) => `${picked.has(item.id) ? "on" : ""}${available.has(item.id) ? "" : " dim"}`.trim()} />
+        classNameFor={(item) => `${picked.has(item.id) ? "on" : ""}${item.taken ? " dim" : ""}`.trim()} />
       {!state && <p style={{ padding: 12 }}>読み込み中…</p>}
       {open && (
         <div className="mask" role="dialog" aria-modal="true" aria-label={open.name} onClick={() => setOpen(null)}>
@@ -195,8 +260,8 @@ export default function BuyerPage() {
             <div className="sp">{money(open.price)}</div>
             <h2>{open.name}</h2>
             {open.note ? <p className="sn">{open.note}</p> : null}
-            {openRange ? <p className="sm">{openRange}</p> : null}
-            {!okOpen && <p className="sw">{why(open, day)}</p>}
+            {openAvail ? <p className="sm">{openAvail}</p> : null}
+            {!okOpen && <p className="sw">{why(open, day || (state?.days?.[0] || ""))}</p>}
             <button type="button" className="cta" disabled={!okOpen}
               onClick={() => { toggle(open.id); setOpen(null); }}
               style={{ background: okOpen ? (onOpen ? "#eee" : "#ff9900") : "#ccc" }}>{onOpen ? "外す" : "追加"}</button>

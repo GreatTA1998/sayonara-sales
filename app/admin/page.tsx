@@ -2,22 +2,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon, IconBtn } from "@/components/icons";
 import { Listings, type PhotoItem } from "@/components/photo-listing";
+import { dayLbl, isLateOnly } from "@/lib/days";
 import { Snack, useSnack } from "./snack";
 
-type Item = PhotoItem & { claimId?: string | null; note?: string };
-type Claim = { id: string; code: string; day: string; slot?: string; contact?: string; contactMethod?: string; itemIds: string[]; status: string };
+type Item = PhotoItem & { claimId?: string | null; note?: string; availableFrom?: string; availableTo?: string };
+type Claim = {
+  id: string; code: string; day: string; slot?: string; contact?: string; contactMethod?: string;
+  lineUserId?: string; itemIds: string[]; status: string;
+};
 type AdminState = { address: string; items: Item[]; claims: Claim[] };
+type Auth = { linked: boolean; displayName: string | null };
 
 /** Library-first: no capture (capture forces camera). Specific types bias Photos over Files. */
 const IMG_ACCEPT = "image/jpeg,image/png,image/heic,image/heif,image/webp,image/gif,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif";
 
 const byPriceDesc = (a: Item, b: Item) => (b.price ?? -1) - (a.price ?? -1);
-const WK = "月火水木金土日";
-const dayLbl = (d: string) => {
-  const [y, m, day] = d.split("-").map(Number);
-  const w = WK[(new Date(Date.UTC(y, m - 1, day)).getUTCDay() + 6) % 7];
-  return `${m}月${day}日（${w}）`;
-};
 const statusJa = (s: string) =>
   s === "booked" ? "予約済" : s === "picked_up" ? "受取済" : s === "cancelled" ? "キャンセル" : s;
 const methodJa = (m?: string) => (m === "phone" ? "電話" : m === "line" ? "LINE" : m || "");
@@ -31,15 +30,21 @@ export default function AdminPage() {
   const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState("0");
   const [editNote, setEditNote] = useState("");
+  const [editLate, setEditLate] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [sheetMenu, setSheetMenu] = useState<string | null>(null); // "item" | photo url
   const { snack, show } = useSnack();
+  const [auth, setAuth] = useState<Auth>({ linked: false, displayName: null });
   const [addrDraft, setAddrDraft] = useState("");
   const addrDraftRef = useRef("");
   const addrTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const addrSaved = useRef("");
   const addrDirty = useRef(false);
   const addrReq = useRef(0);
+  const loadAuth = useCallback(async () => {
+    const a = await fetch("/api/auth/me", { cache: "no-store" }).then((r) => r.json());
+    setAuth({ linked: !!a.linked, displayName: a.displayName || null });
+  }, []);
   const load = useCallback(async () => {
     const res = await fetch("/api/admin", { cache: "no-store" });
     if (!res.ok) { setErr("読み込みに失敗しました"); show("読み込みに失敗しました", "err"); return; }
@@ -53,7 +58,7 @@ export default function AdminPage() {
     }
   }, [show]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void load(); void loadAuth(); }, [load, loadAuth]);
   useEffect(() => () => { if (addrTimer.current) clearTimeout(addrTimer.current); }, []);
 
   const items = useMemo(() => [...(data?.items || [])].sort(byPriceDesc), [data?.items]);
@@ -134,16 +139,19 @@ export default function AdminPage() {
     setEditName(item.name);
     setEditPrice(String(item.price ?? 0));
     setEditNote(item.note || "");
+    setEditLate(isLateOnly(item));
   }
 
   async function saveDetail() {
     if (!open) return;
     const nextPrice = editPrice === "" ? 0 : Number(editPrice);
+    const wasLate = isLateOnly(open);
     const payload: Record<string, unknown> = { action: "edit", id: open.id };
     let changed = false;
     if (editName !== open.name) { payload.name = editName; changed = true; }
     if (nextPrice !== (open.price ?? 0)) { payload.price = nextPrice; changed = true; }
     if (editNote !== (open.note || "")) { payload.note = editNote.trim(); changed = true; }
+    if (editLate !== wasLate) { payload.lateOnly = editLate; changed = true; }
     if (!changed) { setOpenId(null); return; }
     const ok = await act(payload, "保存しました");
     if (ok) setOpenId(null);
@@ -236,7 +244,9 @@ export default function AdminPage() {
   return (
     <main className="buy">
       <header className="bar admin-bar">
-        <span className="admin-lab" aria-label="管理ページ">管理</span>
+        {auth.linked && auth.displayName
+          ? <span className="shop" aria-label="ショップ名">{auth.displayName}</span>
+          : <span className="admin-lab" aria-label="管理ページ">管理</span>}
         <label className="area-float">
           <span>区</span>
           <input value={addrDraft} disabled={!data}
@@ -244,6 +254,11 @@ export default function AdminPage() {
             placeholder="目黒区" autoComplete="address-level2" />
         </label>
         <span className="spacer" aria-hidden="true" />
+        {!auth.linked ? (
+          <a className="line-link" href="/api/auth/line?next=admin">LINE</a>
+        ) : (
+          <button type="button" className="line-link ghost" onClick={() => void fetch("/api/auth/logout", { method: "POST" }).then(loadAuth)}>解除</button>
+        )}
         <IconBtn name="plus" label="品目を追加" size={22}
           disabled={!data || uploading === "batch"}
           onClick={() => setAddOpen(true)} className="solid" />
@@ -265,6 +280,7 @@ export default function AdminPage() {
             const contact = [
               methodJa(c.contactMethod),
               c.contact && c.contact !== "LINE" ? c.contact : "",
+              c.lineUserId ? "LINE連携" : "",
             ].filter(Boolean).join(" · ");
             return (
               <li key={c.id} style={{ padding: "8px 0", borderBottom: "1px solid #eee", fontSize: 13 }}>
@@ -358,6 +374,11 @@ export default function AdminPage() {
             <label className="float">
               <span>メモ</span>
               <textarea value={editNote} onChange={(e) => setEditNote(e.target.value)} disabled={busyOpen} rows={3} />
+            </label>
+            <label className="late-check">
+              <input type="checkbox" checked={editLate} disabled={busyOpen}
+                onChange={(e) => setEditLate(e.target.checked)} />
+              <span>後半のみ（最後の4日）</span>
             </label>
             <div className="save-row" onClick={(e) => e.stopPropagation()}>
               <button type="button" className="cta" disabled={busyOpen} onClick={() => void saveDetail()}
