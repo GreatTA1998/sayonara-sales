@@ -12,6 +12,9 @@ type AdminState = { address: string; items: Item[]; claims: Claim[] };
 const IMG_ACCEPT = "image/jpeg,image/png,image/heic,image/heif,image/webp,image/gif,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif";
 
 const byPriceDesc = (a: Item, b: Item) => (b.price ?? -1) - (a.price ?? -1);
+const statusJa = (s: string) =>
+  s === "booked" ? "予約済" : s === "picked_up" ? "受取済" : s === "cancelled" ? "キャンセル" : s;
+const methodJa = (m?: string) => (m === "phone" ? "電話" : m === "line" ? "LINE" : m || "");
 
 export default function AdminPage() {
   const [data, setData] = useState<AdminState | null>(null);
@@ -33,7 +36,7 @@ export default function AdminPage() {
   const addrReq = useRef(0);
   const load = useCallback(async () => {
     const res = await fetch("/api/admin", { cache: "no-store" });
-    if (!res.ok) { setErr("Failed to load"); show("Failed to load", "err"); return; }
+    if (!res.ok) { setErr("読み込みに失敗しました"); show("読み込みに失敗しました", "err"); return; }
     setErr(null);
     const body = await res.json();
     setData(body);
@@ -78,7 +81,7 @@ export default function AdminPage() {
     });
     const body = await res.json();
     if (!res.ok) {
-      const msg = body.error || "Failed";
+      const msg = body.error || "失敗しました";
       setErr(msg); show(msg, "err");
       return null;
     }
@@ -99,7 +102,7 @@ export default function AdminPage() {
     const body = await res.json();
     if (!res.ok) {
       if (req !== addrReq.current) return;
-      const msg = body.error || "Failed";
+      const msg = body.error || "失敗しました";
       setErr(msg); show(msg, "err");
       return;
     }
@@ -108,7 +111,7 @@ export default function AdminPage() {
     addrSaved.current = saved;
     setData((d) => d && { ...d, address: saved });
     if (addrDraftRef.current.trim() === saved) addrDirty.current = false;
-    show("Saved", "ok");
+    show("保存しました", "ok");
   }
 
   function onAddressChange(value: string) {
@@ -136,7 +139,7 @@ export default function AdminPage() {
     if (nextPrice !== (open.price ?? 0)) { payload.price = nextPrice; changed = true; }
     if (editNote !== (open.note || "")) { payload.note = editNote.trim(); changed = true; }
     if (!changed) { setOpenId(null); return; }
-    const ok = await act(payload, "Saved");
+    const ok = await act(payload, "保存しました");
     if (ok) setOpenId(null);
   }
 
@@ -152,14 +155,14 @@ export default function AdminPage() {
   }
 
   async function uploadPhoto(itemId: string, file: File) {
-    setUploading(itemId); setErr(null); show("Uploading…", "busy");
+    setUploading(itemId); setErr(null); show("アップロード中…", "busy");
     try {
       const fd = new FormData();
       fd.set("file", file);
       fd.set("itemId", itemId);
       const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error || "Upload failed");
+      if (!res.ok) throw new Error(body.error || "アップロードに失敗しました");
       if (body.item) upsertItem(body.item as Item);
       else {
         const photos = Array.isArray(body.photos) ? body.photos.map(String) : [];
@@ -168,9 +171,9 @@ export default function AdminPage() {
           items: d.items.map((i) => (i.id === itemId ? { ...i, photos } : i)),
         });
       }
-      show("Photo uploaded", "ok");
+      show("写真を追加しました", "ok");
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Upload failed";
+      const msg = e instanceof Error ? e.message : "アップロードに失敗しました";
       setErr(msg); show(msg, "err");
     } finally { setUploading(null); }
   }
@@ -181,43 +184,43 @@ export default function AdminPage() {
     setAddOpen(false);
     setUploading("batch"); setErr(null);
     let ok = 0;
-    show(`Uploading 0/${images.length}…`, "busy");
+    show(`アップロード中 0/${images.length}…`, "busy");
     for (let i = 0; i < images.length; i++) {
       try {
         const fd = new FormData();
         fd.set("file", images[i]);
         const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
         const body = await res.json();
-        if (!res.ok) throw new Error(body.error || "Upload failed");
+        if (!res.ok) throw new Error(body.error || "アップロードに失敗しました");
         if (body.item) upsertItem(body.item as Item);
         ok++;
-        show(`Uploading ${ok}/${images.length}…`, "busy");
+        show(`アップロード中 ${ok}/${images.length}…`, "busy");
       } catch (e) {
-        const msg = e instanceof Error ? e.message : "Upload failed";
+        const msg = e instanceof Error ? e.message : "アップロードに失敗しました";
         setErr(msg); show(msg, "err");
       }
     }
     setUploading(null);
-    if (ok) show(ok === 1 ? "Item added" : `Added ${ok} items`, "ok");
+    if (ok) show(ok === 1 ? "品目を追加しました" : `${ok}件追加しました`, "ok");
   }
 
   async function deleteItem(item: Item) {
-    if (!confirm(`Delete "${item.name || "item"}"?`)) return;
-    setDeleting(item.id); show("Deleting…", "busy");
+    if (!confirm(`「${item.name || "無題"}」を削除しますか？`)) return;
+    setDeleting(item.id); show("削除中…", "busy");
     try {
       const ok = await act({ action: "remove", id: item.id });
       if (ok && openId === item.id) setOpenId(null);
-      show(ok ? "Item deleted" : "Delete failed", ok ? "ok" : "err");
+      show(ok ? "削除しました" : "削除に失敗しました", ok ? "ok" : "err");
     } finally { setDeleting(null); }
   }
 
   async function deletePhoto(item: Item, url: string) {
-    if (!confirm(`Remove this photo from "${item.name || "item"}"?`)) return;
+    if (!confirm(`この写真を削除しますか？`)) return;
     const photos = (item.photos || []).filter((p) => p !== url);
-    setDeleting(item.id); show("Deleting…", "busy");
+    setDeleting(item.id); show("削除中…", "busy");
     try {
       const ok = await act({ action: "edit", id: item.id, photos });
-      show(ok ? "Photo removed" : "Delete failed", ok ? "ok" : "err");
+      show(ok ? "写真を削除しました" : "削除に失敗しました", ok ? "ok" : "err");
     } finally { setDeleting(null); }
   }
 
@@ -227,51 +230,54 @@ export default function AdminPage() {
   return (
     <main className="buy">
       <header className="bar admin-bar">
-        <span className="admin-lab" aria-label="Admin page">Admin</span>
+        <span className="admin-lab" aria-label="管理ページ">管理</span>
         <input className="area-in" value={addrDraft} disabled={!data}
-          onChange={(e) => onAddressChange(e.target.value)} aria-label="Address" placeholder="Address" />
-        <IconBtn name="plus" label="Add items" size={22}
+          onChange={(e) => onAddressChange(e.target.value)} aria-label="エリア" placeholder="下目黒" />
+        <IconBtn name="plus" label="品目を追加" size={22}
           disabled={!data || uploading === "batch"}
           onClick={() => setAddOpen(true)} className="solid" />
       </header>
-      <p style={{ margin: "6px 8px 4px", fontSize: 12, color: "#666" }}>Admin page — tap a listing to edit</p>
       {err && <div className="err">{err}</div>}
-      {!data && !err && <p style={{ padding: 12, color: "#555" }}>Loading…</p>}
+      {!data && !err && <p style={{ padding: 12, color: "#555" }}>読み込み中…</p>}
       <Listings items={items} onSelect={openDetail}
         disabledFor={(it) => deleting === it.id}
         classNameFor={(it) => (deleting === it.id ? "dim" : "")} />
-      {!items.length && data && <p style={{ padding: 12, color: "#777" }}>No items yet</p>}
+      {!items.length && data && <p style={{ padding: 12, color: "#777" }}>品目がありません</p>}
 
       <section style={{ padding: "12px 8px 24px" }}>
-        <div style={{ fontWeight: 600, marginBottom: 6 }}>Claims</div>
+        <div style={{ fontWeight: 600, marginBottom: 6 }}>予約</div>
         <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
           {(data?.claims || []).map((c) => (
             <li key={c.id} style={{ padding: "8px 0", borderBottom: "1px solid #eee", fontSize: 13 }}>
-              <div><b>{c.code}</b> · {c.day.slice(5)}{c.slot ? ` · ${c.slot}` : ""} · {c.status}</div>
-              <div style={{ color: "#555" }}>{c.itemIds.map((id) => data?.items.find((i) => i.id === id)?.name || id).join(", ")}{c.contactMethod ? ` · ${c.contactMethod}` : ""}{c.contact ? ` · ${c.contact}` : ""}</div>
+              <div><b>{c.code}</b> · {c.day.slice(5)}{c.slot ? ` · ${c.slot}` : ""} · {statusJa(c.status)}</div>
+              <div style={{ color: "#555" }}>
+                {c.itemIds.map((id) => data?.items.find((i) => i.id === id)?.name || id).join("、")}
+                {c.contactMethod ? ` · ${methodJa(c.contactMethod)}` : ""}
+                {c.contact && c.contact !== "LINE" ? ` · ${c.contact}` : ""}
+              </div>
               {c.status === "booked" && (
                 <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-                  <button type="button" onClick={() => act({ action: "cancel", id: c.id }, "Saved")}>Cancel</button>
-                  <button type="button" onClick={() => act({ action: "picked_up", id: c.id }, "Saved")}>Picked up</button>
+                  <button type="button" onClick={() => act({ action: "cancel", id: c.id }, "保存しました")}>キャンセル</button>
+                  <button type="button" onClick={() => act({ action: "picked_up", id: c.id }, "保存しました")}>受取済み</button>
                 </div>
               )}
             </li>
           ))}
-          {!data?.claims?.length && <li style={{ color: "#777" }}>No claims yet</li>}
+          {!data?.claims?.length && <li style={{ color: "#777" }}>予約はまだありません</li>}
         </ul>
       </section>
 
       {addOpen && (
-        <div className="mask" role="dialog" aria-modal="true" aria-label="Add items"
+        <div className="mask" role="dialog" aria-modal="true" aria-label="品目を追加"
           onClick={() => setAddOpen(false)}>
           <div className="sheet add-sheet" onClick={(e) => e.stopPropagation()}>
             <div className="add-head">
-              <h2>Add items</h2>
-              <IconBtn name="close" label="Close" onClick={() => setAddOpen(false)} className="ghost-border" />
+              <h2>品目を追加</h2>
+              <IconBtn name="close" label="閉じる" onClick={() => setAddOpen(false)} className="ghost-border" />
             </div>
-            <p className="add-cue">Each photo becomes its own item. Opens photo library (no camera).</p>
+            <p className="add-cue">写真1枚につき品目が1つ作成されます。</p>
             <label className="cta" style={{ background: "#111", color: "#fff", display: "block", textAlign: "center", cursor: "pointer" }}>
-              Add photos
+              写真を追加
               <input type="file" accept={IMG_ACCEPT} multiple hidden
                 onChange={(e) => { const f = e.target.files; e.target.value = ""; if (f?.length) void addFromPhotos(Array.from(f)); }} />
             </label>
@@ -280,26 +286,26 @@ export default function AdminPage() {
       )}
 
       {open && (
-        <div className="mask" role="dialog" aria-modal="true" aria-label="Edit item"
+        <div className="mask" role="dialog" aria-modal="true" aria-label="品目を編集"
           onClick={() => { if (!busyOpen) { setSheetMenu(null); setOpenId(null); } }}>
           <div className="sheet" onClick={(e) => { e.stopPropagation(); if (sheetMenu) setSheetMenu(null); }}
             style={{ maxHeight: "90vh", overflowY: "auto" }}>
             <div className="add-head">
-              <h2 style={{ margin: 0, fontSize: 18 }}>Edit</h2>
-              <IconBtn name="close" label="Close" disabled={busyOpen} onClick={() => setOpenId(null)} className="ghost-border" />
+              <h2 style={{ margin: 0, fontSize: 18 }}>編集</h2>
+              <IconBtn name="close" label="閉じる" disabled={busyOpen} onClick={() => setOpenId(null)} className="ghost-border" />
             </div>
             <div className="pics">
               {pics.map((src) => (
                 <div key={src} className="pic-wrap" onClick={(e) => e.stopPropagation()}>
                   <img src={src} alt="" loading="lazy" decoding="async" />
                   <div className="pic-more">
-                    <IconBtn name="more" label="Photo menu" disabled={busyOpen} size={16} className="ghost-border"
+                    <IconBtn name="more" label="写真メニュー" disabled={busyOpen} size={16} className="ghost-border"
                       onClick={() => setSheetMenu(sheetMenu === src ? null : src)} />
                     {sheetMenu === src && (
                       <div className="menu-pop">
                         <button type="button" className="danger" disabled={busyOpen}
                           onClick={() => { setSheetMenu(null); void deletePhoto(open, src); }}>
-                          <Icon name="trash" size={16} /> Delete photo
+                          <Icon name="trash" size={16} /> 写真を削除
                         </button>
                       </div>
                     )}
@@ -307,7 +313,7 @@ export default function AdminPage() {
                 </div>
               ))}
               <label className={`pic-add${uploading === open.id || busyOpen ? " busy" : ""}`}
-                aria-label="Add photo" onClick={(e) => e.stopPropagation()}>
+                aria-label="写真を追加" onClick={(e) => e.stopPropagation()}>
                 <Icon name="plus" size={22} />
                 <input type="file" accept={IMG_ACCEPT} hidden disabled={busyOpen || uploading === open.id}
                   onChange={(e) => {
@@ -318,29 +324,29 @@ export default function AdminPage() {
               </label>
             </div>
             <label className="float">
-              <span>Name</span>
+              <span>名前</span>
               <input value={editName} onChange={(e) => setEditName(e.target.value)} disabled={busyOpen} />
             </label>
             <label className="float">
-              <span>Price</span>
+              <span>価格</span>
               <input type="number" min={0} inputMode="numeric" value={editPrice}
                 onChange={(e) => setEditPrice(e.target.value)} disabled={busyOpen} />
             </label>
             <label className="float">
-              <span>Note</span>
+              <span>メモ</span>
               <textarea value={editNote} onChange={(e) => setEditNote(e.target.value)} disabled={busyOpen} rows={3} />
             </label>
             <div className="save-row" onClick={(e) => e.stopPropagation()}>
               <button type="button" className="cta" disabled={busyOpen} onClick={() => void saveDetail()}
-                style={{ background: "#111", color: "#fff", flex: 1, margin: 0 }}>Save</button>
+                style={{ background: "#111", color: "#fff", flex: 1, margin: 0 }}>保存</button>
               <div className="save-more">
-                <IconBtn name="more" label="Listing menu" disabled={busyOpen} className="ghost-border"
+                <IconBtn name="more" label="品目メニュー" disabled={busyOpen} className="ghost-border"
                   onClick={() => setSheetMenu(sheetMenu === "item" ? null : "item")} />
                 {sheetMenu === "item" && (
                   <div className="menu-pop up">
                     <button type="button" className="danger" disabled={busyOpen}
                       onClick={() => { setSheetMenu(null); void deleteItem(open); }}>
-                      <Icon name="trash" size={16} /> Delete listing
+                      <Icon name="trash" size={16} /> 品目を削除
                     </button>
                   </div>
                 )}

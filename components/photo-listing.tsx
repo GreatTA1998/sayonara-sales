@@ -7,7 +7,7 @@ export const money = (p: number | null) => (p == null ? "無料" : `¥${p.toLoca
 
 function labelName(name: string) {
   const t = (name || "").trim();
-  return t || "Untitled";
+  return t || "無題";
 }
 
 /** Quiet “more photos” hint — bottom-right when count > 1. */
