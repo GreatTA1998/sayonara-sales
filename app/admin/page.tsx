@@ -8,6 +8,9 @@ type Item = PhotoItem & { claimId?: string | null; note?: string };
 type Claim = { id: string; code: string; day: string; slot?: string; contact?: string; contactMethod?: string; itemIds: string[]; status: string };
 type AdminState = { address: string; items: Item[]; claims: Claim[] };
 
+/** Library-first: no capture (capture forces camera). Specific types bias Photos over Files. */
+const IMG_ACCEPT = "image/jpeg,image/png,image/heic,image/heif,image/webp,image/gif,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif";
+
 const byPriceDesc = (a: Item, b: Item) => (b.price ?? -1) - (a.price ?? -1);
 
 export default function AdminPage() {
@@ -264,19 +267,12 @@ export default function AdminPage() {
               <h2>Add items</h2>
               <IconBtn name="close" label="Close" onClick={() => setAddOpen(false)} className="ghost-border" />
             </div>
-            <p className="add-cue">Each photo becomes its own item.</p>
-            <div className="add-acts">
-              <label className="add-act" aria-label="Camera">
-                <Icon name="camera" size={28} />
-                <input type="file" accept="image/*" capture="environment" hidden
-                  onChange={(e) => { const f = e.target.files; e.target.value = ""; if (f?.length) void addFromPhotos(Array.from(f)); }} />
-              </label>
-              <label className="add-act" aria-label="Photo library">
-                <Icon name="photo" size={28} />
-                <input type="file" accept="image/*" multiple hidden
-                  onChange={(e) => { const f = e.target.files; e.target.value = ""; if (f?.length) void addFromPhotos(Array.from(f)); }} />
-              </label>
-            </div>
+            <p className="add-cue">Each photo becomes its own item. Opens photo library (no camera).</p>
+            <label className="cta" style={{ background: "#111", color: "#fff", display: "block", textAlign: "center", cursor: "pointer" }}>
+              Add photos
+              <input type="file" accept={IMG_ACCEPT} multiple hidden
+                onChange={(e) => { const f = e.target.files; e.target.value = ""; if (f?.length) void addFromPhotos(Array.from(f)); }} />
+            </label>
           </div>
         </div>
       )}
@@ -313,7 +309,7 @@ export default function AdminPage() {
               style={{ background: "#111", color: "#fff", marginBottom: 8 }}>Save</button>
             <label className={`icon-row${uploading === open.id || busyOpen ? " busy" : ""}`}>
               <Icon name="photo" size={18} /> {uploading === open.id ? "Uploading…" : "Add photo"}
-              <input type="file" accept="image/*" hidden disabled={busyOpen || uploading === open.id}
+              <input type="file" accept={IMG_ACCEPT} hidden disabled={busyOpen || uploading === open.id}
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   e.target.value = "";
