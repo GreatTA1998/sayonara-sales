@@ -1,20 +1,20 @@
 import { NextResponse } from "next/server";
-import { PICKUP_DAYS, PICKUP_SLOTS, itemStatus, shortCode, takenSlots, uid, withStore } from "@/lib/store";
+import { PICKUP_DAYS, PICKUP_SLOTS, itemStatus, shortCode, shopFromUrl, takenSlots, uid, withStore } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  const shop = shopFromUrl(req);
   const body = await req.json();
   const day = String(body.day || "");
   const slot = String(body.slot || "");
   const contactMethod = body.contactMethod === "phone" ? "phone" as const : body.contactMethod === "line" ? "line" as const : undefined;
-  // Soft identity: typed LINE display name (no OAuth).
   const contact = String(body.contact || "").trim();
   const itemIds: string[] = Array.isArray(body.itemIds) ? body.itemIds.map(String) : [];
   if (!PICKUP_DAYS.includes(day) || !PICKUP_SLOTS.includes(slot) || !itemIds.length || !contactMethod || !contact)
     return NextResponse.json({ error: "日付・時間・LINE名・連絡方法・品目を確認してください" }, { status: 400 });
   try {
-    const result = await withStore((s) => {
+    const result = await withStore(shop, (s) => {
       if (takenSlots(s, day).includes(slot)) throw new Error("その時間帯は埋まっています");
       for (const id of itemIds) {
         const item = s.items.find((i) => i.id === id);

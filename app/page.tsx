@@ -1,102 +1,135 @@
 "use client";
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { listPins, openShop, saveGeo, type Pin } from "@/lib/shop";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import AdminUi from "@/components/admin-ui";
+import { Listings, type PhotoItem } from "@/components/photo-listing";
+import {
+  DEFAULT_WARD, ELTON_LABEL, WARDS, ensureShopId, getName, listSales, listWardPins,
+  openShop, type SaleRow,
+} from "@/lib/shop";
 
 const HubMap = dynamic(() => import("@/components/hub-map"), { ssr: false, loading: () => <div className="hub-map ph" /> });
 
 type Tab = "buy" | "sell";
-
-const TIPS = [
-  "写真を撮って出品するだけ",
-  "まとめて選んで引き取り依頼",
-  "LINEの個別やりとりが不要",
-];
+type EltonItem = PhotoItem & { taken?: boolean };
 
 export default function HubPage() {
-  const router = useRouter();
   const [tab, setTab] = useState<Tab>("buy");
-  const [pins, setPins] = useState<Pin[]>([]);
-  const [focus, setFocus] = useState<{ lat: number; lng: number } | null>(null);
-  const [near, setNear] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [started, setStarted] = useState(false);
-  const [name, setName] = useState("");
+  const [sales, setSales] = useState<SaleRow[]>([]);
+  const [selected, setSelected] = useState<SaleRow | null>(null);
+  const [elton, setElton] = useState<EltonItem[]>([]);
+  const [shopId, setShopId] = useState("");
+  const [lineSaved, setLineSaved] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [lineName, setLineName] = useState("");
+  const [adminName, setAdminName] = useState("出品");
 
-  const refresh = useCallback(() => setPins(listPins()), []);
-  useEffect(() => { refresh(); }, [refresh]);
+  const refreshSales = useCallback(() => setSales(listSales()), []);
+  useEffect(() => { refreshSales(); }, [refreshSales]);
 
-  function askNear() {
-    if (!navigator.geolocation) { setNear("位置情報が使えません"); return; }
-    setBusy(true); setNear(null);
-    navigator.geolocation.getCurrentPosition(
-      (p) => {
-        const { latitude: lat, longitude: lng } = p.coords;
-        setFocus({ lat, lng });
-        const mine = pins.find((x) => x.mine);
-        if (mine) { saveGeo(mine.id, lat, lng); refresh(); }
-        setNear(null);
-        setBusy(false);
-      },
-      () => { setNear("位置を取得できませんでした"); setBusy(false); },
-      { timeout: 8000 },
-    );
+  useEffect(() => {
+    void fetch("/api/state?shop=elton", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => setElton((d.items || []) as EltonItem[]))
+      .catch(() => setElton([]));
+  }, []);
+
+  useEffect(() => {
+    if (tab !== "sell") return;
+    const id = ensureShopId();
+    setShopId(id);
+    const n = getName();
+    setLineSaved(!!n);
+    setAdminName(n || "出品");
+    setLineName(n);
+  }, [tab]);
+
+  const wardPins = useMemo(
+    () => listWardPins(sales, selected?.ward || null),
+    [sales, selected],
+  );
+  const focus = selected ? (WARDS[selected.ward] || WARDS[DEFAULT_WARD]) : null;
+
+  function pickSale(row: SaleRow) {
+    setSelected(row);
   }
 
-  function startSell(e: { preventDefault(): void }) {
+  function saveLogin(e: { preventDefault(): void }) {
     e.preventDefault();
-    const id = openShop(name);
+    const id = openShop(lineName);
     if (!id) return;
-    refresh();
-    router.push(`/s/${id}/admin`);
+    setShopId(id);
+    setLineSaved(true);
+    setAdminName(lineName.trim());
+    setLoginOpen(false);
+    refreshSales();
   }
 
   return (
-    <main className="wrap hub">
-      <h1>Sayonara Sales</h1>
-      <div className="hub-tabs" role="tablist" aria-label="買う・売る">
-        <button type="button" role="tab" aria-selected={tab === "buy"} className={tab === "buy" ? "on" : ""}
-          onClick={() => setTab("buy")}>買う</button>
-        <button type="button" role="tab" aria-selected={tab === "sell"} className={tab === "sell" ? "on" : ""}
-          onClick={() => setTab("sell")}>売る</button>
+    <main className={`hub-root${tab === "sell" ? " sell-mode" : ""}`}>
+      <div className="wrap hub">
+        <h1>Sayonara Sales</h1>
+        <div className="hub-tabs" role="tablist" aria-label="買う・売る">
+          <button type="button" role="tab" aria-selected={tab === "buy"} className={tab === "buy" ? "on" : ""}
+            onClick={() => setTab("buy")}>買う</button>
+          <button type="button" role="tab" aria-selected={tab === "sell"} className={tab === "sell" ? "on" : ""}
+            onClick={() => setTab("sell")}>売る</button>
+        </div>
       </div>
 
       {tab === "buy" && (
         <section className="hub-buy" role="tabpanel">
-          <p className="hint">地図のピンから引き取りへ。戻るときもここから。</p>
-          <HubMap pins={pins} focus={focus} onPin={(id) => router.push(`/s/${id}`)} />
-          <button type="button" className="ghost" onClick={askNear} disabled={busy}>
-            {busy ? "取得中…" : "現在地"}
-          </button>
-          {near && <p className="hint">{near}</p>}
-          {!pins.length && <p className="hint">まだピンがありません。売るタブから出品を始めるとここに出ます。</p>}
-          {!!pins.length && (
-            <ul className="dir">
-              {pins.map((p) => (
-                <li key={p.id}>
-                  <a href={`/s/${p.id}`}>{p.name}</a>
-                  {p.mine ? " · 自分" : ""} · {p.id}
+          <div className="wrap hub">
+            <div className="hub-elton">
+              <div className="hub-elton-h">
+                <span className="font-bold">{ELTON_LABEL}</span>
+                <span className="hint">{DEFAULT_WARD}</span>
+                <a className="hub-more" href="/s/elton">もっと見る</a>
+              </div>
+              <Listings items={elton} onSelect={() => { window.location.href = "/s/elton"; }}
+                classNameFor={(it) => (it as EltonItem).taken ? "dim" : ""} />
+              {!elton.length && <p className="hint pad">読み込み中…</p>}
+            </div>
+            <p className="hint">区で探す。リストを選ぶと地図がハイライト。</p>
+          </div>
+          <HubMap pins={wardPins} focus={focus} selectedWard={selected?.ward || null}
+            onWard={(w) => {
+              const row = sales.find((s) => s.ward === w);
+              if (row) setSelected(row);
+            }} />
+          <div className="wrap hub">
+            <ul className="dir sales">
+              {sales.map((s) => (
+                <li key={s.id}>
+                  <button type="button" className={selected?.id === s.id ? "on" : ""}
+                    onClick={() => pickSale(s)}>
+                    <span className="font-bold">{s.name}</span>
+                    <span className="hint"> · {s.ward}{s.mine ? " · 自分" : ""}</span>
+                  </button>
+                  <a href={s.href}>見る</a>
                 </li>
               ))}
             </ul>
-          )}
+          </div>
         </section>
       )}
 
-      {tab === "sell" && (
+      {tab === "sell" && shopId && (
         <section className="hub-sell" role="tabpanel">
-          <p className="hint">ジモティー風の引越し出品。</p>
-          <ul className="tips">{TIPS.map((t) => <li key={t}>{t}</li>)}</ul>
-          {!started ? (
-            <button type="button" className="dark" onClick={() => setStarted(true)}>出品を始める</button>
-          ) : (
-            <form className="field" onSubmit={startSell}>
-              <label className="float"><span>LINE名</span>
-                <input value={name} onChange={(e) => setName(e.target.value)}
-                  placeholder="表示名" autoComplete="nickname" autoFocus /></label>
-              <button type="submit" className="dark" disabled={!name.trim()}>管理画面へ</button>
-            </form>
+          <AdminUi shop={shopId} name={adminName}
+            login={{ saved: lineSaved, onClick: () => setLoginOpen(true) }} />
+          {loginOpen && (
+            <div className="mask" role="dialog" aria-modal="true" aria-label="ログインして保存"
+              onClick={() => setLoginOpen(false)}>
+              <form className="sheet" onClick={(e) => e.stopPropagation()} onSubmit={saveLogin}>
+                <h2>ログインして保存</h2>
+                <p className="hint">LINE名だけでOK（パスワードなし）</p>
+                <label className="float"><span>LINE名</span>
+                  <input value={lineName} onChange={(e) => setLineName(e.target.value)}
+                    placeholder="表示名" autoComplete="nickname" autoFocus /></label>
+                <button type="submit" className="cta go" disabled={!lineName.trim()}>保存</button>
+              </form>
+            </div>
           )}
         </section>
       )}

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getStore, setLateOnly, uid, withStore } from "@/lib/store";
+import { getStore, setLateOnly, shopFromUrl, uid, withStore } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 const numPrice = (v: unknown) => {
@@ -7,18 +7,19 @@ const numPrice = (v: unknown) => {
   return Math.max(0, Number(v));
 };
 
-export async function GET() {
-  const s = await getStore();
-  return NextResponse.json({ address: s.address, items: s.items, claims: s.claims });
+export async function GET(req: Request) {
+  const shop = shopFromUrl(req);
+  const s = await getStore(shop);
+  return NextResponse.json({ address: s.address, items: s.items, claims: s.claims, shop });
 }
 
 export async function POST(req: Request) {
+  const shop = shopFromUrl(req);
   const body = await req.json();
   try {
-    const result = await withStore((s) => {
+    const result = await withStore(shop, (s) => {
       switch (body.action as string) {
         case "add": {
-          // Untitled items are allowed (photo-first create from admin +).
           const item = {
             id: uid("i"),
             name: String(body.name || "").trim(),

@@ -8,26 +8,30 @@ import { MEGURO } from "@/lib/shop";
 type Props = {
   pins: Pin[];
   focus?: { lat: number; lng: number } | null;
-  onPin: (id: string) => void;
+  selectedWard?: string | null;
+  onWard?: (ward: string) => void;
 };
 
-/** Leaflet map — load via next/dynamic ssr:false from hub. */
-export default function HubMap({ pins, focus, onPin }: Props) {
+/** Ward-level map — low zoom, no street clutter. */
+export default function HubMap({ pins, focus, selectedWard, onWard }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
-  const onPinRef = useRef(onPin);
+  const onWardRef = useRef(onWard);
   const [ready, setReady] = useState(false);
-  onPinRef.current = onPin;
+  onWardRef.current = onWard;
 
   useEffect(() => {
     if (!el.current || mapRef.current) return;
-    const map = L.map(el.current, { zoomControl: false, attributionControl: true })
-      .setView([MEGURO.lat, MEGURO.lng], 14);
+    const map = L.map(el.current, {
+      zoomControl: false, attributionControl: true,
+      minZoom: 10, maxZoom: 12,
+    }).setView([MEGURO.lat, MEGURO.lng], 11);
     L.control.zoom({ position: "bottomright" }).addTo(map);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "&copy; OpenStreetMap",
-      maxZoom: 19,
+    // Quiet basemap at ward zoom (max 12). ESRI light gray — no API key.
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}", {
+      attribution: "Tiles &copy; Esri",
+      maxZoom: 12,
     }).addTo(map);
     layerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
@@ -45,18 +49,25 @@ export default function HubMap({ pins, focus, onPin }: Props) {
     if (!ready || !layer) return;
     layer.clearLayers();
     for (const p of pins) {
-      const html = `<span class="hub-pin${p.mine ? " mine" : ""}">${esc(p.name)}</span>`;
+      const on = selectedWard === p.ward;
+      const html = `<span class="hub-pin ward${on ? " on" : ""}">${esc(p.name)}</span>`;
       const marker = L.marker([p.lat, p.lng], {
         icon: L.divIcon({ className: "hub-pin-wrap", html, iconSize: [0, 0], iconAnchor: [0, 0] }),
+        zIndexOffset: on ? 500 : 0,
       });
-      marker.on("click", () => onPinRef.current(p.id));
+      marker.on("click", () => onWardRef.current?.(p.ward));
       marker.addTo(layer);
+      if (on) {
+        L.circle([p.lat, p.lng], {
+          radius: 1200, color: "#111", weight: 2, fillColor: "#ff9900", fillOpacity: 0.18,
+        }).addTo(layer);
+      }
     }
-  }, [pins, ready]);
+  }, [pins, selectedWard, ready]);
 
   useEffect(() => {
     if (!ready || !focus || !mapRef.current) return;
-    mapRef.current.setView([focus.lat, focus.lng], 15, { animate: true });
+    mapRef.current.setView([focus.lat, focus.lng], 12, { animate: true });
   }, [focus, ready]);
 
   return <div ref={el} className="hub-map" role="presentation" />;
