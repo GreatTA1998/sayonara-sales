@@ -8,10 +8,11 @@ export async function POST(req: Request) {
   const day = String(body.day || "");
   const slot = String(body.slot || "");
   const contactMethod = body.contactMethod === "phone" ? "phone" as const : body.contactMethod === "line" ? "line" as const : undefined;
-  const contact = String(body.contact || "").trim() || undefined;
+  // Soft identity: typed LINE display name (no OAuth).
+  const contact = String(body.contact || "").trim();
   const itemIds: string[] = Array.isArray(body.itemIds) ? body.itemIds.map(String) : [];
-  if (!PICKUP_DAYS.includes(day) || !PICKUP_SLOTS.includes(slot) || !itemIds.length || !contactMethod)
-    return NextResponse.json({ error: "日付・時間・連絡方法・品目を確認してください" }, { status: 400 });
+  if (!PICKUP_DAYS.includes(day) || !PICKUP_SLOTS.includes(slot) || !itemIds.length || !contactMethod || !contact)
+    return NextResponse.json({ error: "日付・時間・LINE名・連絡方法・品目を確認してください" }, { status: 400 });
   try {
     const result = await withStore((s) => {
       if (takenSlots(s, day).includes(slot)) throw new Error("その時間帯は埋まっています");
@@ -23,8 +24,7 @@ export async function POST(req: Request) {
       }
       const claim = {
         id: uid("c"), code: shortCode(), day, slot, itemIds: [...itemIds],
-        contactMethod,
-        contact: contactMethod === "line" ? "LINE" : (contact || "080-4919-2027"),
+        contactMethod, contact,
         status: "booked" as const, createdAt: new Date().toISOString(),
       };
       for (const id of itemIds) s.items.find((i) => i.id === id)!.claimId = claim.id;
