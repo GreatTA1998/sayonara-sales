@@ -41,7 +41,6 @@ function PhoneBlock() {
   return (
     <div className="linebox">
       <a className="linelink" href={PHONE_TEL}>{PHONE_DISPLAY}</a>
-      <p className="hint">タップで発信できます。</p>
     </div>
   );
 }
