@@ -16,7 +16,7 @@ const BLOB = "sayonara-store.json";
 const LOCAL = path.join(process.cwd(), "data", "store.json");
 
 const seed = (): Store => ({
-  address: "目黒駅・不動前駅あたりで引き取り",
+  address: "下目黒",
   items: [
     { id: "i1", name: "IKEA desk", price: 3000, photos: ["https://picsum.photos/seed/desk/600/400"] },
     { id: "i2", name: "Office chair", price: 2000, note: "slight wear" },
