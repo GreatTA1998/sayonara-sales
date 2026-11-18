@@ -29,12 +29,17 @@ const why = (i: Item, day: string) =>
     : !dayOk(i, day) ? `受け取り可能：${rangeLbl(i.availableFrom, i.availableTo)}`
     : "受け取り不可";
 
-function LineBlock({ url }: { url: string }) {
+function LinkQr({ href, label, qrSrc, qrAlt }: { href: string; label: string; qrSrc: string; qrAlt: string }) {
+  const [mode, setMode] = useState<"link" | "qr">("link");
   return (
     <div className="linebox">
-      <p className="hint">リンクを開くか、QRを読み取って追加してください。</p>
-      <a className="linelink" href={url} target="_blank" rel="noopener noreferrer">LINE招待リンク</a>
-      <img className="lineqr" src="/line-qr.jpg" alt="LINE QR" />
+      <div className="slots pair" role="group" aria-label={label}>
+        <button type="button" className={mode === "link" ? "slot on" : "slot"} onClick={() => setMode("link")}>リンク</button>
+        <button type="button" className={mode === "qr" ? "slot on" : "slot"} onClick={() => setMode("qr")}>QR</button>
+      </div>
+      {mode === "link"
+        ? <a className="linelink" href={href} target="_blank" rel="noopener noreferrer">{label}</a>
+        : <img className="lineqr" src={qrSrc} alt={qrAlt} />}
     </div>
   );
 }
@@ -43,7 +48,7 @@ function PhoneBlock() {
   return (
     <div className="linebox">
       <a className="linelink" href={PHONE_TEL}>{PHONE_DISPLAY}</a>
-      <p className="hint">Eltonの電話番号です。タップで発信できます。</p>
+      <p className="hint">タップで発信できます。</p>
     </div>
   );
 }
@@ -123,7 +128,7 @@ export default function BuyerPage() {
         <p>エリア: {receipt.address}</p>
         <ul>{receipt.items.map((n) => <li key={n}>{n}</li>)}</ul>
         {viaLine ? (
-          <section className="field"><span>連絡：LINE</span><LineBlock url={lineUrl} /></section>
+          <section className="field"><span>連絡：LINE</span><LinkQr href={lineUrl} label="LINE招待リンク" qrSrc="/line-qr.jpg" qrAlt="LINE QR" /></section>
         ) : (
           <section className="field"><span>連絡：電話</span><PhoneBlock /></section>
         )}
@@ -200,13 +205,13 @@ export default function BuyerPage() {
               <p className="sw">後半のみの品目があります。日付を{rangeLbl(blocked[0].availableFrom, state?.days?.[state.days.length - 1])}以降にしてください。</p>
             )}
             {!freeSlots.length && <p className="sw">この日は空きがありません。</p>}
-            <p className="hint pay">お支払いは現金またはWise。</p>
+            <p className="hint pay">現金またはWiseで支払い。</p>
             <div className="field"><span>連絡方法</span>
               <div className="slots pair">
                 <button type="button" className={method === "line" ? "slot on" : "slot"} onClick={() => setMethod("line")}>LINE</button>
                 <button type="button" className={method === "phone" ? "slot on" : "slot"} onClick={() => setMethod("phone")}>電話</button>
               </div>
-              {method === "line" && <LineBlock url={lineUrl} />}
+              {method === "line" && <LinkQr href={lineUrl} label="LINE招待リンク" qrSrc="/line-qr.jpg" qrAlt="LINE QR" />}
               {method === "phone" && <PhoneBlock />}
             </div>
             {err && <div className="err">{err}</div>}
