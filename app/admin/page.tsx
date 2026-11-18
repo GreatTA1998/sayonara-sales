@@ -16,6 +16,7 @@ export default function AdminPage() {
   const [uploading, setUploading] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [view, setView] = useState<{ itemId: string; url: string } | null>(null);
   const { snack, show } = useSnack();
   const [addrDraft, setAddrDraft] = useState("");
   const addrDraftRef = useRef("");
@@ -155,12 +156,13 @@ export default function AdminPage() {
     } finally { setDeleting(null); }
   }
 
-  async function deletePhoto(item: Item, url: string, n: number) {
-    if (!confirm(`Remove photo ${n} from "${item.name || "item"}"?`)) return;
+  async function deletePhoto(item: Item, url: string) {
+    if (!confirm(`Remove this photo from "${item.name || "item"}"?`)) return;
     const photos = (item.photos || []).filter((p) => p !== url);
-    setMenuFor(null); setDeleting(item.id); show("Deleting…", "busy");
+    setDeleting(item.id); show("Deleting…", "busy");
     try {
       const ok = await act({ action: "edit", id: item.id, photos });
+      if (ok) setView(null);
       show(ok ? "Photo removed" : "Delete failed", ok ? "ok" : "err");
     } finally { setDeleting(null); }
   }
@@ -205,33 +207,28 @@ export default function AdminPage() {
                     if (v !== (item.price ?? 0)) act({ action: "edit", id: item.id, price: v }, "Saved");
                   }}
                   style={{ width: 64, padding: 4 }} />
-                <label style={{ flex: "0 0 auto", fontSize: 12, padding: "4px 6px", border: "1px dashed #bbb", borderRadius: 4, cursor: uploading === item.id || busy ? "wait" : "pointer", opacity: uploading === item.id || busy ? 0.6 : 1, whiteSpace: "nowrap" }}>
-                  {uploading === item.id ? "…" : "+Photo"}
-                  <input type="file" accept="image/*" hidden disabled={uploading === item.id || busy}
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      e.target.value = "";
-                      if (f) uploadPhoto(item.id, f);
-                    }} />
-                </label>
                 <div style={{ position: "relative", flex: "0 0 auto" }} onClick={(e) => e.stopPropagation()}>
                   <button type="button" disabled={busy} aria-label="Item menu"
                     onClick={() => setMenuFor(menuFor === item.id ? null : item.id)}
                     style={{ padding: "2px 8px", border: "1px solid #ccc", borderRadius: 4, background: "#fff", minWidth: 32 }}>
-                    {busy ? "…" : "⋮"}
+                    {busy || uploading === item.id ? "…" : "⋮"}
                   </button>
                   {menuFor === item.id && !busy && (
                     <div style={{ position: "absolute", right: 0, top: "100%", zIndex: 5, marginTop: 2, minWidth: 140, background: "#fff", border: "1px solid #ccc", borderRadius: 6, boxShadow: "0 4px 12px rgba(0,0,0,.12)", overflow: "hidden" }}>
+                      <label style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 10px", borderBottom: "1px solid #eee", cursor: uploading === item.id ? "wait" : "pointer", opacity: uploading === item.id ? 0.6 : 1 }}>
+                        {uploading === item.id ? "Uploading…" : "Add photo"}
+                        <input type="file" accept="image/*" hidden disabled={uploading === item.id}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            e.target.value = "";
+                            setMenuFor(null);
+                            if (f) uploadPhoto(item.id, f);
+                          }} />
+                      </label>
                       <button type="button" onClick={() => editNote(item)}
                         style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 10px", border: 0, background: "#fff", borderBottom: "1px solid #eee" }}>
                         Edit note
                       </button>
-                      {photos.map((src, i) => (
-                        <button key={src} type="button" onClick={() => deletePhoto(item, src, i + 1)}
-                          style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 10px", border: 0, background: "#fff", borderBottom: "1px solid #eee" }}>
-                          Remove photo {i + 1}
-                        </button>
-                      ))}
                       <button type="button" onClick={() => deleteItem(item)}
                         style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 10px", border: 0, background: "#fff", color: "#b00020" }}>
                         Delete item
@@ -244,7 +241,11 @@ export default function AdminPage() {
               {photos.length > 0 && (
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", width: "100%", alignItems: "center", marginTop: 4 }}>
                   {photos.map((src) => (
-                    <img key={src} src={src} alt="" style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 4, display: "block", background: "#eee" }} />
+                    <button key={src} type="button" disabled={busy} aria-label="View photo"
+                      onClick={() => setView({ itemId: item.id, url: src })}
+                      style={{ padding: 0, border: 0, background: "transparent", cursor: "pointer", lineHeight: 0 }}>
+                      <img src={src} alt="" style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 4, display: "block", background: "#eee" }} />
+                    </button>
                   ))}
                 </div>
               )}
@@ -270,6 +271,24 @@ export default function AdminPage() {
           {!data?.claims?.length && <li style={{ color: "#777" }}>No claims yet</li>}
         </ul>
       </section>
+      {view && (() => {
+        const item = items.find((i) => i.id === view.itemId);
+        if (!item) return null;
+        const busy = deleting === item.id;
+        return (
+          <div role="dialog" aria-modal="true" aria-label="Photo"
+            onClick={() => !busy && setView(null)}
+            style={{ position: "fixed", inset: 0, zIndex: 40, background: "rgba(0,0,0,.92)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "12px 12px 88px" }}>
+            <img src={view.url} alt="" onClick={(e) => e.stopPropagation()}
+              style={{ maxWidth: "100%", maxHeight: "calc(100vh - 120px)", objectFit: "contain", borderRadius: 4 }} />
+            <button type="button" disabled={busy}
+              onClick={(e) => { e.stopPropagation(); deletePhoto(item, view.url); }}
+              style={{ position: "fixed", left: 12, right: 12, bottom: 16, padding: 14, border: 0, borderRadius: 8, background: "#b00020", color: "#fff", fontSize: 16, fontWeight: 600 }}>
+              {busy ? "…" : "Delete"}
+            </button>
+          </div>
+        );
+      })()}
       <Snack snack={snack} />
     </main>
   );
