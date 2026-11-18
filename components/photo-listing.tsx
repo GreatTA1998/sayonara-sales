@@ -37,31 +37,51 @@ function labelName(name: string) {
   return t || "Untitled";
 }
 
+/** Quiet “more photos” hint — bottom-right of the photo when count > 1. */
+function MultiPhotoHint({ count }: { count: number }) {
+  if (count < 2) return null;
+  return (
+    <span className="xmore" aria-hidden="true" title={`${count} photos`}>
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <rect x="3.5" y="1.5" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.2" opacity=".55" />
+        <rect x="1.5" y="3.5" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.2" fill="rgba(0,0,0,.35)" />
+      </svg>
+    </span>
+  );
+}
+
 /** Shared buyer/admin photo card. Default B: photo + optional price + name. Dense: photo only. */
 export function PhotoCard({
   item, dense, onClick, className = "", disabled,
 }: {
   item: PhotoItem; dense: boolean; onClick?: () => void; className?: string; disabled?: boolean;
 }) {
-  const src = (item.photos || [])[0];
+  const photos = item.photos || [];
+  const src = photos[0];
   if (!src) return null;
   const cls = className ? ` ${className}` : "";
   const name = labelName(item.name);
   const showPrice = item.price != null;
+  const n = photos.length;
+  const aria = n > 1 ? `${name}, ${n} photos` : name;
 
   if (dense) {
     return (
-      <button type="button" disabled={disabled} aria-label={name} onClick={onClick}
+      <button type="button" disabled={disabled} aria-label={aria} onClick={onClick}
         className={`xtile dense${cls}`}>
         <img src={src} alt="" loading="lazy" decoding="async" />
+        <MultiPhotoHint count={n} />
       </button>
     );
   }
 
   return (
-    <button type="button" disabled={disabled} aria-label={name} onClick={onClick}
+    <button type="button" disabled={disabled} aria-label={aria} onClick={onClick}
       className={`xcard${cls}`}>
-      <div className="xphoto"><img src={src} alt="" loading="lazy" decoding="async" /></div>
+      <div className="xphoto">
+        <img src={src} alt="" loading="lazy" decoding="async" />
+        <MultiPhotoHint count={n} />
+      </div>
       <div className="xmeta">
         {showPrice ? <div className="xprice">{money(item.price)}</div> : null}
         <div className={`xname${!item.name?.trim() ? " empty" : ""}`}>{name}</div>

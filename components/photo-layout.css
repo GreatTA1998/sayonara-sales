@@ -3,12 +3,15 @@
 .xgrid.dense{grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:2px;padding:0 2px 8px}
 .xtile{position:relative;display:block;width:100%;padding:0;border:0;overflow:hidden;background:#111;border-radius:0;aspect-ratio:1/1;cursor:pointer;font:inherit;color:inherit;text-align:left}
 .xtile img{display:block;width:100%;height:100%;object-fit:cover}
+.xmore{position:absolute;right:5px;bottom:5px;z-index:1;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;background:rgba(0,0,0,.42);color:#fff;pointer-events:none}
+.xgrid.dense .xmore{right:3px;bottom:3px;width:16px;height:16px;border-radius:3px}
+.xgrid.dense .xmore svg{width:10px;height:10px}
 .xtile.on{outline:2px solid #ff9900;outline-offset:-2px}
 .xtile.dim{opacity:.5}
 .xcard{display:flex;flex-direction:column;height:100%;padding:0;border:1px solid #e5e5e5;border-radius:16px;background:#fff;overflow:hidden;cursor:pointer;font:inherit;color:inherit;text-align:left}
 .xcard.on{border-color:#ff9900;background:#fff8ee}
 .xcard.dim{opacity:.5}
-.xcard .xphoto{flex:0 0 auto;aspect-ratio:1/1;background:#111;overflow:hidden}
+.xcard .xphoto{position:relative;flex:0 0 auto;aspect-ratio:1/1;background:#111;overflow:hidden}
 .xcard .xphoto img{display:block;width:100%;height:100%;object-fit:cover}
 .xcard .xmeta{display:flex;flex-direction:column;gap:2px;padding:8px 10px 10px;min-height:0}
 .xcard .xprice{font-size:12px;font-variant-numeric:tabular-nums;color:#333}
