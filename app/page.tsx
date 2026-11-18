@@ -29,12 +29,17 @@ const why = (i: Item, day: string) =>
     : !dayOk(i, day) ? `受け取り可能：${rangeLbl(i.availableFrom, i.availableTo)}`
     : "受け取り不可";
 
-function LineBlock({ url }: { url: string }) {
+function LinkQr({ href, label, qrSrc, qrAlt }: { href: string; label: string; qrSrc: string; qrAlt: string }) {
+  const [mode, setMode] = useState<"link" | "qr">("link");
   return (
     <div className="linebox">
-      <p className="linesub">リンクを開くか、QRコードを読み取って追加してください。</p>
-      <a className="linelink" href={url} target="_blank" rel="noopener noreferrer">LINE招待リンク</a>
-      <img className="lineqr" src="/line-qr.jpg" alt="LINE QR" />
+      <div className="slots pair" role="group" aria-label={label}>
+        <button type="button" className={mode === "link" ? "slot on" : "slot"} onClick={() => setMode("link")}>リンク</button>
+        <button type="button" className={mode === "qr" ? "slot on" : "slot"} onClick={() => setMode("qr")}>QR</button>
+      </div>
+      {mode === "link"
+        ? <a className="linelink" href={href} target="_blank" rel="noopener noreferrer">{label}</a>
+        : <img className="lineqr" src={qrSrc} alt={qrAlt} />}
     </div>
   );
 }
@@ -43,7 +48,7 @@ function PhoneBlock() {
   return (
     <div className="linebox">
       <a className="linelink" href={PHONE_TEL}>{PHONE_DISPLAY}</a>
-      <p className="hint">Eltonの電話番号です。タップで発信できます。</p>
+      <p className="hint">タップで発信できます。</p>
     </div>
   );
 }
@@ -75,6 +80,13 @@ export default function BuyerPage() {
   }, [state, day]);
   useEffect(() => { if (slot && !freeSlots.includes(slot)) setSlot(null); }, [freeSlots, slot]);
 
+  const pickedItems = useMemo(
+    () => (state?.items || []).filter((i) => picked.has(i.id)),
+    [state, picked],
+  );
+  const blocked = useMemo(() => pickedItems.filter((i) => !dayOk(i, day)), [pickedItems, day]);
+  const canSend = !!slot && !!method && picked.size > 0 && !blocked.length;
+
   function toggle(id: string) {
     const it = state?.items.find((i) => i.id === id);
     if (!it || it.taken) return;
@@ -83,7 +95,7 @@ export default function BuyerPage() {
 
   async function book() {
     if (!picked.size || !slot || !method || busy) return;
-    const bad = [...picked].map((id) => state?.items.find((i) => i.id === id)).find((i) => i && !dayOk(i, day));
+    const bad = pickedItems.find((i) => !dayOk(i, day));
     if (bad) { setErr(`${bad.name}: ${why(bad, day)}`); return; }
     setBusy(true); setErr(null);
     try {
@@ -116,68 +128,11 @@ export default function BuyerPage() {
         <p>エリア: {receipt.address}</p>
         <ul>{receipt.items.map((n) => <li key={n}>{n}</li>)}</ul>
         {viaLine ? (
-          <section className="field"><span>連絡：LINE</span><LineBlock url={lineUrl} /></section>
+          <section className="field"><span>連絡：LINE</span><LinkQr href={lineUrl} label="LINE招待リンク" qrSrc="/line-qr.jpg" qrAlt="LINE QR" /></section>
         ) : (
           <section className="field"><span>連絡：電話</span><PhoneBlock /></section>
         )}
         <button type="button" className="dark" onClick={() => setReceipt(null)}>一覧に戻る</button>
-      </main>
-    );
-  }
-
-  if (checkout) {
-    const names = (state?.items || []).filter((i) => picked.has(i.id));
-    const blocked = names.filter((i) => !dayOk(i, day));
-    const canSend = !!slot && !!method && picked.size > 0 && !blocked.length;
-    return (
-      <main className="wrap checkout">
-        <button type="button" className="back" onClick={() => { setCheckout(false); setErr(null); }}>← 戻る</button>
-        <h1>引き取り日程</h1>
-        <div className="when">
-          <select value={day} aria-label="日付" onChange={(e) => {
-            const nd = e.target.value; setDay(nd); setSlot(null);
-            setPicked((p) => new Set([...p].filter((id) => {
-              const it = state?.items.find((i) => i.id === id);
-              return it && !it.taken && dayOk(it, nd);
-            })));
-          }}>
-            {(state?.days || []).map((d) => <option key={d} value={d}>{dayLbl(d)}</option>)}
-          </select>
-          <div className="slots trio" role="group" aria-label="時間帯">
-            {(state?.slots || []).map((s) => {
-              const free = freeSlots.includes(s);
-              return (
-                <button key={s} type="button" disabled={!free}
-                  className={slot === s ? "slot on" : "slot"}
-                  onClick={() => free && setSlot(s)}>{s}</button>
-              );
-            })}
-          </div>
-        </div>
-        {blocked.length > 0 && (
-          <p className="sw">後半のみの品目があります。日付を{rangeLbl(blocked[0].availableFrom, state?.days?.[state.days.length - 1])}以降にしてください。</p>
-        )}
-        {!freeSlots.length && <p className="sw">この日は空きがありません。</p>}
-        <div className="field"><span>品目（{names.length}）</span>
-          <ul className="clist">{names.map((i) => (
-            <li key={i.id}>{i.name} · {money(i.price)}{i.lateOnly ? " · 後半のみ" : ""}</li>
-          ))}</ul>
-          <p className="total-row">
-            <span className="total">合計 {money(names.reduce((n, i) => n + (i.price ?? 0), 0))}</span>
-            <span className="pay-hint">お支払いは現金またはWise。</span>
-          </p>
-        </div>
-        <div className="field"><span>連絡方法</span>
-          <div className="slots pair">
-            <button type="button" className={method === "line" ? "slot on" : "slot"} onClick={() => setMethod("line")}>LINE</button>
-            <button type="button" className={method === "phone" ? "slot on" : "slot"} onClick={() => setMethod("phone")}>電話</button>
-          </div>
-          {method === "line" && <LineBlock url={lineUrl} />}
-          {method === "phone" && <PhoneBlock />}
-        </div>
-        {err && <div className="err">{err}</div>}
-        <button type="button" className="cta" disabled={busy || !canSend} onClick={book}
-          style={{ background: canSend ? "#ff9900" : "#ccc" }}>{busy ? "送信中…" : "依頼を送信"}</button>
       </main>
     );
   }
@@ -198,15 +153,15 @@ export default function BuyerPage() {
         </span>
         <span className="span">{span}</span>
         <button type="button" className="req"
-          onClick={() => { setSlot(null); setMethod("line"); setErr(null); setCheckout(true); }}>
+          onClick={() => { setOpen(null); setSlot(null); setMethod("line"); setErr(null); setCheckout(true); }}>
           {picked.size ? `引き取りを依頼 (${picked.size})` : "引き取りを依頼"}
         </button>
       </header>
-      {err && <div className="err">{err}</div>}
+      {err && !checkout && <div className="err">{err}</div>}
       <Listings items={state?.items || []} onSelect={setOpen}
         classNameFor={(item) => `${picked.has(item.id) ? "on" : ""}${item.taken ? " dim" : ""}`.trim()} />
-      {!state && <p className="text-sm text-muted" style={{ padding: 12 }}>読み込み中…</p>}
-      {open && (
+      {!state && <p className="text-sm text-muted pad">読み込み中…</p>}
+      {open && !checkout && (
         <div className="mask" role="dialog" aria-modal="true" aria-label={open.name} onClick={() => setOpen(null)}>
           <div className="sheet" onClick={(e) => e.stopPropagation()}>
             {openPics.length > 0 && <div className="pics">{openPics.map((src) => <img key={src} src={src} alt="" loading="lazy" decoding="async" />)}</div>}
@@ -215,9 +170,53 @@ export default function BuyerPage() {
             {open.note ? <p className="sn">{open.note}</p> : null}
             {openAvail ? <p className="sm">{openAvail}</p> : null}
             {!okOpen && <p className="sw">{why(open, day || (state?.days?.[0] || ""))}</p>}
-            <button type="button" className="cta" disabled={!okOpen}
-              onClick={() => { toggle(open.id); setOpen(null); }}
-              style={{ background: okOpen ? (onOpen ? "#eee" : "#ff9900") : "#ccc" }}>{onOpen ? "外す" : "追加"}</button>
+            <button type="button" className={`cta${okOpen ? (onOpen ? " soft" : " go") : ""}`} disabled={!okOpen}
+              onClick={() => { toggle(open.id); setOpen(null); }}>{onOpen ? "外す" : "追加"}</button>
+          </div>
+        </div>
+      )}
+      {checkout && (
+        <div className="mask" role="dialog" aria-modal="true" aria-label="引き取り日程"
+          onClick={() => { setCheckout(false); setErr(null); }}>
+          <div className="sheet checkout" onClick={(e) => e.stopPropagation()}>
+            <h2>引き取り日程</h2>
+            <div className="when">
+              <select value={day} aria-label="日付" onChange={(e) => {
+                const nd = e.target.value; setDay(nd); setSlot(null);
+                setPicked((p) => new Set([...p].filter((id) => {
+                  const it = state?.items.find((i) => i.id === id);
+                  return it && !it.taken && dayOk(it, nd);
+                })));
+              }}>
+                {(state?.days || []).map((d) => <option key={d} value={d}>{dayLbl(d)}</option>)}
+              </select>
+              <div className="slots trio" role="group" aria-label="時間帯">
+                {(state?.slots || []).map((s) => {
+                  const free = freeSlots.includes(s);
+                  return (
+                    <button key={s} type="button" disabled={!free}
+                      className={slot === s ? "slot on" : "slot"}
+                      onClick={() => free && setSlot(s)}>{s}</button>
+                  );
+                })}
+              </div>
+            </div>
+            {blocked.length > 0 && (
+              <p className="sw">後半のみの品目があります。日付を{rangeLbl(blocked[0].availableFrom, state?.days?.[state.days.length - 1])}以降にしてください。</p>
+            )}
+            {!freeSlots.length && <p className="sw">この日は空きがありません。</p>}
+            <p className="hint pay">現金またはWiseで支払い。</p>
+            <div className="field"><span>連絡方法</span>
+              <div className="slots pair">
+                <button type="button" className={method === "line" ? "slot on" : "slot"} onClick={() => setMethod("line")}>LINE</button>
+                <button type="button" className={method === "phone" ? "slot on" : "slot"} onClick={() => setMethod("phone")}>電話</button>
+              </div>
+              {method === "line" && <LinkQr href={lineUrl} label="LINE招待リンク" qrSrc="/line-qr.jpg" qrAlt="LINE QR" />}
+              {method === "phone" && <PhoneBlock />}
+            </div>
+            {err && <div className="err">{err}</div>}
+            <button type="button" className={`cta${canSend ? " go" : ""}`} disabled={busy || !canSend}
+              onClick={book}>{busy ? "送信中…" : "依頼を送信"}</button>
           </div>
         </div>
       )}
