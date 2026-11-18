@@ -9,31 +9,38 @@ export const money = (p: number | null) => (p == null ? "無料" : `¥${p.toLoca
 
 const STORE = "ss-photo-layout";
 const MODES: PhotoMode[] = ["A", "B", "C", "D"];
+const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
-/** EXPERIMENT: session-persisted mode + radius (default B @ 20). Disposable. */
+/** EXPERIMENT: session-persisted mode + radius + density cols. Disposable. */
 export function usePhotoLayout() {
   const [mode, setMode] = useState<PhotoMode>("B");
   const [radius, setRadius] = useState(20);
+  const [cols, setCols] = useState(4);
   const [ready, setReady] = useState(false);
   useEffect(() => {
     try {
-      const j = JSON.parse(sessionStorage.getItem(STORE) || "{}") as { mode?: PhotoMode; radius?: number };
+      const j = JSON.parse(sessionStorage.getItem(STORE) || "{}") as {
+        mode?: PhotoMode; radius?: number; cols?: number;
+      };
       if (j.mode && MODES.includes(j.mode)) setMode(j.mode);
-      if (typeof j.radius === "number") setRadius(Math.max(0, Math.min(28, j.radius)));
+      if (typeof j.radius === "number") setRadius(clamp(j.radius, 0, 28));
+      if (typeof j.cols === "number") setCols(clamp(Math.round(j.cols), 2, 6));
     } catch { /* ignore */ }
     setReady(true);
   }, []);
   useEffect(() => {
     if (!ready) return;
-    try { sessionStorage.setItem(STORE, JSON.stringify({ mode, radius })); } catch { /* ignore */ }
-  }, [mode, radius, ready]);
-  return { mode, setMode, radius, setRadius };
+    try { sessionStorage.setItem(STORE, JSON.stringify({ mode, radius, cols })); } catch { /* ignore */ }
+  }, [mode, radius, cols, ready]);
+  return { mode, setMode, radius, setRadius, cols, setCols };
 }
 
 export function PhotoLayoutFooter({
-  mode, setMode, radius, setRadius,
+  mode, setMode, radius, setRadius, cols, setCols,
 }: {
-  mode: PhotoMode; setMode: (m: PhotoMode) => void; radius: number; setRadius: (n: number) => void;
+  mode: PhotoMode; setMode: (m: PhotoMode) => void;
+  radius: number; setRadius: (n: number) => void;
+  cols: number; setCols: (n: number) => void;
 }) {
   return (
     <footer className="xfoot" aria-label="Experiment layout controls">
@@ -44,7 +51,12 @@ export function PhotoLayoutFooter({
             aria-pressed={mode === m} onClick={() => setMode(m)}>{m}</button>
         ))}
       </div>
-      <label className="xfoot-radius">
+      <label className="xfoot-slider">
+        <span>cols {cols}</span>
+        <input type="range" min={2} max={6} step={1} value={cols}
+          onChange={(e) => setCols(Number(e.target.value))} />
+      </label>
+      <label className="xfoot-slider">
         <span>radius {radius}px</span>
         <input type="range" min={0} max={28} value={radius}
           onChange={(e) => setRadius(Number(e.target.value))} />
@@ -93,18 +105,22 @@ export function PhotoCard({
 }
 
 export function PhotoGrid<T extends PhotoItem>({
-  items, mode, radius, onSelect, classNameFor, disabledFor,
+  items, mode, radius, cols, onSelect, classNameFor, disabledFor,
 }: {
   items: T[];
   mode: PhotoMode;
   radius: number;
+  cols: number;
   onSelect?: (item: T) => void;
   classNameFor?: (item: T) => string;
   disabledFor?: (item: T) => boolean;
 }) {
   if (!items.length) return null;
   return (
-    <div className="xwrap" style={{ ["--x-r" as string]: `${radius}px` }}>
+    <div className="xwrap" style={{
+      ["--x-r" as string]: `${radius}px`,
+      ["--x-cols" as string]: String(cols),
+    }}>
       <div className={`xgrid mode-${mode}`}>
         {items.map((item) => (
           <PhotoCard key={item.id} item={item} mode={mode}

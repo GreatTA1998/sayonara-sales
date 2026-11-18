@@ -1,8 +1,8 @@
 /* EXPERIMENT photo layouts — disposable with footer controls */
-.xwrap{--x-r:20px}
-.xgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:0 6px 8px;align-items:stretch}
+.xwrap{--x-r:20px;--x-cols:4}
+.xgrid{display:grid;grid-template-columns:repeat(var(--x-cols),minmax(0,1fr));gap:6px;padding:0 6px 8px;align-items:stretch}
 .xgrid.mode-B{gap:8px}
-.xgrid.mode-D{grid-template-columns:repeat(4,1fr);gap:3px;padding:0 4px 8px}
+.xgrid.mode-D{gap:3px;padding:0 4px 8px}
 .xtile{position:relative;display:block;width:100%;padding:0;border:0;overflow:hidden;background:#111;border-radius:var(--x-r);aspect-ratio:4/3;cursor:pointer;font:inherit;color:inherit;text-align:left}
 .xgrid.mode-C .xtile,.xgrid.mode-D .xtile{aspect-ratio:1/1}
 .xtile img{display:block;width:100%;height:100%;object-fit:cover}
@@ -25,7 +25,6 @@
 .xfoot-modes{display:flex;gap:4px}
 .xfoot-modes button{min-width:34px;height:28px;border:1px solid #555;border-radius:5px;background:#222;color:#eee;font-weight:700;cursor:pointer}
 .xfoot-modes button.on{background:#ffcc66;color:#111;border-color:#ffcc66}
-.xfoot-radius{display:flex;flex-direction:column;gap:1px;font-size:11px;color:#ccc;flex:1;min-width:120px}
-.xfoot-radius input{width:100%;accent-color:#ffcc66}
-.buy.xpad,.admin-xpad{padding-bottom:88px}
-@media(max-width:420px){.xgrid{grid-template-columns:repeat(2,1fr)}.xgrid.mode-D{grid-template-columns:repeat(3,1fr);gap:2px}}
+.xfoot-slider{display:flex;flex-direction:column;gap:1px;font-size:11px;color:#ccc;flex:1;min-width:100px}
+.xfoot-slider input{width:100%;accent-color:#ffcc66}
+.buy.xpad,.admin-xpad{padding-bottom:108px}

@@ -273,7 +273,7 @@ export default function AdminPage() {
               if (list.length) void addFromPhotos(list);
             }} />
         </div>
-        <PhotoGrid items={withPh} mode={layout.mode} radius={layout.radius}
+        <PhotoGrid items={withPh} mode={layout.mode} radius={layout.radius} cols={layout.cols}
           onSelect={openDetail}
           disabledFor={(it) => deleting === it.id}
           classNameFor={(it) => (deleting === it.id ? "dim" : "")} />
