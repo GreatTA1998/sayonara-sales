@@ -1,16 +1,10 @@
 import type { CSSProperties, ReactNode } from "react";
 
-export type IconName = "plus" | "stackPlus" | "more" | "trash" | "close" | "photo";
+export type IconName = "plus" | "camera" | "more" | "trash" | "close" | "photo";
 
 const paths: Record<IconName, ReactNode> = {
   plus: <path d="M12 5v14M5 12h14" />,
-  stackPlus: (
-    <>
-      <rect x="8" y="8" width="12" height="12" rx="2" opacity=".4" />
-      <rect x="4" y="4" width="12" height="12" rx="2" />
-      <path d="M10 8v4M8 10h4" />
-    </>
-  ),
+  camera: <><path d="M4 8h3l2-2h6l2 2h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></>,
   more: (
     <>
       <circle cx="12" cy="6" r="1.6" fill="currentColor" stroke="none" />
