@@ -1,29 +1,23 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import BuyerUi from "@/components/buyer-ui";
 import { getId, getName } from "@/lib/shop";
 
-/** Buyer shell for independent ids. Blob per-id = TODO; Elton = /s/elton. */
-export default function StubBuyer() {
+export default function ShopBuyer() {
   const { slug } = useParams<{ slug: string }>();
+  const router = useRouter();
   const id = slug || "";
   const [label, setLabel] = useState(id);
   const [mine, setMine] = useState(false);
+
   useEffect(() => {
+    if (id === "elton") { router.replace("/s/elton"); return; }
     const m = getId() === id;
     setMine(m);
     setLabel(m ? (getName() || id) : id);
-  }, [id]);
-  return (
-    <main className="buy">
-      <header className="bar">
-        <a href="/" className="home" aria-label="ホーム">ホーム</a>
-        <span className="who">
-          <span className="shop">{label || id}</span>
-        </span>
-        {mine && <a className="req" href={`/s/${id}/admin`} style={{ textDecoration: "none" }}>Admin</a>}
-      </header>
-      <p className="hint intro">出品はまだありません（データ分離 TODO）。</p>
-    </main>
-  );
+  }, [id, router]);
+
+  if (!id || id === "elton") return null;
+  return <BuyerUi shop={id} name={label} home adminHref={mine ? `/s/${id}/admin` : undefined} />;
 }

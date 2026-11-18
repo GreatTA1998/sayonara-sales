@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import sharp from "sharp";
-import { uid, withStore } from "@/lib/store";
+import { shopFromUrl, uid, withStore } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +23,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Blob not configured" }, { status: 500 });
   }
   try {
+    const shop = shopFromUrl(req);
     const form = await req.formData();
     const file = form.get("file");
     const itemId = String(form.get("itemId") || "");
@@ -32,14 +33,13 @@ export async function POST(req: Request) {
     if (!file.type.startsWith("image/")) {
       return NextResponse.json({ error: "Image only" }, { status: 400 });
     }
-    // itemId optional: omit to create an untitled listing for this photo.
     const keyId = itemId || uid("i");
     const body = await compress(file);
-    const blob = await put(`sayonara-photos/${keyId}-${Date.now()}.webp`, body, {
+    const blob = await put(`sayonara-photos/${shop}/${keyId}-${Date.now()}.webp`, body, {
       access: "public",
       contentType: "image/webp",
     });
-    const item = await withStore((s) => {
+    const item = await withStore(shop, (s) => {
       let it = itemId ? s.items.find((i) => i.id === itemId) : undefined;
       if (!it) {
         if (itemId) throw new Error("Not found");

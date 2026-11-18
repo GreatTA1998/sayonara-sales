@@ -23,11 +23,25 @@ export const setLateOnly = (it: Item, on: boolean) => {
   else { delete it.availableFrom; delete it.availableTo; }
 };
 
-// TODO: per-shop Blob keys (e.g. sayonara-store-{slug}.json) for independent shops; hub stubs until then.
-const BLOB = "sayonara-store.json";
-const LOCAL = path.join(process.cwd(), "data", "store.json");
+/** Elton keeps legacy blob key; others use sayonara-store-{id}.json */
+export const ELTON_SHOP = "elton";
+export const parseShop = (raw: string | null | undefined) => {
+  const s = (raw || "").trim().toLowerCase();
+  if (!s || s === ELTON_SHOP) return ELTON_SHOP;
+  if (/^\d{5}$/.test(s)) return s;
+  throw new Error("Bad shop");
+};
+export const shopFromUrl = (req: Request) => {
+  try { return parseShop(new URL(req.url).searchParams.get("shop")); }
+  catch { return ELTON_SHOP; }
+};
 
-const seed = (): Store => ({
+const blobKey = (shop: string) =>
+  shop === ELTON_SHOP ? "sayonara-store.json" : `sayonara-store-${shop}.json`;
+const localPath = (shop: string) =>
+  path.join(process.cwd(), "data", shop === ELTON_SHOP ? "store.json" : `store-${shop}.json`);
+
+const eltonSeed = (): Store => ({
   address: "目黒区",
   items: [
     { id: "i1", name: "IKEA desk", price: 3000, photos: ["https://picsum.photos/seed/desk/600/400"] },
@@ -45,47 +59,50 @@ const seed = (): Store => ({
   ],
   claims: [],
 });
+const emptySeed = (): Store => ({ address: "目黒区", items: [], claims: [] });
 
-let mem: Store | null = null;
-let chain: Promise<unknown> = Promise.resolve();
+const mem = new Map<string, Store>();
+const chains = new Map<string, Promise<unknown>>();
 const useBlob = () => !!process.env.BLOB_READ_WRITE_TOKEN;
 
-async function readRaw(): Promise<Store> {
+async function readRaw(shop: string): Promise<Store> {
   if (useBlob()) {
-    const res = await get(BLOB, { access: "public" });
-    if (!res) return seed();
+    const res = await get(blobKey(shop), { access: "public" });
+    if (!res) return shop === ELTON_SHOP ? eltonSeed() : emptySeed();
     return (await new Response(res.stream).json()) as Store;
   }
-  try { return JSON.parse(await fs.readFile(LOCAL, "utf8")) as Store; }
+  try { return JSON.parse(await fs.readFile(localPath(shop), "utf8")) as Store; }
   catch {
-    const s = seed();
-    await fs.mkdir(path.dirname(LOCAL), { recursive: true });
-    await fs.writeFile(LOCAL, JSON.stringify(s, null, 2));
+    const s = shop === ELTON_SHOP ? eltonSeed() : emptySeed();
+    await fs.mkdir(path.dirname(localPath(shop)), { recursive: true });
+    await fs.writeFile(localPath(shop), JSON.stringify(s, null, 2));
     return s;
   }
 }
 
-async function writeRaw(s: Store) {
-  mem = s;
+async function writeRaw(shop: string, s: Store) {
+  mem.set(shop, s);
   if (useBlob()) {
-    await put(BLOB, JSON.stringify(s), {
+    await put(blobKey(shop), JSON.stringify(s), {
       access: "public", addRandomSuffix: false, allowOverwrite: true, contentType: "application/json",
     });
     return;
   }
-  await fs.mkdir(path.dirname(LOCAL), { recursive: true });
-  await fs.writeFile(LOCAL, JSON.stringify(s, null, 2));
+  await fs.mkdir(path.dirname(localPath(shop)), { recursive: true });
+  await fs.writeFile(localPath(shop), JSON.stringify(s, null, 2));
 }
 
-export function withStore<T>(fn: (s: Store) => T | Promise<T>): Promise<T> {
-  const run = chain.then(async () => {
-    const s = scrub(await readRaw());
-    mem = s;
+export function withStore<T>(shop: string, fn: (s: Store) => T | Promise<T>): Promise<T> {
+  const key = parseShop(shop);
+  const prev = chains.get(key) || Promise.resolve();
+  const run = prev.then(async () => {
+    const s = scrub(await readRaw(key));
+    mem.set(key, s);
     const result = await fn(s);
-    await writeRaw(s);
+    await writeRaw(key, s);
     return result;
   });
-  chain = run.then(() => undefined, () => undefined);
+  chains.set(key, run.then(() => undefined, () => undefined));
   return run;
 }
 
@@ -95,9 +112,10 @@ function scrub(s: Store) {
   return s;
 }
 
-export async function getStore(): Promise<Store> {
-  if (!mem) mem = scrub(await readRaw());
-  return structuredClone(mem!);
+export async function getStore(shop: string = ELTON_SHOP): Promise<Store> {
+  const key = parseShop(shop);
+  if (!mem.has(key)) mem.set(key, scrub(await readRaw(key)));
+  return structuredClone(mem.get(key)!);
 }
 
 export function takenSlots(s: Store, day: string): string[] {
