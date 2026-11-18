@@ -238,10 +238,10 @@ export default function AdminPage() {
       <header className="bar admin-bar">
         <span className="admin-lab" aria-label="管理ページ">管理</span>
         <label className="area-float">
-          <span>区・町名</span>
+          <span>区</span>
           <input value={addrDraft} disabled={!data}
             onChange={(e) => onAddressChange(e.target.value)}
-            placeholder="目黒区 下目黒" autoComplete="address-level2" />
+            placeholder="目黒区" autoComplete="address-level2" />
         </label>
         <span className="spacer" aria-hidden="true" />
         <IconBtn name="plus" label="品目を追加" size={22}
