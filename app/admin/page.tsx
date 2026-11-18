@@ -239,6 +239,7 @@ export default function AdminPage() {
   return (
     <main className="buy">
       <header className="bar admin-bar">
+        <a href="/" className="home" aria-label="ホーム">ホーム</a>
         <span className="shop" aria-label="ショップ名">{SHOP_NAME}</span>
         <label className="area-float">
           <span>区</span>

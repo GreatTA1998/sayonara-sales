@@ -32,6 +32,7 @@ export default function HubPage() {
   return (
     <main className="wrap hub">
       <h1>Sayonara Sales</h1>
+      <p className="hint">ジモティー風の引越し出品。まとめて選んで依頼できるので、LINEの個別やりとりが不要。</p>
       <p className="hint">LINE名で自分の店を開く（エルトン在庫とは別）。</p>
       <form className="field" onSubmit={go}>
         <label className="float"><span>LINE名</span>

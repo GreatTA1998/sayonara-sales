@@ -11,10 +11,13 @@ export default function StubShop() {
   useEffect(() => { setMine(getName().toLowerCase() === label.toLowerCase()); }, [label]);
   return (
     <main className="wrap">
+      <header className="bar">
+        <a href="/" className="home" aria-label="ホーム">ホーム</a>
+      </header>
       <h1>{label || "ショップ"}</h1>
       <p className="hint">独立ショップ（スタブ）。Blob 分離は TODO。出品はまだありません。</p>
       {mine && <p><a className="dark" href={`/s/${slug}/admin`} style={{ display: "inline-block", textDecoration: "none" }}>Admin</a></p>}
-      <p className="hint"><a href="/">ハブ</a> · <a href="/s/elton">エルトン</a></p>
+      <p className="hint"><a href="/s/elton">エルトン</a></p>
     </main>
   );
 }

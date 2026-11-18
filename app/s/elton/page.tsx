@@ -128,6 +128,7 @@ export default function BuyerPage() {
   return (
     <main className="buy">
       <header className="bar">
+        <a href="/" className="home" aria-label="ホーム">ホーム</a>
         <span className="who">
           <span className="shop">{SHOP_NAME}</span>
           <span className="area">{(state?.address || "").trim() || "区"}</span>
