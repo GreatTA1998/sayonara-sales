@@ -267,7 +267,7 @@ export default function AdminPage() {
               .join("、");
             const contact = [
               methodJa(c.contactMethod),
-              c.contact && c.contact !== "LINE" ? c.contact : "",
+              c.contact && c.contact !== "LINE" ? `LINE名 ${c.contact}` : "",
             ].filter(Boolean).join(" · ");
             return (
               <li key={c.id} className="claim">

@@ -10,6 +10,7 @@ export type Item = {
 };
 export type Claim = {
   id: string; code: string; day: string; slot: string; itemIds: string[];
+  /** Soft identity: typed LINE display name (buyer). */
   contact?: string; contactMethod?: "line" | "phone";
   status: "booked" | "picked_up" | "cancelled"; createdAt: string;
 };

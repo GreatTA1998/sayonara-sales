@@ -53,6 +53,7 @@ export default function BuyerPage() {
   const [checkout, setCheckout] = useState(false);
   const [slot, setSlot] = useState<string | null>(null);
   const [method, setMethod] = useState<Method | null>(null);
+  const [lineName, setLineName] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
@@ -77,7 +78,7 @@ export default function BuyerPage() {
     [state, picked],
   );
   const blocked = useMemo(() => pickedItems.filter((i) => !dayOk(i, day)), [pickedItems, day]);
-  const canSend = !!slot && !!method && picked.size > 0 && !blocked.length;
+  const canSend = !!slot && !!method && !!lineName.trim() && picked.size > 0 && !blocked.length;
 
   function toggle(id: string) {
     const it = state?.items.find((i) => i.id === id);
@@ -86,7 +87,8 @@ export default function BuyerPage() {
   }
 
   async function book() {
-    if (!picked.size || !slot || !method || busy) return;
+    const name = lineName.trim();
+    if (!picked.size || !slot || !method || !name || busy) return;
     const bad = pickedItems.find((i) => !dayOk(i, day));
     if (bad) { setErr(`${bad.name}: ${why(bad, day)}`); return; }
     setBusy(true); setErr(null);
@@ -94,20 +96,19 @@ export default function BuyerPage() {
       const res = await fetch("/api/book", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          day, slot, itemIds: [...picked], contactMethod: method,
-          contact: method === "phone" ? PHONE_DISPLAY : "LINE",
+          day, slot, itemIds: [...picked], contactMethod: method, contact: name,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "失敗しました");
       setCheckout(false); setOpen(null); setReceipt({ ...data, contactMethod: method });
-      setPicked(new Set()); setSlot(null); setMethod(null); await load();
+      setPicked(new Set()); setSlot(null); setMethod(null); setLineName(""); await load();
     } catch (e) { setErr(e instanceof Error ? e.message : "失敗しました"); await load(); }
     finally { setBusy(false); }
   }
 
   if (receipt) {
-    const viaLine = (receipt.contactMethod || method) === "line" || receipt.contact === "LINE";
+    const viaLine = (receipt.contactMethod || method) === "line";
     return (
       <main className="wrap">
         <h1>依頼を送信しました</h1>
@@ -118,6 +119,7 @@ export default function BuyerPage() {
         <p>合計: {money(receipt.total ?? 0)}</p>
         <p className="hint">お支払いは現金またはWise。</p>
         <p>エリア: {receipt.address}</p>
+        {receipt.contact ? <p>LINE名: {receipt.contact}</p> : null}
         <ul>{receipt.items.map((n) => <li key={n}>{n}</li>)}</ul>
         {viaLine ? (
           <section className="field"><span>連絡：LINE</span><LineBlock href={lineUrl} /></section>
@@ -199,6 +201,11 @@ export default function BuyerPage() {
             )}
             {!freeSlots.length && <p className="sw">この日は空きがありません。</p>}
             <p className="total">合計 {money(pickedItems.reduce((n, i) => n + (i.price ?? 0), 0))} <span className="hint">現金・WiseどちらでもOK</span></p>
+            <label className="float">
+              <span>LINE名</span>
+              <input value={lineName} onChange={(e) => setLineName(e.target.value)}
+                placeholder="表示名" autoComplete="nickname" enterKeyHint="done" />
+            </label>
             <div className="field"><span>連絡方法</span>
               <div className="slots pair">
                 <button type="button" className={method === "line" ? "slot on" : "slot"} onClick={() => setMethod("line")}>LINE</button>
