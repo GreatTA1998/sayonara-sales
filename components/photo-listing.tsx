@@ -26,9 +26,7 @@ export function useDense() {
 export function DenseToggle({ dense, onToggle }: { dense: boolean; onToggle: () => void }) {
   return (
     <button type="button" className={`dense-tog${dense ? " on" : ""}`}
-      aria-pressed={dense} onClick={onToggle}>
-      Dense
-    </button>
+      aria-pressed={dense} onClick={onToggle}>Dense</button>
   );
 }
 
@@ -37,7 +35,7 @@ function labelName(name: string) {
   return t || "Untitled";
 }
 
-/** Quiet “more photos” hint — bottom-right of the photo when count > 1. */
+/** Quiet “more photos” hint — bottom-right when count > 1. */
 function MultiPhotoHint({ count }: { count: number }) {
   if (count < 2) return null;
   return (
@@ -50,18 +48,17 @@ function MultiPhotoHint({ count }: { count: number }) {
   );
 }
 
-/** Shared buyer/admin photo card. Default B: photo + optional price + name. Dense: photo only. */
-export function PhotoCard({
-  item, dense, onClick, className = "", disabled,
-}: {
+type CardProps = {
   item: PhotoItem; dense: boolean; onClick?: () => void; className?: string; disabled?: boolean;
-}) {
+};
+
+/** Shared buyer/admin photo card. B: photo + optional price + name. Dense: photo only. */
+export function PhotoCard({ item, dense, onClick, className = "", disabled }: CardProps) {
   const photos = item.photos || [];
   const src = photos[0];
   if (!src) return null;
   const cls = className ? ` ${className}` : "";
   const name = labelName(item.name);
-  const showPrice = item.price != null;
   const n = photos.length;
   const aria = n > 1 ? `${name}, ${n} photos` : name;
 
@@ -83,22 +80,41 @@ export function PhotoCard({
         <MultiPhotoHint count={n} />
       </div>
       <div className="xmeta">
-        {showPrice ? <div className="xprice">{money(item.price)}</div> : null}
+        {item.price != null ? <div className="xprice">{money(item.price)}</div> : null}
         <div className={`xname${!item.name?.trim() ? " empty" : ""}`}>{name}</div>
       </div>
     </button>
   );
 }
 
-export function PhotoGrid<T extends PhotoItem>({
-  items, dense, onSelect, classNameFor, disabledFor,
+/** Shared photoless tile — price (when set) + name. */
+export function TextTile({
+  item, onClick, className = "", disabled,
 }: {
+  item: PhotoItem; onClick?: () => void; className?: string; disabled?: boolean;
+}) {
+  const name = labelName(item.name);
+  const cls = className ? ` ${className}` : "";
+  return (
+    <button type="button" disabled={disabled} aria-label={name} onClick={onClick}
+      className={`xtxt${cls}`}>
+      {item.price != null ? <span className="xprice">{money(item.price)}</span> : null}
+      <span className={`xname${!item.name?.trim() ? " empty" : ""}`}>{name}</span>
+    </button>
+  );
+}
+
+type ListProps<T extends PhotoItem> = {
   items: T[];
   dense: boolean;
   onSelect?: (item: T) => void;
   classNameFor?: (item: T) => string;
   disabledFor?: (item: T) => boolean;
-}) {
+};
+
+export function PhotoGrid<T extends PhotoItem>({
+  items, dense, onSelect, classNameFor, disabledFor,
+}: ListProps<T>) {
   if (!items.length) return null;
   return (
     <div className={`xgrid${dense ? " dense" : ""}`}>
@@ -109,5 +125,27 @@ export function PhotoGrid<T extends PhotoItem>({
           disabled={disabledFor?.(item)} />
       ))}
     </div>
+  );
+}
+
+/** Photo cards first, then photoless tiles — same on buyer + admin. */
+export function Listings<T extends PhotoItem>(props: ListProps<T>) {
+  const withPh: T[] = [];
+  const noPh: T[] = [];
+  for (const i of props.items) ((i.photos || []).length ? withPh : noPh).push(i);
+  return (
+    <>
+      <PhotoGrid {...props} items={withPh} />
+      {noPh.length > 0 && (
+        <div className="xgrid text">
+          {noPh.map((item) => (
+            <TextTile key={item.id} item={item}
+              onClick={props.onSelect ? () => props.onSelect!(item) : undefined}
+              className={props.classNameFor?.(item)}
+              disabled={props.disabledFor?.(item)} />
+          ))}
+        </div>
+      )}
+    </>
   );
 }
