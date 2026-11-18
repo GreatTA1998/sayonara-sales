@@ -8,7 +8,7 @@
 .xcard .xphoto img{display:block;width:100%;height:100%;object-fit:cover}
 .xcard .xmeta{display:flex;flex-direction:column;gap:2px;padding:8px 10px 10px;min-height:0}
 .xcard .xprice,.xtxt .xprice{font-size:var(--t-sm);font-variant-numeric:tabular-nums;color:var(--c-muted)}
-.xcard .xname,.xtxt .xname{font-size:var(--t-sm);font-weight:var(--fw-bold);line-height:1.25;color:var(--c);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.xcard .xname,.xtxt .xname{font-size:var(--t-sm);font-weight:var(--fw);line-height:1.25;color:var(--c);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .xcard .xname.empty,.xtxt .xname.empty{font-weight:var(--fw);color:var(--c-muted)}
 .xgrid.text{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px}
 .xtxt{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border:1px solid #e5e5e5;border-radius:16px;background:#fff;text-align:left;cursor:pointer;font:inherit;color:inherit}
@@ -16,9 +16,9 @@
 .xtxt.dim{opacity:.5}
 .xtxt .xname{word-break:break-word}
 .admin-bar{justify-content:flex-start}
-.admin-bar .admin-lab,.admin-bar .shop{flex:0 0 auto;font-size:var(--t-base);font-weight:var(--fw-bold);color:var(--c);padding:0 4px;white-space:nowrap;max-width:40%;overflow:hidden;text-overflow:ellipsis}
+.admin-bar .admin-lab,.admin-bar .shop{flex:0 0 auto;font-size:var(--t-base);font-weight:var(--fw);color:var(--c);padding:0 4px;white-space:nowrap;max-width:40%;overflow:hidden;text-overflow:ellipsis}
 .admin-bar .area-float{flex:0 1 8.5rem;width:8.5rem;min-width:6.5rem;max-width:min(8.5rem,calc(100% - 5.5rem));display:flex;flex-direction:column;gap:1px;margin:0;padding:3px 9px 4px;border:1px solid #ccc;border-radius:8px;background:#fff;box-sizing:border-box}
-.admin-bar .area-float>span{font-size:var(--t-sm);font-weight:var(--fw-bold);color:var(--c-muted);line-height:1.15}
+.admin-bar .area-float>span{font-size:var(--t-sm);font-weight:var(--fw);color:var(--c-muted);line-height:1.15}
 .admin-bar .area-float input{border:0;padding:0;margin:0;outline:0;width:100%;min-width:0;background:transparent;font:inherit;font-size:var(--t-base);line-height:1.3;color:var(--c)}
 .admin-bar .area-float input::placeholder{color:var(--c-muted)}
 .admin-bar .area-float:focus-within{border-color:#888}
