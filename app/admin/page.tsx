@@ -27,7 +27,6 @@ export default function AdminPage() {
   const addrSaved = useRef("");
   const addrDirty = useRef(false);
   const addrReq = useRef(0);
-  const addInputRef = useRef<HTMLInputElement | null>(null);
   const load = useCallback(async () => {
     const res = await fetch("/api/admin", { cache: "no-store" });
     if (!res.ok) { setErr("Failed to load"); show("Failed to load", "err"); return; }
@@ -226,15 +225,9 @@ export default function AdminPage() {
         <span className="admin-lab" aria-label="Admin page">Admin</span>
         <input className="area-in" value={addrDraft} disabled={!data}
           onChange={(e) => onAddressChange(e.target.value)} aria-label="Address" placeholder="Address" />
-        <IconBtn name="stackPlus" label="Add photos as items" size={22}
+        <IconBtn name="plus" label="Add items" size={22}
           disabled={!data || uploading === "batch"}
           onClick={() => setAddOpen(true)} className="solid" />
-        <input ref={addInputRef} type="file" accept="image/*" multiple hidden
-          onChange={(e) => {
-            const list = e.target.files ? Array.from(e.target.files) : [];
-            e.target.value = "";
-            if (list.length) void addFromPhotos(list);
-          }} />
       </header>
       <p style={{ margin: "6px 8px 4px", fontSize: 12, color: "#666" }}>Admin page — tap a listing to edit</p>
       {err && <div className="err">{err}</div>}
@@ -264,17 +257,26 @@ export default function AdminPage() {
       </section>
 
       {addOpen && (
-        <div className="mask" role="dialog" aria-modal="true" aria-label="Add photos"
+        <div className="mask" role="dialog" aria-modal="true" aria-label="Add items"
           onClick={() => setAddOpen(false)}>
           <div className="sheet add-sheet" onClick={(e) => e.stopPropagation()}>
             <div className="add-head">
               <h2>Add items</h2>
               <IconBtn name="close" label="Close" onClick={() => setAddOpen(false)} className="ghost-border" />
             </div>
-            <div className="thumb-strip" aria-hidden="true"><span /><span /><span /></div>
             <p className="add-cue">Each photo becomes its own item.</p>
-            <button type="button" className="cta" style={{ background: "#111", color: "#fff" }}
-              onClick={() => addInputRef.current?.click()}>Add photos</button>
+            <div className="add-acts">
+              <label className="add-act" aria-label="Camera">
+                <Icon name="camera" size={28} />
+                <input type="file" accept="image/*" capture="environment" hidden
+                  onChange={(e) => { const f = e.target.files; e.target.value = ""; if (f?.length) void addFromPhotos(Array.from(f)); }} />
+              </label>
+              <label className="add-act" aria-label="Photo library">
+                <Icon name="photo" size={28} />
+                <input type="file" accept="image/*" multiple hidden
+                  onChange={(e) => { const f = e.target.files; e.target.value = ""; if (f?.length) void addFromPhotos(Array.from(f)); }} />
+              </label>
+            </div>
           </div>
         </div>
       )}
