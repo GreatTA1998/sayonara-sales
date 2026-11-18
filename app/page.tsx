@@ -29,22 +29,6 @@ const why = (i: Item, day: string) =>
     : !dayOk(i, day) ? `受け取り可能：${rangeLbl(i.availableFrom, i.availableTo)}`
     : "受け取り不可";
 
-function LineBlock({ href }: { href: string }) {
-  return (
-    <div className="linebox">
-      <a className="linelink" href={href} target="_blank" rel="noopener noreferrer">LINE招待リンク</a>
-    </div>
-  );
-}
-
-function PhoneBlock() {
-  return (
-    <div className="linebox">
-      <a className="linelink" href={PHONE_TEL}>{PHONE_DISPLAY}</a>
-    </div>
-  );
-}
-
 export default function BuyerPage() {
   const [state, setState] = useState<State | null>(null);
   const [day, setDay] = useState("");
@@ -54,6 +38,7 @@ export default function BuyerPage() {
   const [slot, setSlot] = useState<string | null>(null);
   const [method, setMethod] = useState<Method | null>(null);
   const [lineName, setLineName] = useState("");
+  const [lineOk, setLineOk] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
@@ -78,7 +63,8 @@ export default function BuyerPage() {
     [state, picked],
   );
   const blocked = useMemo(() => pickedItems.filter((i) => !dayOk(i, day)), [pickedItems, day]);
-  const canSend = !!slot && !!method && !!lineName.trim() && picked.size > 0 && !blocked.length;
+  const canSend = !!slot && !!method && !!lineName.trim() && picked.size > 0 && !blocked.length
+    && (method !== "line" || lineOk);
 
   function toggle(id: string) {
     const it = state?.items.find((i) => i.id === id);
@@ -88,7 +74,7 @@ export default function BuyerPage() {
 
   async function book() {
     const name = lineName.trim();
-    if (!picked.size || !slot || !method || !name || busy) return;
+    if (!picked.size || !slot || !method || !name || busy || (method === "line" && !lineOk)) return;
     const bad = pickedItems.find((i) => !dayOk(i, day));
     if (bad) { setErr(`${bad.name}: ${why(bad, day)}`); return; }
     setBusy(true); setErr(null);
@@ -102,7 +88,7 @@ export default function BuyerPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "失敗しました");
       setCheckout(false); setOpen(null); setReceipt({ ...data, contactMethod: method });
-      setPicked(new Set()); setSlot(null); setMethod(null); setLineName(""); await load();
+      setPicked(new Set()); setSlot(null); setMethod(null); setLineName(""); setLineOk(false); await load();
     } catch (e) { setErr(e instanceof Error ? e.message : "失敗しました"); await load(); }
     finally { setBusy(false); }
   }
@@ -112,20 +98,21 @@ export default function BuyerPage() {
     return (
       <main className="wrap">
         <h1>依頼を送信しました</h1>
-        <p className="hint">Eltonに送信済みです。まだ確定ではありません。来る前に確認を待ってください。</p>
+        <p className="hint">エルトンに送信済み（未確定）。来る前に確認を待ってください。</p>
         <p>コード: <b>{receipt.code}</b></p>
         <p>日付: {dayLbl(receipt.day)}</p>
         <p>時間: {receipt.slot}</p>
         <p>合計: {money(receipt.total ?? 0)}</p>
-        <p className="hint">お支払いは現金またはWise。</p>
+        <p className="hint">現金・WiseどちらでもOK</p>
         <p>エリア: {receipt.address}</p>
         {receipt.contact ? <p>LINE名: {receipt.contact}</p> : null}
         <ul>{receipt.items.map((n) => <li key={n}>{n}</li>)}</ul>
-        {viaLine ? (
-          <section className="field"><span>連絡：LINE</span><LineBlock href={lineUrl} /></section>
-        ) : (
-          <section className="field"><span>連絡：電話</span><PhoneBlock /></section>
-        )}
+        <section className="field">
+          <span>{viaLine ? "連絡：LINE（未追加なら招待リンク）" : "連絡：電話"}</span>
+          {viaLine
+            ? <a className="linelink" href={lineUrl} target="_blank" rel="noopener noreferrer">LINE招待リンク</a>
+            : <a className="linelink" href={PHONE_TEL}>{PHONE_DISPLAY}</a>}
+        </section>
         <button type="button" className="dark" onClick={() => setReceipt(null)}>一覧に戻る</button>
       </main>
     );
@@ -147,7 +134,7 @@ export default function BuyerPage() {
         </span>
         <span className="span">{span}</span>
         <button type="button" className="req"
-          onClick={() => { setOpen(null); setSlot(null); setMethod("line"); setErr(null); setCheckout(true); }}>
+          onClick={() => { setOpen(null); setSlot(null); setMethod("line"); setLineOk(false); setErr(null); setCheckout(true); }}>
           {picked.size ? `引き取りを依頼 (${picked.size})` : "引き取りを依頼"}
         </button>
       </header>
@@ -201,19 +188,24 @@ export default function BuyerPage() {
             )}
             {!freeSlots.length && <p className="sw">この日は空きがありません。</p>}
             <p className="total">合計 {money(pickedItems.reduce((n, i) => n + (i.price ?? 0), 0))} <span className="hint">現金・WiseどちらでもOK</span></p>
-            <label className="float">
-              <span>LINE名</span>
-              <input value={lineName} onChange={(e) => setLineName(e.target.value)}
-                placeholder="表示名" autoComplete="nickname" enterKeyHint="done" />
-            </label>
             <div className="field"><span>連絡方法</span>
               <div className="slots pair">
-                <button type="button" className={method === "line" ? "slot on" : "slot"} onClick={() => setMethod("line")}>LINE</button>
-                <button type="button" className={method === "phone" ? "slot on" : "slot"} onClick={() => setMethod("phone")}>電話</button>
+                <button type="button" className={method === "line" ? "slot on" : "slot"}
+                  onClick={() => { setMethod("line"); setLineOk(false); }}>LINE</button>
+                <button type="button" className={method === "phone" ? "slot on" : "slot"}
+                  onClick={() => setMethod("phone")}>電話</button>
               </div>
-              {method === "line" && <LineBlock href={lineUrl} />}
-              {method === "phone" && <PhoneBlock />}
+              {method === "line" && <div className="linebox">
+                <p className="hint">先に招待リンクでエルトンを友だち追加</p>
+                <a className="linelink" href={lineUrl} target="_blank" rel="noopener noreferrer">LINE招待リンク</a>
+                <label className="late-check"><input type="checkbox" checked={lineOk}
+                  onChange={(e) => setLineOk(e.target.checked)} />LINEで友だち追加しました</label>
+              </div>}
+              {method === "phone" && <a className="linelink" href={PHONE_TEL}>{PHONE_DISPLAY}</a>}
             </div>
+            <label className="float"><span>LINE名</span>
+              <input value={lineName} onChange={(e) => setLineName(e.target.value)}
+                placeholder="表示名" autoComplete="nickname" enterKeyHint="done" /></label>
             {err && <div className="err">{err}</div>}
             <button type="button" className={`cta${canSend ? " go" : ""}`} disabled={busy || !canSend}
               onClick={book}>{busy ? "送信中…" : "依頼を送信"}</button>
