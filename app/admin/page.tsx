@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon, IconBtn } from "@/components/icons";
-import { DenseToggle, PhotoGrid, money, useDense, type PhotoItem } from "@/components/photo-listing";
+import { DenseToggle, Listings, useDense, type PhotoItem } from "@/components/photo-listing";
 import { Snack, useSnack } from "./snack";
 
 type Item = PhotoItem & { claimId?: string | null; note?: string };
@@ -14,7 +14,6 @@ export default function AdminPage() {
   const [data, setData] = useState<AdminState | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
-  const [menuFor, setMenuFor] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -48,8 +47,6 @@ export default function AdminPage() {
   useEffect(() => () => { if (addrTimer.current) clearTimeout(addrTimer.current); }, []);
 
   const items = useMemo(() => [...(data?.items || [])].sort(byPriceDesc), [data?.items]);
-  const withPh = useMemo(() => items.filter((i) => (i.photos || []).length > 0), [items]);
-  const noPh = useMemo(() => items.filter((i) => !(i.photos || []).length), [items]);
   const open = useMemo(() => items.find((i) => i.id === openId) || null, [items, openId]);
 
   function apply(action: string, payload: Record<string, unknown>, body: Record<string, unknown>) {
@@ -122,7 +119,6 @@ export default function AdminPage() {
   }
 
   function openDetail(item: Item) {
-    setMenuFor(null);
     setOpenId(item.id);
     setEditName(item.name);
     setEditPrice(String(item.price ?? 0));
@@ -174,12 +170,9 @@ export default function AdminPage() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Upload failed";
       setErr(msg); show(msg, "err");
-    } finally {
-      setUploading(null);
-    }
+    } finally { setUploading(null); }
   }
 
-  /** Each selected photo becomes an untitled listing. */
   async function addFromPhotos(files: File[]) {
     const images = files.filter((f) => f.type.startsWith("image/"));
     if (!images.length) return;
@@ -208,7 +201,7 @@ export default function AdminPage() {
 
   async function deleteItem(item: Item) {
     if (!confirm(`Delete "${item.name || "item"}"?`)) return;
-    setMenuFor(null); setDeleting(item.id); show("Deleting…", "busy");
+    setDeleting(item.id); show("Deleting…", "busy");
     try {
       const ok = await act({ action: "remove", id: item.id });
       if (ok && openId === item.id) setOpenId(null);
@@ -226,83 +219,35 @@ export default function AdminPage() {
     } finally { setDeleting(null); }
   }
 
-  const menuBtn = (item: Item, busy: boolean) => (
-    <div style={{ position: "relative", flex: "0 0 auto" }} onClick={(e) => e.stopPropagation()}>
-      <IconBtn name="more" label="Item menu" disabled={busy || uploading === item.id}
-        onClick={() => setMenuFor(menuFor === item.id ? null : item.id)} className="ghost-border" />
-      {menuFor === item.id && !busy && (
-        <div className="menu-pop">
-          <button type="button" onClick={() => openDetail(item)}>Edit</button>
-          <label className={uploading === item.id ? "busy" : ""}>
-            <Icon name="photo" size={16} /> {uploading === item.id ? "Uploading…" : "Add photo"}
-            <input type="file" accept="image/*" hidden disabled={uploading === item.id}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                e.target.value = "";
-                setMenuFor(null);
-                if (f) uploadPhoto(item.id, f);
-              }} />
-          </label>
-          <button type="button" className="danger" onClick={() => deleteItem(item)}>
-            <Icon name="trash" size={16} /> Delete
-          </button>
-        </div>
-      )}
-    </div>
-  );
+  const busyOpen = open ? deleting === open.id : false;
+  const pics = open?.photos || [];
 
   return (
-    <main style={S.wrap} onClick={() => menuFor && setMenuFor(null)}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
-        <h1 style={{ ...S.h, margin: 0 }}>Admin</h1>
+    <main className="buy">
+      <header className="bar admin-bar">
+        <input className="area-in" value={addrDraft} disabled={!data}
+          onChange={(e) => onAddressChange(e.target.value)} aria-label="Address" placeholder="Address" />
         <DenseToggle dense={dense} onToggle={toggleDense} />
-      </div>
-      {err && <p style={S.err}>{err}</p>}
-      {!data && !err && <p style={{ color: "#555" }}>Loading…</p>}
-      <section style={S.sec}><div style={S.t}>Address</div>
-        <input value={addrDraft} onChange={(e) => onAddressChange(e.target.value)}
-          disabled={!data} style={{ width: "100%", padding: 8 }} />
-      </section>
-      <section style={S.sec}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-          <div style={{ ...S.t, marginBottom: 0 }}>Items</div>
-          <IconBtn name="stackPlus" label="Add photos as items" size={22}
-            disabled={!data || uploading === "batch"}
-            onClick={() => setAddOpen(true)} className="solid" />
-          <input ref={addInputRef} type="file" accept="image/*" multiple hidden
-            onChange={(e) => {
-              const list = e.target.files ? Array.from(e.target.files) : [];
-              e.target.value = "";
-              if (list.length) void addFromPhotos(list);
-            }} />
-        </div>
-        <PhotoGrid items={withPh} dense={dense}
-          onSelect={openDetail}
-          disabledFor={(it) => deleting === it.id}
-          classNameFor={(it) => (deleting === it.id ? "dim" : "")} />
-        <ul style={S.list}>
-          {noPh.map((item) => {
-            const busy = deleting === item.id;
-            return (
-              <li key={item.id} style={{ ...S.item, opacity: busy ? 0.55 : 1 }}>
-                <div style={{ display: "flex", gap: 8, width: "100%", alignItems: "flex-start" }}>
-                  <div style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, lineHeight: 1.3, wordBreak: "break-word" }}>
-                    {item.name || "Untitled"}
-                  </div>
-                  <div style={{ flex: "0 0 auto", fontSize: 14, fontVariantNumeric: "tabular-nums", color: "#333", lineHeight: 1.3, paddingTop: 1, whiteSpace: "nowrap" }}>
-                    {money(item.price)}
-                  </div>
-                  {menuBtn(item, busy)}
-                </div>
-                {item.note ? <div style={{ width: "100%", fontSize: 12, color: "#555", marginTop: 2 }}>{item.note}</div> : null}
-              </li>
-            );
-          })}
-          {!items.length && <li style={{ color: "#777" }}>No items yet</li>}
-        </ul>
-      </section>
-      <section style={S.sec}><div style={S.t}>Claims</div>
-        <ul style={S.list}>
+        <IconBtn name="stackPlus" label="Add photos as items" size={22}
+          disabled={!data || uploading === "batch"}
+          onClick={() => setAddOpen(true)} className="solid" />
+        <input ref={addInputRef} type="file" accept="image/*" multiple hidden
+          onChange={(e) => {
+            const list = e.target.files ? Array.from(e.target.files) : [];
+            e.target.value = "";
+            if (list.length) void addFromPhotos(list);
+          }} />
+      </header>
+      {err && <div className="err">{err}</div>}
+      {!data && !err && <p style={{ padding: 12, color: "#555" }}>Loading…</p>}
+      <Listings items={items} dense={dense} onSelect={openDetail}
+        disabledFor={(it) => deleting === it.id}
+        classNameFor={(it) => (deleting === it.id ? "dim" : "")} />
+      {!items.length && data && <p style={{ padding: 12, color: "#777" }}>No items yet</p>}
+
+      <section style={{ padding: "12px 8px 24px" }}>
+        <div style={{ fontWeight: 600, marginBottom: 6 }}>Claims</div>
+        <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
           {(data?.claims || []).map((c) => (
             <li key={c.id} style={{ padding: "8px 0", borderBottom: "1px solid #eee", fontSize: 13 }}>
               <div><b>{c.code}</b> · {c.day.slice(5)}{c.slot ? ` · ${c.slot}` : ""} · {c.status}</div>
@@ -327,75 +272,59 @@ export default function AdminPage() {
               <h2>Add items</h2>
               <IconBtn name="close" label="Close" onClick={() => setAddOpen(false)} className="ghost-border" />
             </div>
-            <div className="thumb-strip" aria-hidden="true">
-              <span /><span /><span />
-            </div>
+            <div className="thumb-strip" aria-hidden="true"><span /><span /><span /></div>
             <p className="add-cue">Each photo becomes its own item.</p>
             <button type="button" className="cta" style={{ background: "#111", color: "#fff" }}
-              onClick={() => addInputRef.current?.click()}>
-              Add photos
-            </button>
+              onClick={() => addInputRef.current?.click()}>Add photos</button>
           </div>
         </div>
       )}
 
-      {open && (() => {
-        const busy = deleting === open.id;
-        const pics = open.photos || [];
-        return (
-          <div className="mask" role="dialog" aria-modal="true" aria-label="Edit item"
-            onClick={() => !busy && setOpenId(null)}>
-            <div className="sheet" onClick={(e) => e.stopPropagation()} style={{ maxHeight: "90vh", overflowY: "auto" }}>
-              <div className="add-head">
-                <h2 style={{ margin: 0, fontSize: 18 }}>Edit</h2>
-                <IconBtn name="close" label="Close" disabled={busy} onClick={() => setOpenId(null)} className="ghost-border" />
-              </div>
-              {pics.length > 0 && (
-                <div className="pics">
-                  {pics.map((src) => (
-                    <div key={src} className="pic-wrap">
-                      <img src={src} alt="" loading="lazy" decoding="async" />
-                      <IconBtn name="trash" label="Delete photo" disabled={busy} size={16}
-                        className="danger abs" onClick={() => deletePhoto(open, src)} />
-                    </div>
-                  ))}
-                </div>
-              )}
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Name</label>
-              <input value={editName} onChange={(e) => setEditName(e.target.value)} disabled={busy}
-                style={{ width: "100%", padding: 10, marginBottom: 10, border: "1px solid #ccc", borderRadius: 8 }} />
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Price</label>
-              <input type="number" min={0} inputMode="numeric" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} disabled={busy}
-                style={{ width: "100%", padding: 10, marginBottom: 10, border: "1px solid #ccc", borderRadius: 8 }} />
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Note</label>
-              <textarea value={editNote} onChange={(e) => setEditNote(e.target.value)} disabled={busy} rows={3}
-                style={{ width: "100%", padding: 10, marginBottom: 12, border: "1px solid #ccc", borderRadius: 8, resize: "vertical", font: "inherit" }} />
-              <button type="button" className="cta" disabled={busy} onClick={() => void saveDetail()}
-                style={{ background: "#111", color: "#fff", marginBottom: 8 }}>Save</button>
-              <label className={`icon-row${uploading === open.id || busy ? " busy" : ""}`}>
-                <Icon name="photo" size={18} /> {uploading === open.id ? "Uploading…" : "Add photo"}
-                <input type="file" accept="image/*" hidden disabled={busy || uploading === open.id}
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    e.target.value = "";
-                    if (f) uploadPhoto(open.id, f);
-                  }} />
-              </label>
-              <IconBtn name="trash" label="Delete item" disabled={busy} className="danger block"
-                onClick={() => deleteItem(open)} />
+      {open && (
+        <div className="mask" role="dialog" aria-modal="true" aria-label="Edit item"
+          onClick={() => !busyOpen && setOpenId(null)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()} style={{ maxHeight: "90vh", overflowY: "auto" }}>
+            <div className="add-head">
+              <h2 style={{ margin: 0, fontSize: 18 }}>Edit</h2>
+              <IconBtn name="close" label="Close" disabled={busyOpen} onClick={() => setOpenId(null)} className="ghost-border" />
             </div>
+            {pics.length > 0 && (
+              <div className="pics">
+                {pics.map((src) => (
+                  <div key={src} className="pic-wrap">
+                    <img src={src} alt="" loading="lazy" decoding="async" />
+                    <IconBtn name="trash" label="Delete photo" disabled={busyOpen} size={16}
+                      className="danger abs" onClick={() => deletePhoto(open, src)} />
+                  </div>
+                ))}
+              </div>
+            )}
+            <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Name</label>
+            <input value={editName} onChange={(e) => setEditName(e.target.value)} disabled={busyOpen}
+              style={{ width: "100%", padding: 10, marginBottom: 10, border: "1px solid #ccc", borderRadius: 8 }} />
+            <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Price</label>
+            <input type="number" min={0} inputMode="numeric" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} disabled={busyOpen}
+              style={{ width: "100%", padding: 10, marginBottom: 10, border: "1px solid #ccc", borderRadius: 8 }} />
+            <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Note</label>
+            <textarea value={editNote} onChange={(e) => setEditNote(e.target.value)} disabled={busyOpen} rows={3}
+              style={{ width: "100%", padding: 10, marginBottom: 12, border: "1px solid #ccc", borderRadius: 8, resize: "vertical", font: "inherit" }} />
+            <button type="button" className="cta" disabled={busyOpen} onClick={() => void saveDetail()}
+              style={{ background: "#111", color: "#fff", marginBottom: 8 }}>Save</button>
+            <label className={`icon-row${uploading === open.id || busyOpen ? " busy" : ""}`}>
+              <Icon name="photo" size={18} /> {uploading === open.id ? "Uploading…" : "Add photo"}
+              <input type="file" accept="image/*" hidden disabled={busyOpen || uploading === open.id}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f) uploadPhoto(open.id, f);
+                }} />
+            </label>
+            <IconBtn name="trash" label="Delete item" disabled={busyOpen} className="danger block"
+              onClick={() => deleteItem(open)} />
           </div>
-        );
-      })()}
+        </div>
+      )}
       <Snack snack={snack} />
     </main>
   );
 }
-
-const S: Record<string, React.CSSProperties> = {
-  wrap: { padding: 12, maxWidth: 560, margin: "0 auto" }, h: { fontSize: 18, margin: "0 0 8px" },
-  err: { color: "#b00020", margin: "0 0 8px" },
-  list: { listStyle: "none", margin: 0, padding: 0 },
-  item: { display: "flex", flexWrap: "wrap", gap: 6, alignItems: "flex-start", padding: "6px 0", borderBottom: "1px solid #eee", fontSize: 13 },
-  sec: { marginBottom: 16 }, t: { fontWeight: 600, marginBottom: 6 },
-};

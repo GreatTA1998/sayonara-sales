@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { DenseToggle, PhotoGrid, money, useDense } from "@/components/photo-listing";
+import { DenseToggle, Listings, money, useDense } from "@/components/photo-listing";
 
 type Item = { id: string; name: string; price: number | null; note?: string; taken: boolean; photos?: string[]; availableFrom?: string; availableTo?: string };
 type State = { address: string; days: string[]; slots: string[]; taken: Record<string, string[]>; lineInviteUrl?: string | null; items: Item[] };
@@ -188,28 +188,8 @@ export default function BuyerPage() {
         </button>
       </header>
       {err && <div className="err">{err}</div>}
-      {(() => {
-        const all = state?.items || [];
-        const withPh = all.filter((i) => (i.photos || []).length > 0);
-        const noPh = all.filter((i) => !(i.photos || []).length);
-        const cellCls = (item: Item) => `${picked.has(item.id) ? "on" : ""}${available.has(item.id) ? "" : " dim"}`.trim();
-        return (
-          <>
-            <PhotoGrid items={withPh} dense={dense}
-              onSelect={setOpen} classNameFor={cellCls} />
-            {noPh.length > 0 && (
-              <div className="grid">
-                {noPh.map((item) => (
-                  <button key={item.id} type="button" aria-label={item.name} onClick={() => setOpen(item)}
-                    className={`cell${picked.has(item.id) ? " on" : ""}${available.has(item.id) ? "" : " dim"}`}>
-                    <span className="cap"><span className="price">{money(item.price)}</span><span className="name">{item.name}</span></span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </>
-        );
-      })()}
+      <Listings items={state?.items || []} dense={dense} onSelect={setOpen}
+        classNameFor={(item) => `${picked.has(item.id) ? "on" : ""}${available.has(item.id) ? "" : " dim"}`.trim()} />
       {!state && <p style={{ padding: 12 }}>読み込み中…</p>}
       {open && (
         <div className="mask" role="dialog" aria-modal="true" aria-label={open.name} onClick={() => setOpen(null)}>
