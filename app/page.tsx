@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { DenseToggle, Listings, money, useDense } from "@/components/photo-listing";
+import { Listings, money } from "@/components/photo-listing";
 
 type Item = { id: string; name: string; price: number | null; note?: string; taken: boolean; photos?: string[]; availableFrom?: string; availableTo?: string };
 type State = { address: string; days: string[]; slots: string[]; taken: Record<string, string[]>; lineInviteUrl?: string | null; items: Item[] };
@@ -56,8 +56,6 @@ export default function BuyerPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
-  const { dense, toggle: toggleDense } = useDense();
-
   const lineUrl = state?.lineInviteUrl || LINE_FALLBACK;
 
   const load = useCallback(async () => {
@@ -181,14 +179,13 @@ export default function BuyerPage() {
         <select className="day" value={day} onChange={(e) => { setDay(e.target.value); setPicked(new Set()); }}>
           {(state?.days || []).map((d) => <option key={d} value={d}>{dayLbl(d)}</option>)}
         </select>
-        <DenseToggle dense={dense} onToggle={toggleDense} />
         <button type="button" className="req"
           onClick={() => { setSlot(null); setMethod("line"); setErr(null); setCheckout(true); }}>
           {picked.size ? `引き取りを依頼 (${picked.size})` : "引き取りを依頼"}
         </button>
       </header>
       {err && <div className="err">{err}</div>}
-      <Listings items={state?.items || []} dense={dense} onSelect={setOpen}
+      <Listings items={state?.items || []} onSelect={setOpen}
         classNameFor={(item) => `${picked.has(item.id) ? "on" : ""}${available.has(item.id) ? "" : " dim"}`.trim()} />
       {!state && <p style={{ padding: 12 }}>読み込み中…</p>}
       {open && (
