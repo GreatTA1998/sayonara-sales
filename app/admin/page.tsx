@@ -237,9 +237,12 @@ export default function AdminPage() {
     <main className="buy">
       <header className="bar admin-bar">
         <span className="admin-lab" aria-label="管理ページ">管理</span>
-        <input className="area-in" value={addrDraft} disabled={!data}
-          size={Math.max((addrDraft || "下目黒").length + 1, 3)}
-          onChange={(e) => onAddressChange(e.target.value)} aria-label="エリア" placeholder="下目黒" />
+        <label className="area-float">
+          <span>区・町名</span>
+          <input value={addrDraft} disabled={!data}
+            onChange={(e) => onAddressChange(e.target.value)}
+            placeholder="目黒区 下目黒" autoComplete="address-level2" />
+        </label>
         <span className="spacer" aria-hidden="true" />
         <IconBtn name="plus" label="品目を追加" size={22}
           disabled={!data || uploading === "batch"}
