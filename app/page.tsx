@@ -1,52 +1,105 @@
 "use client";
-import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getId, openShop } from "@/lib/shop";
+import { listPins, openShop, saveGeo, type Pin } from "@/lib/shop";
 
-const DIR = [{ slug: "elton", name: "エルトン", area: "目黒区" }];
+const HubMap = dynamic(() => import("@/components/hub-map"), { ssr: false, loading: () => <div className="hub-map ph" /> });
+
+type Tab = "buy" | "sell";
+
+const TIPS = [
+  "写真を撮って出品するだけ",
+  "まとめて選んで引き取り依頼",
+  "LINEの個別やりとりが不要",
+];
 
 export default function HubPage() {
   const router = useRouter();
-  const [name, setN] = useState("");
+  const [tab, setTab] = useState<Tab>("buy");
+  const [pins, setPins] = useState<Pin[]>([]);
+  const [focus, setFocus] = useState<{ lat: number; lng: number } | null>(null);
   const [near, setNear] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [started, setStarted] = useState(false);
+  const [name, setName] = useState("");
 
-  useEffect(() => { const id = getId(); if (id) router.replace(`/s/${id}`); }, [router]);
-
-  function go(e: { preventDefault(): void }) {
-    e.preventDefault();
-    const id = openShop(name);
-    if (id) router.push(`/s/${id}`);
-  }
+  const refresh = useCallback(() => setPins(listPins()), []);
+  useEffect(() => { refresh(); }, [refresh]);
 
   function askNear() {
     if (!navigator.geolocation) { setNear("位置情報が使えません"); return; }
     setBusy(true); setNear(null);
     navigator.geolocation.getCurrentPosition(
-      (p) => { setNear(`付近（仮） ${p.coords.latitude.toFixed(3)}, ${p.coords.longitude.toFixed(3)}`); setBusy(false); },
+      (p) => {
+        const { latitude: lat, longitude: lng } = p.coords;
+        setFocus({ lat, lng });
+        const mine = pins.find((x) => x.mine);
+        if (mine) { saveGeo(mine.id, lat, lng); refresh(); }
+        setNear(null);
+        setBusy(false);
+      },
       () => { setNear("位置を取得できませんでした"); setBusy(false); },
       { timeout: 8000 },
     );
   }
 
+  function startSell(e: { preventDefault(): void }) {
+    e.preventDefault();
+    const id = openShop(name);
+    if (!id) return;
+    refresh();
+    router.push(`/s/${id}/admin`);
+  }
+
   return (
     <main className="wrap hub">
       <h1>Sayonara Sales</h1>
-      <p className="hint">ジモティー風の引越し出品。まとめて選んで依頼できるので、LINEの個別やりとりが不要。</p>
-      <p className="hint">LINE名で自分の店を開く（エルトン在庫とは別）。</p>
-      <form className="field" onSubmit={go}>
-        <label className="float"><span>LINE名</span>
-          <input value={name} onChange={(e) => setN(e.target.value)} placeholder="表示名" autoComplete="nickname" /></label>
-        <button type="submit" className="dark" disabled={!name.trim()}>自分の店を開く</button>
-      </form>
-      <section className="field">
-        <span>セール地図（仮）</span>
-        <div className="map-ph" aria-hidden="true">地図プレースホルダ</div>
-        <button type="button" className="ghost" onClick={askNear} disabled={busy}>{busy ? "取得中…" : "近くを見る"}</button>
-        {near && <p className="hint">{near}</p>}
-        <ul className="dir">{DIR.map((s) => <li key={s.slug}><a href={`/s/${s.slug}`}>{s.name}</a> · {s.area}</li>)}</ul>
-      </section>
-      <p className="hint"><a href="/s/elton">エルトンのセール</a> · <a href="/admin">エルトン Admin</a></p>
+      <div className="hub-tabs" role="tablist" aria-label="買う・売る">
+        <button type="button" role="tab" aria-selected={tab === "buy"} className={tab === "buy" ? "on" : ""}
+          onClick={() => setTab("buy")}>買う</button>
+        <button type="button" role="tab" aria-selected={tab === "sell"} className={tab === "sell" ? "on" : ""}
+          onClick={() => setTab("sell")}>売る</button>
+      </div>
+
+      {tab === "buy" && (
+        <section className="hub-buy" role="tabpanel">
+          <p className="hint">地図のピンから引き取りへ。戻るときもここから。</p>
+          <HubMap pins={pins} focus={focus} onPin={(id) => router.push(`/s/${id}`)} />
+          <button type="button" className="ghost" onClick={askNear} disabled={busy}>
+            {busy ? "取得中…" : "現在地"}
+          </button>
+          {near && <p className="hint">{near}</p>}
+          {!pins.length && <p className="hint">まだピンがありません。売るタブから出品を始めるとここに出ます。</p>}
+          {!!pins.length && (
+            <ul className="dir">
+              {pins.map((p) => (
+                <li key={p.id}>
+                  <a href={`/s/${p.id}`}>{p.name}</a>
+                  {p.mine ? " · 自分" : ""} · {p.id}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
+      {tab === "sell" && (
+        <section className="hub-sell" role="tabpanel">
+          <p className="hint">ジモティー風の引越し出品。</p>
+          <ul className="tips">{TIPS.map((t) => <li key={t}>{t}</li>)}</ul>
+          {!started ? (
+            <button type="button" className="dark" onClick={() => setStarted(true)}>出品を始める</button>
+          ) : (
+            <form className="field" onSubmit={startSell}>
+              <label className="float"><span>LINE名</span>
+                <input value={name} onChange={(e) => setName(e.target.value)}
+                  placeholder="表示名" autoComplete="nickname" autoFocus /></label>
+              <button type="submit" className="dark" disabled={!name.trim()}>管理画面へ</button>
+            </form>
+          )}
+        </section>
+      )}
     </main>
   );
 }
