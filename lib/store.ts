@@ -23,6 +23,7 @@ export const setLateOnly = (it: Item, on: boolean) => {
   else { delete it.availableFrom; delete it.availableTo; }
 };
 
+// TODO: per-shop Blob keys (e.g. sayonara-store-{slug}.json) for independent shops; hub stubs until then.
 const BLOB = "sayonara-store.json";
 const LOCAL = path.join(process.cwd(), "data", "store.json");
 
