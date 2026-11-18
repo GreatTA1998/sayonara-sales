@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import sharp from "sharp";
-import { withStore } from "@/lib/store";
+import { uid, withStore } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
@@ -26,24 +26,31 @@ export async function POST(req: Request) {
     const form = await req.formData();
     const file = form.get("file");
     const itemId = String(form.get("itemId") || "");
-    if (!(file instanceof File) || !itemId) {
-      return NextResponse.json({ error: "file and itemId required" }, { status: 400 });
+    if (!(file instanceof File)) {
+      return NextResponse.json({ error: "file required" }, { status: 400 });
     }
     if (!file.type.startsWith("image/")) {
       return NextResponse.json({ error: "Image only" }, { status: 400 });
     }
+    // itemId optional: omit to create an untitled listing for this photo.
+    const keyId = itemId || uid("i");
     const body = await compress(file);
-    const blob = await put(`sayonara-photos/${itemId}-${Date.now()}.webp`, body, {
+    const blob = await put(`sayonara-photos/${keyId}-${Date.now()}.webp`, body, {
       access: "public",
       contentType: "image/webp",
     });
     const item = await withStore((s) => {
-      const it = s.items.find((i) => i.id === itemId);
-      if (!it) throw new Error("Not found");
+      let it = itemId ? s.items.find((i) => i.id === itemId) : undefined;
+      if (!it) {
+        if (itemId) throw new Error("Not found");
+        it = { id: keyId, name: "", price: 0, photos: [] };
+        s.items.push(it);
+      }
       it.photos = [...(it.photos || []), blob.url];
       return it;
     });
     return NextResponse.json({
+      item,
       url: blob.url,
       photos: item.photos,
       bytesIn: file.size,
