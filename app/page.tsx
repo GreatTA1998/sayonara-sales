@@ -149,6 +149,7 @@ export default function BuyerPage() {
           {picked.size ? `引き取りを依頼 (${picked.size})` : "引き取りを依頼"}
         </button>
       </header>
+      <p className="hint intro">引っ越しのため出品 / 特記なき限り動作確認済み<br />車あり・まとめ買いの方は予約枠を優先</p>
       {err && !checkout && <div className="err">{err}</div>}
       <Listings items={state?.items || []} onSelect={setOpen}
         classNameFor={(item) => `${picked.has(item.id) ? "on" : ""}${item.taken ? " dim" : ""}`.trim()} />
