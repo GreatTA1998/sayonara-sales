@@ -198,7 +198,7 @@ export default function BuyerPage() {
               <p className="sw">後半のみの品目があります。日付を{rangeLbl(blocked[0].availableFrom, state?.days?.[state.days.length - 1])}以降にしてください。</p>
             )}
             {!freeSlots.length && <p className="sw">この日は空きがありません。</p>}
-            <p className="total">合計 {money(pickedItems.reduce((n, i) => n + (i.price ?? 0), 0))} <span className="hint">現金またはWiseで支払い。</span></p>
+            <p className="total">合計 {money(pickedItems.reduce((n, i) => n + (i.price ?? 0), 0))} <span className="hint">現金・WiseどちらでもOK</span></p>
             <div className="field"><span>連絡方法</span>
               <div className="slots pair">
                 <button type="button" className={method === "line" ? "slot on" : "slot"} onClick={() => setMethod("line")}>LINE</button>
