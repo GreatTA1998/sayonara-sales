@@ -202,7 +202,7 @@ export default function BuyerPage() {
                 {withPh.map((item) => (
                   <button key={item.id} type="button" aria-label={item.name} onClick={() => setOpen(item)}
                     className={cls(item, " has-photo")}>
-                    <img className="hero" src={(item.photos || [])[0]} alt="" />
+                    <img className="hero" src={(item.photos || [])[0]} alt="" loading="lazy" decoding="async" />
                     <span className="chip price">{money(item.price)}</span>
                   </button>
                 ))}
@@ -225,7 +225,7 @@ export default function BuyerPage() {
       {open && (
         <div className="mask" role="dialog" aria-modal="true" aria-label={open.name} onClick={() => setOpen(null)}>
           <div className="sheet" onClick={(e) => e.stopPropagation()}>
-            {openPics.length > 0 && <div className="pics">{openPics.map((src) => <img key={src} src={src} alt="" />)}</div>}
+            {openPics.length > 0 && <div className="pics">{openPics.map((src) => <img key={src} src={src} alt="" loading="lazy" decoding="async" />)}</div>}
             <div className="sp">{money(open.price)}</div>
             <h2>{open.name}</h2>
             {open.note ? <p className="sn">{open.note}</p> : null}
