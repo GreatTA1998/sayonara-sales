@@ -29,17 +29,10 @@ const why = (i: Item, day: string) =>
     : !dayOk(i, day) ? `受け取り可能：${rangeLbl(i.availableFrom, i.availableTo)}`
     : "受け取り不可";
 
-function LinkQr({ href, label, qrSrc, qrAlt }: { href: string; label: string; qrSrc: string; qrAlt: string }) {
-  const [mode, setMode] = useState<"link" | "qr">("link");
+function LineBlock({ href }: { href: string }) {
   return (
     <div className="linebox">
-      <div className="slots pair" role="group" aria-label={label}>
-        <button type="button" className={mode === "link" ? "slot on" : "slot"} onClick={() => setMode("link")}>リンク</button>
-        <button type="button" className={mode === "qr" ? "slot on" : "slot"} onClick={() => setMode("qr")}>QR</button>
-      </div>
-      {mode === "link"
-        ? <a className="linelink" href={href} target="_blank" rel="noopener noreferrer">{label}</a>
-        : <img className="lineqr" src={qrSrc} alt={qrAlt} />}
+      <a className="linelink" href={href} target="_blank" rel="noopener noreferrer">LINE招待リンク</a>
     </div>
   );
 }
@@ -128,7 +121,7 @@ export default function BuyerPage() {
         <p>エリア: {receipt.address}</p>
         <ul>{receipt.items.map((n) => <li key={n}>{n}</li>)}</ul>
         {viaLine ? (
-          <section className="field"><span>連絡：LINE</span><LinkQr href={lineUrl} label="LINE招待リンク" qrSrc="/line-qr.jpg" qrAlt="LINE QR" /></section>
+          <section className="field"><span>連絡：LINE</span><LineBlock href={lineUrl} /></section>
         ) : (
           <section className="field"><span>連絡：電話</span><PhoneBlock /></section>
         )}
@@ -176,9 +169,9 @@ export default function BuyerPage() {
         </div>
       )}
       {checkout && (
-        <div className="mask pop" role="dialog" aria-modal="true" aria-label="引き取り日程"
+        <div className="mask" role="dialog" aria-modal="true" aria-label="引き取り日程"
           onClick={() => { setCheckout(false); setErr(null); }}>
-          <div className="sheet pop checkout" onClick={(e) => e.stopPropagation()}>
+          <div className="sheet checkout" onClick={(e) => e.stopPropagation()}>
             <h2>引き取り日程</h2>
             <div className="when">
               <select value={day} aria-label="日付" onChange={(e) => {
@@ -211,7 +204,7 @@ export default function BuyerPage() {
                 <button type="button" className={method === "line" ? "slot on" : "slot"} onClick={() => setMethod("line")}>LINE</button>
                 <button type="button" className={method === "phone" ? "slot on" : "slot"} onClick={() => setMethod("phone")}>電話</button>
               </div>
-              {method === "line" && <LinkQr href={lineUrl} label="LINE招待リンク" qrSrc="/line-qr.jpg" qrAlt="LINE QR" />}
+              {method === "line" && <LineBlock href={lineUrl} />}
               {method === "phone" && <PhoneBlock />}
             </div>
             {err && <div className="err">{err}</div>}
