@@ -23,6 +23,7 @@ export default function AdminPage() {
   const [editPrice, setEditPrice] = useState("0");
   const [editNote, setEditNote] = useState("");
   const [addOpen, setAddOpen] = useState(false);
+  const [sheetMenu, setSheetMenu] = useState<string | null>(null); // "item" | photo url
   const { snack, show } = useSnack();
   const [addrDraft, setAddrDraft] = useState("");
   const addrDraftRef = useRef("");
@@ -119,6 +120,7 @@ export default function AdminPage() {
   }
 
   function openDetail(item: Item) {
+    setSheetMenu(null);
     setOpenId(item.id);
     setEditName(item.name);
     setEditPrice(String(item.price ?? 0));
@@ -279,45 +281,71 @@ export default function AdminPage() {
 
       {open && (
         <div className="mask" role="dialog" aria-modal="true" aria-label="Edit item"
-          onClick={() => !busyOpen && setOpenId(null)}>
-          <div className="sheet" onClick={(e) => e.stopPropagation()} style={{ maxHeight: "90vh", overflowY: "auto" }}>
+          onClick={() => { if (!busyOpen) { setSheetMenu(null); setOpenId(null); } }}>
+          <div className="sheet" onClick={(e) => { e.stopPropagation(); if (sheetMenu) setSheetMenu(null); }}
+            style={{ maxHeight: "90vh", overflowY: "auto" }}>
             <div className="add-head">
               <h2 style={{ margin: 0, fontSize: 18 }}>Edit</h2>
               <IconBtn name="close" label="Close" disabled={busyOpen} onClick={() => setOpenId(null)} className="ghost-border" />
             </div>
-            {pics.length > 0 && (
-              <div className="pics">
-                {pics.map((src) => (
-                  <div key={src} className="pic-wrap">
-                    <img src={src} alt="" loading="lazy" decoding="async" />
-                    <IconBtn name="trash" label="Delete photo" disabled={busyOpen} size={16}
-                      className="danger abs" onClick={() => deletePhoto(open, src)} />
+            <div className="pics">
+              {pics.map((src) => (
+                <div key={src} className="pic-wrap" onClick={(e) => e.stopPropagation()}>
+                  <img src={src} alt="" loading="lazy" decoding="async" />
+                  <div className="pic-more">
+                    <IconBtn name="more" label="Photo menu" disabled={busyOpen} size={16} className="ghost-border"
+                      onClick={() => setSheetMenu(sheetMenu === src ? null : src)} />
+                    {sheetMenu === src && (
+                      <div className="menu-pop">
+                        <button type="button" className="danger" disabled={busyOpen}
+                          onClick={() => { setSheetMenu(null); void deletePhoto(open, src); }}>
+                          <Icon name="trash" size={16} /> Delete photo
+                        </button>
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
-            <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Name</label>
-            <input value={editName} onChange={(e) => setEditName(e.target.value)} disabled={busyOpen}
-              style={{ width: "100%", padding: 10, marginBottom: 10, border: "1px solid #ccc", borderRadius: 8 }} />
-            <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Price</label>
-            <input type="number" min={0} inputMode="numeric" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} disabled={busyOpen}
-              style={{ width: "100%", padding: 10, marginBottom: 10, border: "1px solid #ccc", borderRadius: 8 }} />
-            <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Note</label>
-            <textarea value={editNote} onChange={(e) => setEditNote(e.target.value)} disabled={busyOpen} rows={3}
-              style={{ width: "100%", padding: 10, marginBottom: 12, border: "1px solid #ccc", borderRadius: 8, resize: "vertical", font: "inherit" }} />
-            <button type="button" className="cta" disabled={busyOpen} onClick={() => void saveDetail()}
-              style={{ background: "#111", color: "#fff", marginBottom: 8 }}>Save</button>
-            <label className={`icon-row${uploading === open.id || busyOpen ? " busy" : ""}`}>
-              <Icon name="photo" size={18} /> {uploading === open.id ? "Uploading…" : "Add photo"}
-              <input type="file" accept={IMG_ACCEPT} hidden disabled={busyOpen || uploading === open.id}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  e.target.value = "";
-                  if (f) uploadPhoto(open.id, f);
-                }} />
+                </div>
+              ))}
+              <label className={`pic-add${uploading === open.id || busyOpen ? " busy" : ""}`}
+                aria-label="Add photo" onClick={(e) => e.stopPropagation()}>
+                <Icon name="plus" size={22} />
+                <input type="file" accept={IMG_ACCEPT} hidden disabled={busyOpen || uploading === open.id}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    if (f) uploadPhoto(open.id, f);
+                  }} />
+              </label>
+            </div>
+            <label className="float">
+              <span>Name</span>
+              <input value={editName} onChange={(e) => setEditName(e.target.value)} disabled={busyOpen} />
             </label>
-            <IconBtn name="trash" label="Delete item" disabled={busyOpen} className="danger block"
-              onClick={() => deleteItem(open)} />
+            <label className="float">
+              <span>Price</span>
+              <input type="number" min={0} inputMode="numeric" value={editPrice}
+                onChange={(e) => setEditPrice(e.target.value)} disabled={busyOpen} />
+            </label>
+            <label className="float">
+              <span>Note</span>
+              <textarea value={editNote} onChange={(e) => setEditNote(e.target.value)} disabled={busyOpen} rows={3} />
+            </label>
+            <div className="save-row" onClick={(e) => e.stopPropagation()}>
+              <button type="button" className="cta" disabled={busyOpen} onClick={() => void saveDetail()}
+                style={{ background: "#111", color: "#fff", flex: 1, margin: 0 }}>Save</button>
+              <div className="save-more">
+                <IconBtn name="more" label="Listing menu" disabled={busyOpen} className="ghost-border"
+                  onClick={() => setSheetMenu(sheetMenu === "item" ? null : "item")} />
+                {sheetMenu === "item" && (
+                  <div className="menu-pop up">
+                    <button type="button" className="danger" disabled={busyOpen}
+                      onClick={() => { setSheetMenu(null); void deleteItem(open); }}>
+                      <Icon name="trash" size={16} /> Delete listing
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
