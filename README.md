@@ -1,6 +1,6 @@
 # Sayonara Sales
 
-Phone-first move-out sale: buyer claims at `/`, admin at `/admin`.
+Phone-first move-out sale: hub at `/`, Elton buyer at `/s/elton`, Elton admin at `/admin`. Independent shops: `/s/{line-name}` (+ `/admin` stub).
 
 ## Env (Vercel)
 
