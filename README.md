@@ -7,7 +7,6 @@ Phone-first move-out sale. Hub `/`: **買う** = Elton listings + ward map/sales
 | Variable | Required | Purpose |
 |---|---|---|
 | `BLOB_READ_WRITE_TOKEN` | prod | Vercel Blob persistence (auto when Blob linked) |
-| `LINE_INVITE_URL` | no | Checkout LINE invite link override |
 
 ## Dev
 
