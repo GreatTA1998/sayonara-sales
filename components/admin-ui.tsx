@@ -354,9 +354,9 @@ export default function ShopAdminView({ shop, name }: Props) {
 
       <section className="prof-block">
         <div className="claims-h">ショップ情報</div>
-        <label className="float"><span>自己紹介</span>
+        <label className="float"><span>ショップメモ</span>
           <textarea value={bio} rows={2} onChange={(e) => setBio(e.target.value)}
-            onBlur={() => void persistProfile(bio, jimoty)} placeholder="短い紹介（買う人に表示）" /></label>
+            onBlur={() => void persistProfile(bio, jimoty)} placeholder="動作確認・値引き・引越し・車・まとめ買い優先など" /></label>
         <label className="float"><span>ジモティーURL（任意）</span>
           <input value={jimoty} onChange={(e) => setJimoty(e.target.value)}
             onBlur={() => void persistProfile(bio, jimoty)}
