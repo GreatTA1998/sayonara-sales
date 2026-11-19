@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import AppNav from "@/components/app-nav";
 import { Listings, money } from "@/components/photo-listing";
 import { dayLbl, pickupSpan, rangeLbl } from "@/lib/days";
+import { SITE_URL } from "@/lib/site";
 
 type Item = {
   id: string; name: string; price: number | null; note?: string; taken: boolean;
@@ -45,9 +46,11 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
   const [shared, setShared] = useState(false);
   const lineUrl = state?.lineInviteUrl || LINE_FALLBACK;
   const span = pickupSpan(state?.days || []);
+  const shareUrl = `${SITE_URL}${shop === "elton" ? "/s/elton" : `/s/${shop}`}`;
 
   const load = useCallback(async () => {
     const data = (await fetch(api(shop, "/api/state"), { cache: "no-store" }).then((r) => r.json())) as State;
@@ -76,13 +79,16 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     setPicked((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
 
-  async function share() {
-    const url = typeof window !== "undefined"
-      ? `${window.location.origin}${shop === "elton" ? "/s/elton" : `/s/${shop}`}`
-      : "";
+  async function copyShare() {
     try {
-      if (navigator.share) await navigator.share({ title: `${name} — サヨナラ`, url });
-      else { await navigator.clipboard.writeText(url); setShared(true); setTimeout(() => setShared(false), 1600); }
+      await navigator.clipboard.writeText(shareUrl);
+      setShared(true);
+      setTimeout(() => setShared(false), 1600);
+    } catch { /* ignore */ }
+  }
+  async function systemShare() {
+    try {
+      if (navigator.share) await navigator.share({ title: `${name} — サヨナラ`, url: shareUrl });
     } catch { /* user cancel */ }
   }
 
@@ -148,8 +154,8 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
           <span className="area">{(state?.address || "").trim() || "区"}</span>
         </span>
         <span className="span">{span}</span>
-        <button type="button" className="share" onClick={() => void share()}>
-          {shared ? "コピー済" : "シェア"}
+        <button type="button" className="share" onClick={() => { setShared(false); setShareOpen(true); }}>
+          シェア
         </button>
         <button type="button" className="req"
           onClick={() => { setOpen(null); setSlot(null); setMethod("line"); setLineOk(false); setErr(null); setCheckout(true); }}>
@@ -176,6 +182,21 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             {!okOpen && <p className="sw">{why(open, day || (state?.days?.[0] || ""))}</p>}
             <button type="button" className={`cta${okOpen ? (onOpen ? " soft" : " go") : ""}`} disabled={!okOpen}
               onClick={() => { toggle(open.id); setOpen(null); }}>{onOpen ? "外す" : "追加"}</button>
+          </div>
+        </div>
+      )}
+      {shareOpen && (
+        <div className="mask" role="dialog" aria-modal="true" aria-label="シェア"
+          onClick={() => setShareOpen(false)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()}>
+            <h2>シェア</h2>
+            <p className="share-url">{shareUrl}</p>
+            <button type="button" className="cta go" onClick={() => void copyShare()}>
+              {shared ? "コピー済" : "コピー"}
+            </button>
+            <button type="button" className="cta soft" onClick={() => void systemShare()}>
+              他のアプリで共有
+            </button>
           </div>
         </div>
       )}

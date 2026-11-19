@@ -38,7 +38,7 @@ export default function HomePage() {
   return (
     <main className="home">
       <AppNav top onAuth={() => void refresh()} />
-      <h1 className="slogan">まとめて売って、まとめて買う。</h1>
+      <h1 className="slogan">まとめて買って、売って。</h1>
       <p className="subhero">ジモティの補完に。引っ越しリンクを共有し、まとめて選んで枠で引き取る。確定してからLINE。</p>
 
       <div className="home-browse">
