@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import { ensureShopId, getId, getName, getProfile, openShop, saveProfile } from "@/lib/shop";
+import {
+  AUTH_EVT, adminPath, ensureShopId, getId, getName, getProfile, openShop, saveProfile,
+} from "@/lib/shop";
 
 type Props = {
   /** Home is the only page with navbar on top. */
@@ -26,14 +28,15 @@ export default function AppNav({ top, onAuth }: Props) {
     setBio(p.bio);
     setJimoty(p.jimotyUrl);
   }
-  useEffect(() => { sync(); }, []);
+  useEffect(() => {
+    sync();
+    window.addEventListener(AUTH_EVT, sync);
+    return () => window.removeEventListener(AUTH_EVT, sync);
+  }, []);
 
   function saveLogin(e: { preventDefault(): void }) {
     e.preventDefault();
-    const id = openShop(draft);
-    if (!id) return;
-    setShopId(id);
-    setName(draft.trim());
+    if (!openShop(draft)) return;
     setLoginOpen(false);
     onAuth?.();
   }
@@ -44,7 +47,7 @@ export default function AppNav({ top, onAuth }: Props) {
     setProfOpen(false);
   }
 
-  const sellHref = shopId ? `/s/${shopId}/admin` : "#";
+  const sellHref = shopId ? adminPath(shopId) : "#";
   const sellLabel = name ? "マイ出品" : "出品";
   const logged = !!name;
 
@@ -59,9 +62,9 @@ export default function AppNav({ top, onAuth }: Props) {
           onClick={(e) => {
             if (shopId) return;
             e.preventDefault();
-            ensureShopId();
-            setShopId(getId());
-            window.location.href = `/s/${getId()}/admin`;
+            const id = ensureShopId();
+            setShopId(id);
+            window.location.href = adminPath(id);
           }}>{sellLabel}</a>
         {logged ? (
           <button type="button" className="nav-a" onClick={() => setProfOpen(true)}>{name}</button>

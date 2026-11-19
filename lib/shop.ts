@@ -1,15 +1,25 @@
-/** Soft LINE → 5-digit id (client). Elton = separate path + blob. */
+/** Soft LINE → shop id (client). Known names reclaim reserved shops. */
 export const NAME_KEY = "ss-line-name";
 export const ID_KEY = "ss-shop-id";
 const MAP_KEY = "ss-shop-map";
 const PROF_KEY = "ss-profile";
+export const AUTH_EVT = "ss-auth";
 
 export const ELTON_ID = "elton";
 export const ELTON_LABEL = "エルトン";
 export const DEFAULT_WARD = "目黒区";
 
+/** LINE名 variants → reserved shop (not a fresh dig5). */
+const KNOWN: Record<string, string> = {
+  エルトン: ELTON_ID,
+  elton: ELTON_ID,
+};
+
 const dig5 = (s: string) => /^\d{5}$/.test(s);
+const isShop = (s: string) => dig5(s) || s === ELTON_ID;
 const newId = () => String(10000 + Math.floor(Math.random() * 90000));
+const norm = (s: string) => s.trim().toLowerCase();
+const knownId = (n: string) => KNOWN[norm(n)] || KNOWN[n.trim()] || "";
 
 export type SaleRow = {
   id: string; name: string; ward: string; href: string; mine: boolean;
@@ -18,6 +28,10 @@ export type SaleRow = {
 
 export const getName = () => typeof window === "undefined" ? "" : (localStorage.getItem(NAME_KEY) || "").trim();
 export const getId = () => typeof window === "undefined" ? "" : (localStorage.getItem(ID_KEY) || "").trim();
+export const adminPath = (id: string) => id === ELTON_ID ? "/admin" : `/s/${id}/admin`;
+export const notifyAuth = () => {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(AUTH_EVT));
+};
 
 const readMap = (): Record<string, string> => {
   try { return JSON.parse(localStorage.getItem(MAP_KEY) || "{}") as Record<string, string>; }
@@ -43,28 +57,29 @@ export const saveProfile = (p: Profile) => {
 export const ensureShopId = () => {
   if (typeof window === "undefined") return "";
   let id = getId();
-  if (dig5(id)) return id;
+  if (isShop(id)) return id;
   id = newId();
   localStorage.setItem(ID_KEY, id);
   return id;
 };
 
-/** Persist LINE名 → id; reuse guest id when name is new. */
+/** Persist LINE名 → id; known sellers reclaim; else reuse guest dig5. */
 export const openShop = (n: string) => {
   if (typeof window === "undefined") return "";
   const v = n.trim();
-  if (!v) { localStorage.removeItem(NAME_KEY); return getId(); }
+  if (!v) { localStorage.removeItem(NAME_KEY); notifyAuth(); return getId(); }
   const map = readMap();
-  const key = v.toLowerCase();
-  let id = map[key] || "";
+  const key = norm(v);
+  let id = knownId(v) || map[key] || "";
   const cur = getId();
-  if (!dig5(id)) {
+  if (!isShop(id)) {
     id = dig5(cur) ? cur : newId();
-    map[key] = id;
-    localStorage.setItem(MAP_KEY, JSON.stringify(map));
   }
+  map[key] = id;
+  localStorage.setItem(MAP_KEY, JSON.stringify(map));
   localStorage.setItem(NAME_KEY, v);
   localStorage.setItem(ID_KEY, id);
+  notifyAuth();
   return id;
 };
 
@@ -77,7 +92,7 @@ export const listSales = (): SaleRow[] => {
   const mine = getId();
   const mineName = getName();
   const rows: SaleRow[] = [
-    { id: ELTON_ID, name: ELTON_LABEL, ward: DEFAULT_WARD, href: "/s/elton", mine: false },
+    { id: ELTON_ID, name: ELTON_LABEL, ward: DEFAULT_WARD, href: "/s/elton", mine: mine === ELTON_ID },
   ];
   const seen = new Set<string>([ELTON_ID]);
   for (const [name, id] of Object.entries(map)) {
