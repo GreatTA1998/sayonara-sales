@@ -39,20 +39,19 @@ export default function HomePage() {
     <main className="home">
       <AppNav top onAuth={() => void refresh()} />
       <h1 className="slogan">まとめて売って、まとめて買う。</h1>
-      <p className="subhero">リンクを共有して出品。まとめて選んで、枠で引き取る。確定してから、LINEでつながる。</p>
+      <p className="subhero">ジモティの補完に。引っ越しリンクを共有し、まとめて選んで枠で引き取る。確定してからLINE。</p>
 
       <div className="home-browse">
-        <div className="shop-rail" role="list" aria-label="ショップ一覧">
+        <div className="shop-tabs" role="tablist" aria-label="ショップ一覧">
           {cards.map((c) => (
-            <button key={c.id} type="button" role="listitem"
-              className={`shop-card${selected === c.id ? " on" : ""}`}
+            <button key={c.id} type="button" role="tab"
+              className={`shop-tab${selected === c.id ? " on" : ""}`}
+              aria-selected={selected === c.id}
               onClick={() => setSelected(c.id)}>
-              <span className="sc-count">{c.count}点</span>
-              <span className="sc-ward">{c.ward}</span>
-              <span className="sc-name">{c.name}{c.mine ? " · 自分" : ""}</span>
+              {c.count}点 {c.ward}
             </button>
           ))}
-          {!cards.length && <div className="shop-card ph">読み込み中…</div>}
+          {!cards.length && <span className="shop-tab ph">読み込み中…</span>}
         </div>
 
         <div className="home-shop">
