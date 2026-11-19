@@ -297,9 +297,12 @@ export default function ShopAdminView({ shop, name }: Props) {
       <header className="bar admin-bar">
         <span className="shop" aria-label="ショップ名">{label || "Admin"}</span>
         <label className="area-float" aria-label="区">
-          <input value={addrDraft} disabled={!data}
-            onChange={(e) => onAddressChange(e.target.value)}
-            placeholder="目黒" autoComplete="address-level2" />
+          <span className="area-grow">
+            <span className="area-mirror" aria-hidden="true">{addrDraft || "目黒"}</span>
+            <input value={addrDraft} disabled={!data}
+              onChange={(e) => onAddressChange(e.target.value)}
+              placeholder="目黒" autoComplete="address-level2" />
+          </span>
           <span aria-hidden="true">区</span>
         </label>
         <span className="spacer" aria-hidden="true" />
@@ -356,19 +359,15 @@ export default function ShopAdminView({ shop, name }: Props) {
             placeholder="https://jmty.jp/…" inputMode="url" /></label>
       </section>
 
-      <button type="button" className="cta go add-photos"
+      <button type="button" className="cta add-photos"
         disabled={!data || uploading === "batch"}
         onClick={() => fileRef.current?.click()}>写真を追加</button>
+      <p className="hint add-tip">1枚＝1出品。名前はあとで。</p>
       <input ref={fileRef} type="file" accept={IMG_ACCEPT} multiple hidden
         disabled={!data || uploading === "batch"}
         onChange={(e) => { const f = e.target.files; e.target.value = ""; if (f?.length) void addFromPhotos(Array.from(f)); }} />
 
-      {empty ? (
-        <section className="tutorial">
-          <p className="text-xl font-bold">はじめての出品</p>
-          <p className="text-2xl font-bold">写真を複数枚選ぶと、1枚ごとに品目ができます。<br />名前や詳細はあとからでOK。</p>
-        </section>
-      ) : (
+      {!empty && (
         <Listings items={items} onSelect={openDetail}
           disabledFor={(it) => deleting === it.id}
           classNameFor={(it) => (deleting === it.id ? "dim" : "")} />

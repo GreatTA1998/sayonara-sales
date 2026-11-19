@@ -89,7 +89,7 @@ export default function AppNav({ top, onAuth }: Props) {
     <>
       <nav className={`app-nav${top ? " top" : " bot"} nav-exp-${exp}`} aria-label="アプリ">
         <a href="/" className="brand" aria-label="サヨナラ ホーム">
-          <span className="logo" aria-hidden="true" />
+          <img className="logo" src="/sun-logo.png" alt="" width={26} height={19} />
           <span>サヨナラ</span>
         </a>
         <a className="nav-a" href={sellHref}
