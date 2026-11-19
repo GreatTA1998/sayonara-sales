@@ -93,9 +93,9 @@ export default function AppNav({ top, onAuth }: Props) {
           onClick={() => setProfOpen(false)}>
           <form className="sheet" onClick={(e) => e.stopPropagation()} onSubmit={saveProf}>
             <h2>{name}</h2>
-            <label className="float"><span>自己紹介</span>
+            <label className="float"><span>ショップメモ</span>
               <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3}
-                placeholder="短い紹介" /></label>
+                placeholder="動作確認・値引き・引越し・車・まとめ買い優先など" /></label>
             <label className="float"><span>ジモティーURL（任意）</span>
               <input value={jimoty} onChange={(e) => setJimoty(e.target.value)}
                 placeholder="https://jmty.jp/…" inputMode="url" autoComplete="url" /></label>
