@@ -38,7 +38,8 @@ export default function HomePage() {
   return (
     <main className="home">
       <AppNav top onAuth={() => void refresh()} />
-      <p className="slogan">まとめて売って、まとめて買う。</p>
+      <h1 className="slogan">まとめて売って、まとめて買う。</h1>
+      <p className="subhero">リンクを共有して出品。まとめて選んで、枠で引き取る。確定してから、LINEでつながる。</p>
 
       <div className="home-browse">
         <div className="shop-rail" role="list" aria-label="ショップ一覧">
