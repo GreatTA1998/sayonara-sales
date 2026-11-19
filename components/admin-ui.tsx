@@ -30,12 +30,12 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [editPrice, setEditPrice] = useState("0");
   const [editNote, setEditNote] = useState("");
   const [editLate, setEditLate] = useState(false);
-  const [addOpen, setAddOpen] = useState(false);
   const [sheetMenu, setSheetMenu] = useState<string | null>(null);
   const [logged, setLogged] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [lineDraft, setLineDraft] = useState("");
-  const [label, setLabel] = useState(name);
+  const [label, setLabel] = useState(/^\d{5}$/.test(name) ? "" : name);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [bio, setBio] = useState("");
   const [jimoty, setJimoty] = useState("");
   const [pubOk, setPubOk] = useState(false);
@@ -217,7 +217,6 @@ export default function ShopAdminView({ shop, name }: Props) {
   async function addFromPhotos(files: File[]) {
     const images = files.filter((f) => f.type.startsWith("image/"));
     if (!images.length) return;
-    setAddOpen(false);
     setUploading("batch"); setErr(null);
     let ok = 0;
     show(`アップロード中 0/${images.length}…`, "busy");
@@ -292,7 +291,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   return (
     <main className="buy admin">
       <header className="bar admin-bar">
-        <span className="shop" aria-label="ショップ名">{label || name}</span>
+        <span className="shop" aria-label="ショップ名">{label || "Admin"}</span>
         <label className="area-float">
           <span>区</span>
           <input value={addrDraft} disabled={!data}
@@ -311,7 +310,10 @@ export default function ShopAdminView({ shop, name }: Props) {
         )}
         <IconBtn name="plus" label="品目を追加" size={22}
           disabled={!data || uploading === "batch"}
-          onClick={() => setAddOpen(true)} className="solid" />
+          onClick={() => fileRef.current?.click()} className="solid" />
+        <input ref={fileRef} type="file" accept={IMG_ACCEPT} multiple hidden
+          disabled={!data || uploading === "batch"}
+          onChange={(e) => { const f = e.target.files; e.target.value = ""; if (f?.length) void addFromPhotos(Array.from(f)); }} />
       </header>
 
       {err && <div className="err">{err}</div>}
@@ -352,9 +354,10 @@ export default function ShopAdminView({ shop, name }: Props) {
 
       {empty ? (
         <section className="tutorial">
-          <p className="font-bold">はじめての出品</p>
-          <p className="hint">写真を複数枚選ぶと、1枚ごとに品目ができます。<br />名前や詳細はあとからでOK。</p>
-          <button type="button" className="cta go" onClick={() => setAddOpen(true)}>写真を追加</button>
+          <p className="text-xl font-bold">はじめての出品</p>
+          <p className="text-2xl font-bold">写真を複数枚選ぶと、1枚ごとに品目ができます。<br />名前や詳細はあとからでOK。</p>
+          <button type="button" className="cta go" onClick={() => fileRef.current?.click()}
+            disabled={uploading === "batch"}>写真を追加</button>
         </section>
       ) : (
         <Listings items={items} onSelect={openDetail}
@@ -403,24 +406,6 @@ export default function ShopAdminView({ shop, name }: Props) {
             <button type="submit" className="cta go" disabled={!lineDraft.trim()}>保存</button>
             <p className="hint" style={{ marginTop: 10 }}>より安全なLINE連携は準備中</p>
           </form>
-        </div>
-      )}
-
-      {addOpen && (
-        <div className="mask" role="dialog" aria-modal="true" aria-label="品目を追加"
-          onClick={() => setAddOpen(false)}>
-          <div className="sheet add-sheet" onClick={(e) => e.stopPropagation()}>
-            <div className="add-head">
-              <h2>品目を追加</h2>
-              <IconBtn name="close" label="閉じる" onClick={() => setAddOpen(false)} className="ghost-border" />
-            </div>
-            <p className="add-cue">写真1枚につき品目が1つ作成されます。</p>
-            <label className="cta" style={{ background: "#111", color: "#fff", display: "block", textAlign: "center", cursor: "pointer" }}>
-              写真を追加
-              <input type="file" accept={IMG_ACCEPT} multiple hidden
-                onChange={(e) => { const f = e.target.files; e.target.value = ""; if (f?.length) void addFromPhotos(Array.from(f)); }} />
-            </label>
-          </div>
         </div>
       )}
 
