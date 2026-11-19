@@ -352,6 +352,17 @@ export default function ShopAdminView({ shop, name }: Props) {
         </section>
       )}
 
+      <section className="prof-block">
+        <div className="claims-h">ショップ情報</div>
+        <label className="float"><span>自己紹介</span>
+          <textarea value={bio} rows={2} onChange={(e) => setBio(e.target.value)}
+            onBlur={() => void persistProfile(bio, jimoty)} placeholder="短い紹介（買う人に表示）" /></label>
+        <label className="float"><span>ジモティーURL（任意）</span>
+          <input value={jimoty} onChange={(e) => setJimoty(e.target.value)}
+            onBlur={() => void persistProfile(bio, jimoty)}
+            placeholder="https://jmty.jp/…" inputMode="url" /></label>
+      </section>
+
       {empty ? (
         <section className="tutorial">
           <p className="text-xl font-bold">はじめての出品</p>
@@ -364,17 +375,6 @@ export default function ShopAdminView({ shop, name }: Props) {
           disabledFor={(it) => deleting === it.id}
           classNameFor={(it) => (deleting === it.id ? "dim" : "")} />
       )}
-
-      <section className="prof-block">
-        <div className="claims-h">ショップ情報</div>
-        <label className="float"><span>自己紹介</span>
-          <textarea value={bio} rows={2} onChange={(e) => setBio(e.target.value)}
-            onBlur={() => void persistProfile(bio, jimoty)} placeholder="短い紹介（買う人に表示）" /></label>
-        <label className="float"><span>ジモティーURL（任意）</span>
-          <input value={jimoty} onChange={(e) => setJimoty(e.target.value)}
-            onBlur={() => void persistProfile(bio, jimoty)}
-            placeholder="https://jmty.jp/…" inputMode="url" /></label>
-      </section>
 
       {done.length > 0 && (
         <section className="claims done">
