@@ -19,6 +19,8 @@ const IMG_ACCEPT = "image/jpeg,image/png,image/heic,image/heif,image/webp,image/
 const api = (shop: string, path: string) => `${path}?shop=${encodeURIComponent(shop)}`;
 const byPriceDesc = (a: Item, b: Item) => (b.price ?? -1) - (a.price ?? -1);
 const methodJa = (m?: string) => (m === "phone" ? "電話" : m === "line" ? "LINE" : m || "");
+const kuStem = (v: string) => v.replace(/区$/, "");
+const kuFull = (v: string) => { const s = kuStem(v).trim(); return s ? `${s}区` : ""; };
 
 export default function ShopAdminView({ shop, name }: Props) {
   const [data, setData] = useState<AdminState | null>(null);
@@ -55,8 +57,9 @@ export default function ShopAdminView({ shop, name }: Props) {
     setData(body);
     addrSaved.current = body.address || "";
     if (!addrDirty.current) {
-      addrDraftRef.current = body.address || "";
-      setAddrDraft(body.address || "");
+      const stem = kuStem(body.address || "");
+      addrDraftRef.current = stem;
+      setAddrDraft(stem);
     }
     const local = getProfile();
     setBio(body.bio || local.bio || "");
@@ -119,7 +122,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   }
 
   async function saveAddress(raw: string) {
-    const next = raw.trim();
+    const next = kuFull(raw);
     if (next === addrSaved.current) return;
     const req = ++addrReq.current;
     setErr(null);
@@ -138,16 +141,17 @@ export default function ShopAdminView({ shop, name }: Props) {
     const saved = String(body.address ?? next);
     addrSaved.current = saved;
     setData((d) => d && { ...d, address: saved });
-    if (addrDraftRef.current.trim() === saved) addrDirty.current = false;
+    if (kuFull(addrDraftRef.current) === saved) addrDirty.current = false;
     show("保存しました", "ok");
   }
 
   function onAddressChange(value: string) {
+    const stem = kuStem(value);
     addrDirty.current = true;
-    addrDraftRef.current = value;
-    setAddrDraft(value);
+    addrDraftRef.current = stem;
+    setAddrDraft(stem);
     if (addrTimer.current) clearTimeout(addrTimer.current);
-    addrTimer.current = setTimeout(() => { void saveAddress(value); }, 450);
+    addrTimer.current = setTimeout(() => { void saveAddress(stem); }, 450);
   }
 
   async function persistProfile(nextBio: string, nextJimoty: string) {
@@ -292,28 +296,17 @@ export default function ShopAdminView({ shop, name }: Props) {
     <main className="buy admin">
       <header className="bar admin-bar">
         <span className="shop" aria-label="ショップ名">{label || "Admin"}</span>
-        <label className="area-float">
-          <span>区</span>
+        <label className="area-float" aria-label="区">
           <input value={addrDraft} disabled={!data}
             onChange={(e) => onAddressChange(e.target.value)}
-            placeholder="目黒区" autoComplete="address-level2" />
+            placeholder="目黒" autoComplete="address-level2" />
+          <span aria-hidden="true">区</span>
         </label>
         <span className="spacer" aria-hidden="true" />
-        {!logged ? (
-          <button type="button" className="login-save" onClick={() => { setLineDraft(""); setLoginOpen(true); }}>
-            ログインして保存
-          </button>
-        ) : (
-          <button type="button" className="req" onClick={publish}>
-            {pubOk ? "リンクコピー済" : "公開する"}
-          </button>
-        )}
-        <IconBtn name="plus" label="品目を追加" size={22}
-          disabled={!data || uploading === "batch"}
-          onClick={() => fileRef.current?.click()} className="solid" />
-        <input ref={fileRef} type="file" accept={IMG_ACCEPT} multiple hidden
-          disabled={!data || uploading === "batch"}
-          onChange={(e) => { const f = e.target.files; e.target.value = ""; if (f?.length) void addFromPhotos(Array.from(f)); }} />
+        <button type="button" className="req"
+          onClick={logged ? publish : () => { setLineDraft(""); setLoginOpen(true); }}>
+          {logged ? (pubOk ? "リンクコピー済" : "公開する") : "ログインして保存"}
+        </button>
       </header>
 
       {err && <div className="err">{err}</div>}
@@ -363,12 +356,17 @@ export default function ShopAdminView({ shop, name }: Props) {
             placeholder="https://jmty.jp/…" inputMode="url" /></label>
       </section>
 
+      <button type="button" className="cta go add-photos"
+        disabled={!data || uploading === "batch"}
+        onClick={() => fileRef.current?.click()}>写真を追加</button>
+      <input ref={fileRef} type="file" accept={IMG_ACCEPT} multiple hidden
+        disabled={!data || uploading === "batch"}
+        onChange={(e) => { const f = e.target.files; e.target.value = ""; if (f?.length) void addFromPhotos(Array.from(f)); }} />
+
       {empty ? (
         <section className="tutorial">
           <p className="text-xl font-bold">はじめての出品</p>
           <p className="text-2xl font-bold">写真を複数枚選ぶと、1枚ごとに品目ができます。<br />名前や詳細はあとからでOK。</p>
-          <button type="button" className="cta go" onClick={() => fileRef.current?.click()}
-            disabled={uploading === "batch"}>写真を追加</button>
         </section>
       ) : (
         <Listings items={items} onSelect={openDetail}
