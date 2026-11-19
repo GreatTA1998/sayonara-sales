@@ -291,18 +291,17 @@ export default function ShopAdminView({ shop, name }: Props) {
   const busyOpen = open ? deleting === open.id : false;
   const pics = open?.photos || [];
   const empty = !!data && !items.length;
+  const areaN = Math.max(2, Array.from(addrDraft || "目黒").length);
 
   return (
     <main className="buy admin">
       <header className="bar admin-bar">
         <span className="shop" aria-label="ショップ名">{label || "Admin"}</span>
         <label className="area-float" aria-label="区">
-          <span className="area-grow">
-            <span className="area-mirror" aria-hidden="true">{addrDraft || "目黒"}</span>
-            <input value={addrDraft} disabled={!data}
-              onChange={(e) => onAddressChange(e.target.value)}
-              placeholder="目黒" autoComplete="address-level2" />
-          </span>
+            <input value={addrDraft} disabled={!data} size={areaN}
+            style={{ width: `${areaN}em` }}
+            onChange={(e) => onAddressChange(e.target.value)}
+            placeholder="目黒" autoComplete="address-level2" />
           <span aria-hidden="true">区</span>
         </label>
         <span className="spacer" aria-hidden="true" />
