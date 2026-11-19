@@ -10,6 +10,28 @@ type Props = {
   onAuth?: () => void;
 };
 
+type Exp = 1 | 2 | 3;
+const NAV_KEY = "sayonara-nav-exp";
+
+function readExp(): Exp {
+  try {
+    const q = new URLSearchParams(location.search).get("nav");
+    if (q === "1" || q === "2" || q === "3") return +q as Exp;
+    const ls = localStorage.getItem(NAV_KEY);
+    if (ls === "1" || ls === "2" || ls === "3") return +ls as Exp;
+  } catch { /* SSR / private */ }
+  return 1;
+}
+
+function writeExp(n: Exp) {
+  try {
+    localStorage.setItem(NAV_KEY, String(n));
+    const u = new URL(location.href);
+    u.searchParams.set("nav", String(n));
+    history.replaceState(null, "", u);
+  } catch { /* ignore */ }
+}
+
 /** State-aware app chrome: logo+サヨナラ | 出品/マイ出品 | login/LINE名 (+ profile popover). */
 export default function AppNav({ top, onAuth }: Props) {
   const [name, setName] = useState("");
@@ -19,6 +41,7 @@ export default function AppNav({ top, onAuth }: Props) {
   const [draft, setDraft] = useState("");
   const [bio, setBio] = useState("");
   const [jimoty, setJimoty] = useState("");
+  const [exp, setExp] = useState<Exp>(1);
 
   function sync() {
     const n = getName();
@@ -30,9 +53,20 @@ export default function AppNav({ top, onAuth }: Props) {
   }
   useEffect(() => {
     sync();
+    const n = readExp();
+    setExp(n);
+    try {
+      const q = new URLSearchParams(location.search).get("nav");
+      if (q === "1" || q === "2" || q === "3") localStorage.setItem(NAV_KEY, q);
+    } catch { /* ignore */ }
     window.addEventListener(AUTH_EVT, sync);
     return () => window.removeEventListener(AUTH_EVT, sync);
   }, []);
+
+  function pickExp(n: Exp) {
+    setExp(n);
+    writeExp(n);
+  }
 
   function saveLogin(e: { preventDefault(): void }) {
     e.preventDefault();
@@ -53,7 +87,7 @@ export default function AppNav({ top, onAuth }: Props) {
 
   return (
     <>
-      <nav className={`app-nav${top ? " top" : " bot"}`} aria-label="アプリ">
+      <nav className={`app-nav${top ? " top" : " bot"} nav-exp-${exp}`} aria-label="アプリ">
         <a href="/" className="brand" aria-label="サヨナラ ホーム">
           <span className="logo" aria-hidden="true" />
           <span>サヨナラ</span>
@@ -72,6 +106,13 @@ export default function AppNav({ top, onAuth }: Props) {
           <button type="button" className="nav-a" onClick={() => { setDraft(""); setLoginOpen(true); }}>ログイン</button>
         )}
       </nav>
+
+      <div className="nav-exp-sw" role="group" aria-label="ナビ実験">
+        {([1, 2, 3] as Exp[]).map((n) => (
+          <button key={n} type="button" className={exp === n ? "on" : undefined}
+            aria-pressed={exp === n} onClick={() => pickExp(n)}>{n}</button>
+        ))}
+      </div>
 
       {loginOpen && (
         <div className="mask" role="dialog" aria-modal="true" aria-label="ログイン"
