@@ -5,7 +5,7 @@ import { Icon, IconBtn } from "@/components/icons";
 import { Listings, type PhotoItem } from "@/components/photo-listing";
 import { Snack, useSnack } from "@/components/snack";
 import { dayLbl, isLateOnly } from "@/lib/days";
-import { getName, getProfile, openShop, saveProfile } from "@/lib/shop";
+import { AUTH_EVT, adminPath, getName, getProfile, openShop, saveProfile } from "@/lib/shop";
 
 type Item = PhotoItem & { claimId?: string | null; note?: string; availableFrom?: string; availableTo?: string };
 type Claim = {
@@ -65,9 +65,14 @@ export default function ShopAdminView({ shop, name }: Props) {
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
-    const n = getName();
-    setLogged(!!n);
-    if (n) setLabel(n);
+    const sync = () => {
+      const n = getName();
+      setLogged(!!n);
+      if (n) setLabel(n);
+    };
+    sync();
+    window.addEventListener(AUTH_EVT, sync);
+    return () => window.removeEventListener(AUTH_EVT, sync);
   }, []);
   useEffect(() => () => { if (addrTimer.current) clearTimeout(addrTimer.current); }, []);
 
@@ -262,6 +267,10 @@ export default function ShopAdminView({ shop, name }: Props) {
     setLogged(true);
     setLabel(lineDraft.trim());
     setLoginOpen(false);
+    if (id !== shop) {
+      window.location.href = adminPath(id);
+      return;
+    }
     show("保存しました", "ok");
   }
 
