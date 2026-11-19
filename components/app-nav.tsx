@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { LineLoginLink, useLineOAuthReturn } from "@/components/line-oauth";
 import {
   AUTH_EVT, adminPath, ensureShopId, getId, getName, getProfile, openShop, saveProfile,
 } from "@/lib/shop";
@@ -63,6 +64,7 @@ export default function AppNav({ top, onAuth }: Props) {
     window.addEventListener(AUTH_EVT, sync);
     return () => window.removeEventListener(AUTH_EVT, sync);
   }, []);
+  useLineOAuthReturn(sync);
 
   function pickExp(n: N) {
     setExp(n);
@@ -136,7 +138,8 @@ export default function AppNav({ top, onAuth }: Props) {
               <input value={draft} onChange={(e) => setDraft(e.target.value)}
                 placeholder="表示名" autoComplete="nickname" autoFocus /></label>
             <button type="submit" className="cta go" disabled={!draft.trim()}>サインイン</button>
-            <p className="hint" style={{ marginTop: 10 }}>より安全なLINE連携は準備中</p>
+            <p className="hint" style={{ marginTop: 10 }}>より安全に使う場合はLINE連携</p>
+            <LineLoginLink />
           </form>
         </div>
       )}
@@ -153,6 +156,8 @@ export default function AppNav({ top, onAuth }: Props) {
               <input value={jimoty} onChange={(e) => setJimoty(e.target.value)}
                 placeholder="https://jmty.jp/…" inputMode="url" autoComplete="url" /></label>
             <button type="submit" className="cta go">保存</button>
+            <p className="hint" style={{ marginTop: 10 }}>より安全に使う場合はLINE連携</p>
+            <LineLoginLink />
           </form>
         </div>
       )}
