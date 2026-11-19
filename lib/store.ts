@@ -14,7 +14,7 @@ export type Claim = {
   contact?: string; contactMethod?: "line" | "phone";
   status: "booked" | "picked_up" | "cancelled"; createdAt: string;
 };
-export type Store = { address: string; items: Item[]; claims: Claim[] };
+export type Store = { address: string; bio?: string; jimotyUrl?: string; items: Item[]; claims: Claim[] };
 
 export { LATE_FROM, PICKUP_DAYS, PICKUP_SLOTS, isLateOnly };
 

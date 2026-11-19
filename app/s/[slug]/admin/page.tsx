@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import AdminUi from "@/components/admin-ui";
+import ShopAdminView from "@/components/admin-ui";
 import { getId, getName } from "@/lib/shop";
 
 export default function ShopAdmin() {
@@ -16,5 +16,5 @@ export default function ShopAdmin() {
   }, [id, router]);
 
   if (!id || id === "elton") return null;
-  return <AdminUi shop={id} name={label || id} home />;
+  return <ShopAdminView shop={id} name={label || id} />;
 }

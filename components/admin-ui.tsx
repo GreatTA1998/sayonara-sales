@@ -1,34 +1,26 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import AppNav from "@/components/app-nav";
 import { Icon, IconBtn } from "@/components/icons";
 import { Listings, type PhotoItem } from "@/components/photo-listing";
 import { Snack, useSnack } from "@/components/snack";
 import { dayLbl, isLateOnly } from "@/lib/days";
+import { getName, getProfile, openShop, saveProfile } from "@/lib/shop";
 
 type Item = PhotoItem & { claimId?: string | null; note?: string; availableFrom?: string; availableTo?: string };
 type Claim = {
   id: string; code: string; day: string; slot?: string; contact?: string; contactMethod?: string;
   itemIds: string[]; status: string;
 };
-type AdminState = { address: string; items: Item[]; claims: Claim[] };
-type Props = {
-  shop: string;
-  name: string;
-  home?: boolean;
-  /** Soft LINE login control in top-right (hub 売る). */
-  login?: { saved: boolean; onClick: () => void };
-};
+type AdminState = { address: string; bio?: string; jimotyUrl?: string; items: Item[]; claims: Claim[] };
+type Props = { shop: string; name: string };
 
-/** Library-first: no capture (capture forces camera). Specific types bias Photos over Files. */
 const IMG_ACCEPT = "image/jpeg,image/png,image/heic,image/heif,image/webp,image/gif,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif";
 const api = (shop: string, path: string) => `${path}?shop=${encodeURIComponent(shop)}`;
-
 const byPriceDesc = (a: Item, b: Item) => (b.price ?? -1) - (a.price ?? -1);
-const statusJa = (s: string) =>
-  s === "booked" ? "予約済" : s === "picked_up" ? "受取済" : s === "cancelled" ? "キャンセル" : s;
 const methodJa = (m?: string) => (m === "phone" ? "電話" : m === "line" ? "LINE" : m || "");
 
-export default function AdminUi({ shop, name, home, login }: Props) {
+export default function ShopAdminView({ shop, name }: Props) {
   const [data, setData] = useState<AdminState | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
@@ -39,7 +31,14 @@ export default function AdminUi({ shop, name, home, login }: Props) {
   const [editNote, setEditNote] = useState("");
   const [editLate, setEditLate] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
-  const [sheetMenu, setSheetMenu] = useState<string | null>(null); // "item" | photo url
+  const [sheetMenu, setSheetMenu] = useState<string | null>(null);
+  const [logged, setLogged] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [lineDraft, setLineDraft] = useState("");
+  const [label, setLabel] = useState(name);
+  const [bio, setBio] = useState("");
+  const [jimoty, setJimoty] = useState("");
+  const [pubOk, setPubOk] = useState(false);
   const { snack, show } = useSnack();
   const [addrDraft, setAddrDraft] = useState("");
   const addrDraftRef = useRef("");
@@ -47,24 +46,35 @@ export default function AdminUi({ shop, name, home, login }: Props) {
   const addrSaved = useRef("");
   const addrDirty = useRef(false);
   const addrReq = useRef(0);
+
   const load = useCallback(async () => {
     const res = await fetch(api(shop, "/api/admin"), { cache: "no-store" });
     if (!res.ok) { setErr("読み込みに失敗しました"); show("読み込みに失敗しました", "err"); return; }
     setErr(null);
-    const body = await res.json();
+    const body = await res.json() as AdminState;
     setData(body);
     addrSaved.current = body.address || "";
     if (!addrDirty.current) {
       addrDraftRef.current = body.address || "";
       setAddrDraft(body.address || "");
     }
+    const local = getProfile();
+    setBio(body.bio || local.bio || "");
+    setJimoty(body.jimotyUrl || local.jimotyUrl || "");
   }, [shop, show]);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const n = getName();
+    setLogged(!!n);
+    if (n) setLabel(n);
+  }, []);
   useEffect(() => () => { if (addrTimer.current) clearTimeout(addrTimer.current); }, []);
 
   const items = useMemo(() => [...(data?.items || [])].sort(byPriceDesc), [data?.items]);
   const open = useMemo(() => items.find((i) => i.id === openId) || null, [items, openId]);
+  const pending = useMemo(() => (data?.claims || []).filter((c) => c.status === "booked"), [data?.claims]);
+  const done = useMemo(() => (data?.claims || []).filter((c) => c.status === "picked_up"), [data?.claims]);
 
   function apply(action: string, payload: Record<string, unknown>, body: Record<string, unknown>) {
     setData((d) => {
@@ -133,6 +143,11 @@ export default function AdminUi({ shop, name, home, login }: Props) {
     setAddrDraft(value);
     if (addrTimer.current) clearTimeout(addrTimer.current);
     addrTimer.current = setTimeout(() => { void saveAddress(value); }, 450);
+  }
+
+  async function persistProfile(nextBio: string, nextJimoty: string) {
+    saveProfile({ bio: nextBio, jimotyUrl: nextJimoty });
+    await act({ action: "profile", bio: nextBio, jimotyUrl: nextJimoty });
   }
 
   function openDetail(item: Item) {
@@ -240,14 +255,35 @@ export default function AdminUi({ shop, name, home, login }: Props) {
     } finally { setDeleting(null); }
   }
 
+  function saveLogin(e: { preventDefault(): void }) {
+    e.preventDefault();
+    const id = openShop(lineDraft);
+    if (!id) return;
+    setLogged(true);
+    setLabel(lineDraft.trim());
+    setLoginOpen(false);
+    show("保存しました", "ok");
+  }
+
+  function publish() {
+    const href = shop === "elton" ? "/s/elton" : `/s/${shop}`;
+    setPubOk(true);
+    show("公開しました", "ok");
+    setTimeout(() => setPubOk(false), 1800);
+    if (typeof window !== "undefined") {
+      const url = `${window.location.origin}${href}`;
+      void navigator.clipboard?.writeText(url).catch(() => undefined);
+    }
+  }
+
   const busyOpen = open ? deleting === open.id : false;
   const pics = open?.photos || [];
+  const empty = !!data && !items.length;
 
   return (
-    <main className="buy">
+    <main className="buy admin">
       <header className="bar admin-bar">
-        {home ? <a href="/" className="home" aria-label="ホーム">ホーム</a> : null}
-        <span className="shop" aria-label="ショップ名">{name}</span>
+        <span className="shop" aria-label="ショップ名">{label || name}</span>
         <label className="area-float">
           <span>区</span>
           <input value={addrDraft} disabled={!data}
@@ -255,54 +291,111 @@ export default function AdminUi({ shop, name, home, login }: Props) {
             placeholder="目黒区" autoComplete="address-level2" />
         </label>
         <span className="spacer" aria-hidden="true" />
-        {login && !login.saved ? (
-          <button type="button" className="login-save" onClick={login.onClick}>ログインして保存</button>
-        ) : null}
+        {!logged ? (
+          <button type="button" className="login-save" onClick={() => { setLineDraft(""); setLoginOpen(true); }}>
+            ログインして保存
+          </button>
+        ) : (
+          <button type="button" className="req" onClick={publish}>
+            {pubOk ? "リンクコピー済" : "公開する"}
+          </button>
+        )}
         <IconBtn name="plus" label="品目を追加" size={22}
           disabled={!data || uploading === "batch"}
           onClick={() => setAddOpen(true)} className="solid" />
       </header>
-      {err && <div className="err">{err}</div>}
-      {!data && !err && <p className="text-sm text-muted" style={{ padding: 12 }}>読み込み中…</p>}
-      <Listings items={items} onSelect={openDetail}
-        disabledFor={(it) => deleting === it.id}
-        classNameFor={(it) => (deleting === it.id ? "dim" : "")} />
-      {!items.length && data && <p className="text-sm text-muted" style={{ padding: 12 }}>品目がありません</p>}
 
-      <section className="claims">
-        <div className="claims-h">予約</div>
-        <ul>
-          {(data?.claims || []).map((c) => {
-            const names = c.itemIds
-              .map((id) => data?.items.find((i) => i.id === id)?.name?.trim() || "無題")
-              .join("、");
-            const contact = [
-              methodJa(c.contactMethod),
-              c.contact && c.contact !== "LINE" ? `LINE名 ${c.contact}` : "",
-            ].filter(Boolean).join(" · ");
-            return (
-              <li key={c.id} className="claim">
-                <div className="text-base">
-                  <b>{dayLbl(c.day)}</b>
-                  {c.slot ? ` · ${c.slot}` : ""}
-                  {names ? ` · ${names}` : ""}
-                </div>
-                <div className="text-sm text-muted claim-meta">
-                  {statusJa(c.status)}
-                  {contact ? ` · ${contact}` : ""}
-                </div>
-                {c.status === "booked" && (
-                  <div className="claim-acts">
-                    <button type="button" onClick={() => act({ action: "cancel", id: c.id }, "保存しました")}>キャンセル</button>
-                    <button type="button" onClick={() => act({ action: "picked_up", id: c.id }, "保存しました")}>受取済み</button>
+      {err && <div className="err">{err}</div>}
+      {!data && !err && <p className="text-sm text-muted pad">読み込み中…</p>}
+
+      {pending.length > 0 && (
+        <section className="claims pending">
+          <div className="claims-h">引き取り予定</div>
+          <ol className="timeline">
+            {pending.map((c) => {
+              const names = c.itemIds
+                .map((id) => data?.items.find((i) => i.id === id)?.name?.trim() || "無題")
+                .join("、");
+              const contact = [
+                methodJa(c.contactMethod),
+                c.contact && c.contact !== "LINE" ? c.contact : "",
+              ].filter(Boolean).join(" · ");
+              return (
+                <li key={c.id} className="tl-item">
+                  <div className="tl-time">
+                    <b>{dayLbl(c.day)}</b>
+                    {c.slot ? <span>{c.slot}</span> : null}
                   </div>
-                )}
-              </li>
-            );
-          })}
-          {!data?.claims?.length && <li className="text-sm text-muted">予約はまだありません</li>}
-        </ul>
+                  <div className="tl-body">
+                    <div className="text-base">{names}</div>
+                    {contact ? <div className="text-sm text-muted">{contact}</div> : null}
+                    <div className="claim-acts">
+                      <button type="button" onClick={() => act({ action: "cancel", id: c.id }, "保存しました")}>キャンセル</button>
+                      <button type="button" onClick={() => act({ action: "picked_up", id: c.id }, "受取済み")}>受取済み</button>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      )}
+
+      {empty ? (
+        <section className="tutorial">
+          <p className="font-bold">はじめての出品</p>
+          <p className="hint">写真を複数枚選ぶと、1枚ごとに品目ができます。<br />名前や詳細はあとからでOK。</p>
+          <button type="button" className="cta go" onClick={() => setAddOpen(true)}>写真を追加</button>
+        </section>
+      ) : (
+        <Listings items={items} onSelect={openDetail}
+          disabledFor={(it) => deleting === it.id}
+          classNameFor={(it) => (deleting === it.id ? "dim" : "")} />
+      )}
+
+      <section className="prof-block">
+        <div className="claims-h">ショップ情報</div>
+        <label className="float"><span>自己紹介</span>
+          <textarea value={bio} rows={2} onChange={(e) => setBio(e.target.value)}
+            onBlur={() => void persistProfile(bio, jimoty)} placeholder="短い紹介（買う人に表示）" /></label>
+        <label className="float"><span>ジモティーURL（任意）</span>
+          <input value={jimoty} onChange={(e) => setJimoty(e.target.value)}
+            onBlur={() => void persistProfile(bio, jimoty)}
+            placeholder="https://jmty.jp/…" inputMode="url" /></label>
       </section>
+
+      {done.length > 0 && (
+        <section className="claims done">
+          <div className="claims-h">完了</div>
+          <p className="hint thanks">ありがとう。スムーズな受け渡しでした。</p>
+          <ul>
+            {done.map((c) => (
+              <li key={c.id} className="claim">
+                <div className="text-sm text-muted">{dayLbl(c.day)}{c.slot ? ` · ${c.slot}` : ""} · 受取済</div>
+              </li>
+            ))}
+          </ul>
+          <p className="soft-promo hint">
+            ほかの小さなアプリも →{" "}
+            <a className="linelink" href="https://linelton.dev" target="_blank" rel="noopener noreferrer">linelton.dev</a>
+          </p>
+        </section>
+      )}
+
+      {loginOpen && (
+        <div className="mask" role="dialog" aria-modal="true" aria-label="ログインして保存"
+          onClick={() => setLoginOpen(false)}>
+          <form className="sheet" onClick={(e) => e.stopPropagation()} onSubmit={saveLogin}>
+            <h2>ログインして保存</h2>
+            <p className="hint">LINE名だけでOK。ゲスト出品はこの名前に紐づきます。</p>
+            <label className="float"><span>LINE名</span>
+              <input value={lineDraft} onChange={(e) => setLineDraft(e.target.value)}
+                placeholder="表示名" autoComplete="nickname" autoFocus /></label>
+            <button type="submit" className="cta go" disabled={!lineDraft.trim()}>保存</button>
+            <p className="hint" style={{ marginTop: 10 }}>より安全なLINE連携は準備中</p>
+          </form>
+        </div>
+      )}
 
       {addOpen && (
         <div className="mask" role="dialog" aria-modal="true" aria-label="品目を追加"
@@ -397,6 +490,7 @@ export default function AdminUi({ shop, name, home, login }: Props) {
           </div>
         </div>
       )}
+      <AppNav />
       <Snack snack={snack} />
     </main>
   );
