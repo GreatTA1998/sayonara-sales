@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import BuyerUi from "@/components/buyer-ui";
+import ShopBuyerView from "@/components/buyer-ui";
 import { getId, getName } from "@/lib/shop";
 
 export default function ShopBuyer() {
@@ -9,15 +9,12 @@ export default function ShopBuyer() {
   const router = useRouter();
   const id = slug || "";
   const [label, setLabel] = useState(id);
-  const [mine, setMine] = useState(false);
 
   useEffect(() => {
     if (id === "elton") { router.replace("/s/elton"); return; }
-    const m = getId() === id;
-    setMine(m);
-    setLabel(m ? (getName() || id) : id);
+    setLabel(getId() === id ? (getName() || id) : id);
   }, [id, router]);
 
   if (!id || id === "elton") return null;
-  return <BuyerUi shop={id} name={label} home adminHref={mine ? `/s/${id}/admin` : undefined} />;
+  return <ShopBuyerView shop={id} name={label} />;
 }

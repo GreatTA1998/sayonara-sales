@@ -10,7 +10,10 @@ const numPrice = (v: unknown) => {
 export async function GET(req: Request) {
   const shop = shopFromUrl(req);
   const s = await getStore(shop);
-  return NextResponse.json({ address: s.address, items: s.items, claims: s.claims, shop });
+  return NextResponse.json({
+    address: s.address, bio: s.bio || "", jimotyUrl: s.jimotyUrl || "",
+    items: s.items, claims: s.claims, shop,
+  });
 }
 
 export async function POST(req: Request) {
@@ -45,6 +48,10 @@ export async function POST(req: Request) {
           s.items = s.items.filter((i) => i.id !== body.id); return { ok: true };
         case "address":
           s.address = String(body.address || "").trim(); return { address: s.address };
+        case "profile":
+          if ("bio" in body) s.bio = String(body.bio || "").trim();
+          if ("jimotyUrl" in body) s.jimotyUrl = String(body.jimotyUrl || "").trim();
+          return { bio: s.bio || "", jimotyUrl: s.jimotyUrl || "" };
         case "cancel":
         case "release": {
           const keep = body.action === "release" ? String(body.keepId || "") : "";

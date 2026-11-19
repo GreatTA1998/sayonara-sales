@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import AppNav from "@/components/app-nav";
 import { Listings, money } from "@/components/photo-listing";
 import { dayLbl, pickupSpan, rangeLbl } from "@/lib/days";
 
@@ -8,7 +9,8 @@ type Item = {
   photos?: string[]; availableFrom?: string; availableTo?: string; lateOnly?: boolean;
 };
 type State = {
-  address: string; days: string[]; slots: string[]; taken: Record<string, string[]>;
+  address: string; bio?: string; jimotyUrl?: string;
+  days: string[]; slots: string[]; taken: Record<string, string[]>;
   lineInviteUrl?: string | null; items: Item[];
 };
 type Receipt = {
@@ -16,7 +18,7 @@ type Receipt = {
   total?: number; contact?: string; contactMethod?: string;
 };
 type Method = "line" | "phone";
-type Props = { shop: string; name: string; home?: boolean; adminHref?: string };
+type Props = { shop: string; name: string; /** Hide bottom nav when embedded on home. */ embed?: boolean };
 
 const LINE_FALLBACK = "https://line.me/ti/p/yBg2x2X_ut";
 const PHONE_DISPLAY = "080-4919-2027";
@@ -30,7 +32,7 @@ const why = (i: Item, day: string) =>
     : !dayOk(i, day) ? `受け取り可能：${rangeLbl(i.availableFrom, i.availableTo)}`
     : "受け取り不可";
 
-export default function BuyerUi({ shop, name, home, adminHref }: Props) {
+export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [state, setState] = useState<State | null>(null);
   const [day, setDay] = useState("");
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -43,6 +45,7 @@ export default function BuyerUi({ shop, name, home, adminHref }: Props) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [shared, setShared] = useState(false);
   const lineUrl = state?.lineInviteUrl || LINE_FALLBACK;
   const span = pickupSpan(state?.days || []);
 
@@ -71,6 +74,16 @@ export default function BuyerUi({ shop, name, home, adminHref }: Props) {
     const it = state?.items.find((i) => i.id === id);
     if (!it || it.taken) return;
     setPicked((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
+
+  async function share() {
+    const url = typeof window !== "undefined"
+      ? `${window.location.origin}${shop === "elton" ? "/s/elton" : `/s/${shop}`}`
+      : "";
+    try {
+      if (navigator.share) await navigator.share({ title: `${name} — サヨナラ`, url });
+      else { await navigator.clipboard.writeText(url); setShared(true); setTimeout(() => setShared(false), 1600); }
+    } catch { /* user cancel */ }
   }
 
   async function book() {
@@ -115,6 +128,7 @@ export default function BuyerUi({ shop, name, home, adminHref }: Props) {
             : <a className="linelink" href={PHONE_TEL}>{PHONE_DISPLAY}</a>}
         </section>
         <button type="button" className="dark" onClick={() => setReceipt(null)}>一覧に戻る</button>
+        {!embed && <AppNav />}
       </main>
     );
   }
@@ -127,21 +141,26 @@ export default function BuyerUi({ shop, name, home, adminHref }: Props) {
     : open ? rangeLbl(open.availableFrom, open.availableTo) : "";
 
   return (
-    <main className="buy">
+    <main className={`buy${embed ? " embed" : ""}`}>
       <header className="bar">
-        {home ? <a href="/" className="home" aria-label="ホーム">ホーム</a> : null}
         <span className="who">
           <span className="shop">{name}</span>
           <span className="area">{(state?.address || "").trim() || "区"}</span>
         </span>
         <span className="span">{span}</span>
-        {adminHref ? <a className="req" href={adminHref} style={{ textDecoration: "none", background: "#eee" }}>Admin</a> : null}
+        <button type="button" className="share" onClick={() => void share()}>
+          {shared ? "コピー済" : "シェア"}
+        </button>
         <button type="button" className="req"
           onClick={() => { setOpen(null); setSlot(null); setMethod("line"); setLineOk(false); setErr(null); setCheckout(true); }}>
           {picked.size ? `引き取りを依頼 (${picked.size})` : "引き取りを依頼"}
         </button>
       </header>
       <p className="hint intro">引っ越しのため出品 / 特記なき限り動作確認済み<br />車あり・まとめ買いの方は予約枠を優先</p>
+      {state?.bio ? <p className="hint bio">{state.bio}</p> : null}
+      {state?.jimotyUrl ? (
+        <p className="hint bio"><a className="linelink" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">ジモティー</a></p>
+      ) : null}
       {err && !checkout && <div className="err">{err}</div>}
       <Listings items={state?.items || []} onSelect={setOpen}
         classNameFor={(item) => `${picked.has(item.id) ? "on" : ""}${item.taken ? " dim" : ""}`.trim()} />
@@ -215,6 +234,7 @@ export default function BuyerUi({ shop, name, home, adminHref }: Props) {
           </div>
         </div>
       )}
+      {!embed && <AppNav />}
     </main>
   );
 }

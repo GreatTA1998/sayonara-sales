@@ -14,7 +14,7 @@ export type Claim = {
   contact?: string; contactMethod?: "line" | "phone";
   status: "booked" | "picked_up" | "cancelled"; createdAt: string;
 };
-export type Store = { address: string; items: Item[]; claims: Claim[] };
+export type Store = { address: string; bio?: string; jimotyUrl?: string; items: Item[]; claims: Claim[] };
 
 export { LATE_FROM, PICKUP_DAYS, PICKUP_SLOTS, isLateOnly };
 
@@ -43,6 +43,8 @@ const localPath = (shop: string) =>
 
 const eltonSeed = (): Store => ({
   address: "目黒区",
+  bio: "引っ越しのため出品しています。特記なき限り動作確認済み。",
+  jimotyUrl: "",
   items: [
     { id: "i1", name: "IKEA desk", price: 3000, photos: ["https://picsum.photos/seed/desk/600/400"] },
     { id: "i2", name: "Office chair", price: 2000, note: "slight wear" },

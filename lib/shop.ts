@@ -2,7 +2,7 @@
 export const NAME_KEY = "ss-line-name";
 export const ID_KEY = "ss-shop-id";
 const MAP_KEY = "ss-shop-map";
-const GEO_KEY = "ss-shop-geo";
+const PROF_KEY = "ss-profile";
 
 export const ELTON_ID = "elton";
 export const ELTON_LABEL = "エルトン";
@@ -11,16 +11,10 @@ export const DEFAULT_WARD = "目黒区";
 const dig5 = (s: string) => /^\d{5}$/.test(s);
 const newId = () => String(10000 + Math.floor(Math.random() * 90000));
 
-/** 目黒区附近 — default map center. */
-export const MEGURO = { lat: 35.6415, lng: 139.698 };
-
-/** Known wards for hub map (ward-level only). */
-export const WARDS: Record<string, { lat: number; lng: number }> = {
-  目黒区: MEGURO,
+export type SaleRow = {
+  id: string; name: string; ward: string; href: string; mine: boolean;
+  count?: number;
 };
-
-export type Pin = { id: string; name: string; lat: number; lng: number; mine: boolean; ward: string };
-export type SaleRow = { id: string; name: string; ward: string; href: string; mine: boolean };
 
 export const getName = () => typeof window === "undefined" ? "" : (localStorage.getItem(NAME_KEY) || "").trim();
 export const getId = () => typeof window === "undefined" ? "" : (localStorage.getItem(ID_KEY) || "").trim();
@@ -29,9 +23,20 @@ const readMap = (): Record<string, string> => {
   try { return JSON.parse(localStorage.getItem(MAP_KEY) || "{}") as Record<string, string>; }
   catch { return {}; }
 };
-const readGeo = (): Record<string, { lat: number; lng: number }> => {
-  try { return JSON.parse(localStorage.getItem(GEO_KEY) || "{}") as Record<string, { lat: number; lng: number }>; }
-  catch { return {}; }
+
+export type Profile = { bio: string; jimotyUrl: string };
+export const getProfile = (): Profile => {
+  if (typeof window === "undefined") return { bio: "", jimotyUrl: "" };
+  try {
+    const p = JSON.parse(localStorage.getItem(PROF_KEY) || "{}") as Partial<Profile>;
+    return { bio: String(p.bio || ""), jimotyUrl: String(p.jimotyUrl || "") };
+  } catch { return { bio: "", jimotyUrl: "" }; }
+};
+export const saveProfile = (p: Profile) => {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(PROF_KEY, JSON.stringify({
+    bio: p.bio.trim(), jimotyUrl: p.jimotyUrl.trim(),
+  }));
 };
 
 /** Guest shop id so admin UI works before LINE名 soft-save. */
@@ -63,13 +68,6 @@ export const openShop = (n: string) => {
   return id;
 };
 
-export const saveGeo = (id: string, lat: number, lng: number) => {
-  if (typeof window === "undefined" || !dig5(id)) return;
-  const geo = readGeo();
-  geo[id] = { lat, lng };
-  localStorage.setItem(GEO_KEY, JSON.stringify(geo));
-};
-
 /** Hub sales: Elton in 目黒区 + local soft-identity shops. */
 export const listSales = (): SaleRow[] => {
   if (typeof window === "undefined") {
@@ -91,22 +89,4 @@ export const listSales = (): SaleRow[] => {
     rows.push({ id: mine, name: mineName || mine, ward: DEFAULT_WARD, href: `/s/${mine}`, mine: true });
   }
   return rows;
-};
-
-/** Ward pins for map (dedupe by ward). */
-export const listWardPins = (sales: SaleRow[], selectedWard?: string | null): Pin[] => {
-  const wards = new Map<string, Pin>();
-  for (const s of sales) {
-    const g = WARDS[s.ward] || MEGURO;
-    if (!wards.has(s.ward)) {
-      wards.set(s.ward, {
-        id: s.ward, name: s.ward, lat: g.lat, lng: g.lng,
-        mine: false, ward: s.ward,
-      });
-    }
-  }
-  return [...wards.values()].map((p) => ({
-    ...p,
-    mine: selectedWard ? p.ward === selectedWard : false,
-  }));
 };

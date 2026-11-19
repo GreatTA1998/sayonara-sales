@@ -12,6 +12,8 @@ export async function GET(req: Request) {
   return NextResponse.json({
     shop,
     address: s.address,
+    bio: s.bio || "",
+    jimotyUrl: s.jimotyUrl || "",
     days: PICKUP_DAYS,
     slots: PICKUP_SLOTS,
     taken,
