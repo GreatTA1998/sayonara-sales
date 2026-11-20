@@ -26,7 +26,7 @@ export function useDense(): [boolean, (on: boolean) => void] {
 }
 
 /** Dual-option pill — selected = current mode (not flip-to). */
-function Seg({ label, opts, value, onPick }: {
+export function Seg({ label, opts, value, onPick }: {
   label: string; opts: [string, string][]; value: string; onPick: (v: string) => void;
 }) {
   return (

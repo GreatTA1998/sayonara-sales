@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import AppNav from "@/components/app-nav";
 import { Icon, IconBtn } from "@/components/icons";
 import { LineLoginLink, useLineOAuthReturn } from "@/components/line-oauth";
-import { byPrice, Listings, ListingTools, usePriceDir, type PhotoItem } from "@/components/photo-listing";
+import { byPrice, Listings, ListingTools, Seg, usePriceDir, type PhotoItem } from "@/components/photo-listing";
 import SquareCam from "@/components/square-cam";
 import { Snack, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
@@ -80,6 +80,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [youtube, setYoutube] = useState("");
   const [lineInvite, setLineInvite] = useState("");
   const [phone, setPhone] = useState("");
+  const [contactMode, setContactMode] = useState<"line" | "phone">("line");
   const [slots, setSlots] = useState<string[]>([...PICKUP_SLOTS]);
   const [slotA, setSlotA] = useState("11:00");
   const [slotB, setSlotB] = useState("11:15");
@@ -127,6 +128,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     setYoutube(body.youtubeUrl || ytUrl(bioVal) || local.youtubeUrl || "");
     setLineInvite(body.lineInviteUrl || "");
     setPhone(body.phone || "");
+    setContactMode((body.phone || "").trim() && !(body.lineInviteUrl || "").trim() ? "phone" : "line");
     setSlots(body.slots?.length ? body.slots : [...PICKUP_SLOTS]);
     setPickupFrom(body.pickupFrom || DEF_FROM);
     setPickupTo(body.pickupTo || body.moveOut || DEF_TO);
@@ -260,8 +262,6 @@ export default function ShopAdminView({ shop, name }: Props) {
     });
     if (yt !== nextYt) setYoutube(yt);
   }
-
-  const contactOk = !!(lineInvite.trim() || phone.trim());
 
   function openDetail(item: Item) {
     setSheetMenu(null);
@@ -603,8 +603,8 @@ export default function ShopAdminView({ shop, name }: Props) {
   }
 
   function publish() {
-    if (pub === "off" && !contactOk) {
-      const msg = "LINE招待リンクか電話番号のどちらかを入力してください";
+    if (pub === "off" && !(contactMode === "line" ? lineInvite.trim() : phone.trim())) {
+      const msg = `${contactMode === "line" ? "LINE招待リンク" : "電話番号"}を入力してください`;
       setErr(msg); show(msg, "err");
       return;
     }
@@ -693,15 +693,14 @@ export default function ShopAdminView({ shop, name }: Props) {
               onBlur={() => void persistProfile(bio, jimoty, youtube)}
               placeholder="内見動画URL" inputMode="url" autoComplete="url" /></label>
         </div>
-        <p className="hint">買い手連絡 — LINEか電話のどちらか必須</p>
-        <label className="float"><span>LINE招待リンク</span>
-          <input value={lineInvite} onChange={(e) => setLineInvite(e.target.value)}
+        <Seg label="買い手連絡" value={contactMode} onPick={(v) => setContactMode(v as "line" | "phone")}
+          opts={[["line", "LINE"], ["phone", "電話"]]} />
+        <label className="float"><span>{contactMode === "line" ? "LINE招待リンク" : "電話番号"}</span>
+          <input value={contactMode === "line" ? lineInvite : phone}
+            onChange={(e) => (contactMode === "line" ? setLineInvite : setPhone)(e.target.value)}
             onBlur={() => void persistProfile(bio, jimoty, youtube, lineInvite, phone)}
-            placeholder="https://line.me/ti/p/…" inputMode="url" autoComplete="off" /></label>
-        <label className="float"><span>電話番号</span>
-          <input value={phone} onChange={(e) => setPhone(e.target.value)}
-            onBlur={() => void persistProfile(bio, jimoty, youtube, lineInvite, phone)}
-            placeholder="080-0000-0000" inputMode="tel" autoComplete="tel" /></label>
+            placeholder={contactMode === "line" ? "https://line.me/ti/p/…" : "080-0000-0000"}
+            inputMode={contactMode === "line" ? "url" : "tel"} autoComplete={contactMode === "line" ? "off" : "tel"} /></label>
         <div className="slot-add">
           <label className="float"><span>受取開始</span>
             <input type="date" value={pickupFrom} aria-label="受取開始"
