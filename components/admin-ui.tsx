@@ -869,7 +869,6 @@ export default function ShopAdminView({ shop, name }: Props) {
             e.preventDefault();
           }}>
           <div className="sheet edit" onClick={(e) => { e.stopPropagation(); if (sheetMenu) setSheetMenu(null); }}>
-            <h2>編集</h2>
             <div className="pics">
               {pics.map((src, i) => {
                 const st = picBusy[src];
