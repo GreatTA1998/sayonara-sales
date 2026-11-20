@@ -222,9 +222,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
       </header>
       {bioShow ? <p className="hint bio">{bioShow}</p> : null}
       <p className="ext-links">
-        {lineUrl
-          ? <a className="hint" href={lineUrl} target="_blank" rel="noopener noreferrer">{name}</a>
-          : <span className="hint">{name}</span>}
+        <span className="hint">{name}</span>
         {state?.jimotyUrl && (
           <a className="ext-link" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">
             <img className="ext-ico" src="/jimoty.png" alt="" />Jimoty profile
