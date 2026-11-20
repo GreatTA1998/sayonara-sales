@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import AppNav from "@/components/app-nav";
 import { DateField, Icon, IconBtn } from "@/components/icons";
 import { LineLoginLink, useLineOAuthReturn } from "@/components/line-oauth";
-import { byPrice, Listings, ListingTools, Seg, usePriceDir, type PhotoItem } from "@/components/photo-listing";
+import { byPrice, Listings, ListingTools, Seg, useDense, usePriceDir, type PhotoItem } from "@/components/photo-listing";
 import SquareCam from "@/components/square-cam";
 import { Snack, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
@@ -68,7 +68,8 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState("0");
   const [editNote, setEditNote] = useState("");
-  const [sheetMenu, setSheetMenu] = useState<string | null>(null);
+  const [itemMenu, setItemMenu] = useState(false);
+  const [viewPic, setViewPic] = useState<string | null>(null);
   const [claimId, setClaimId] = useState<string | null>(null);
   const [logged, setLogged] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -96,7 +97,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const dragRef = useRef<{ from: number; over: number; x: number; y: number; moved: boolean } | null>(null);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
-  const [pub, setPub] = useState<"off" | "on" | "ok">("off");
+  const [pub, setPub] = useState<"off" | "on" | "see">("off");
   const { snack, show } = useSnack();
   const [addrDraft, setAddrDraft] = useState("");
   const addrDraftRef = useRef("");
@@ -110,6 +111,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const editSavedRef = useRef<{ id: string; name: string; price: number; note: string } | null>(null);
   const editReq = useRef(0);
   const [priceDir, setPriceDir] = usePriceDir();
+  const [dense, setDense] = useDense();
 
   const load = useCallback(async () => {
     const res = await fetch(api(shop, "/api/admin"), { cache: "no-store" });
@@ -134,7 +136,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     setSlots(body.slots?.length ? body.slots : [...PICKUP_SLOTS]);
     setPickupFrom(body.pickupFrom || DEF_FROM);
     setPickupTo(body.pickupTo || body.moveOut || DEF_TO);
-    if (body.published) setPub((p) => (p === "ok" ? p : "on"));
+    if (body.published) setPub((p) => { try { return p === "see" || sessionStorage.getItem(`ss-copied-${shop}`) ? "see" : "on"; } catch { return p === "see" ? "see" : "on"; } });
   }, [shop, show]);
 
   useEffect(() => { void load(); }, [load]);
@@ -264,7 +266,8 @@ export default function ShopAdminView({ shop, name }: Props) {
   }
 
   function openDetail(item: Item) {
-    setSheetMenu(null);
+    setItemMenu(false);
+    setViewPic(null);
     if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
     if (editIdRef.current && editIdRef.current !== item.id) void flushEdit();
     const snap = { id: item.id, name: item.name, price: item.price ?? 0, note: item.note || "" };
@@ -336,7 +339,8 @@ export default function ShopAdminView({ shop, name }: Props) {
   }
 
   function closeEdit() {
-    setSheetMenu(null);
+    setItemMenu(false);
+    setViewPic(null);
     setOpenId(null);
     void flushEdit();
   }
@@ -346,11 +350,12 @@ export default function ShopAdminView({ shop, name }: Props) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || deleting === openId) return;
       e.preventDefault();
+      if (viewPic) { setViewPic(null); return; }
       closeEdit();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [openId, deleting]);
+  }, [openId, deleting, viewPic]);
 
   function upsertItem(item: Item) {
     setData((d) => {
@@ -537,6 +542,7 @@ export default function ShopAdminView({ shop, name }: Props) {
       delete picJobs.current[url];
       setPicStatus(url, null);
       patchPhotos(item.id, (photos) => photos.filter((p) => p !== url));
+      setViewPic((v) => (v === url ? null : v));
       show("写真を削除しました", "ok");
       return;
     }
@@ -545,6 +551,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     setDeleting(item.id); show("削除中…", "busy");
     try {
       const ok = await saveRemotePhotos(item.id, photos);
+      if (ok) setViewPic((v) => (v === url ? null : v));
       show(ok ? "写真を削除しました" : "削除に失敗しました", ok ? "ok" : "err");
     } finally { setDeleting(null); }
   }
@@ -560,18 +567,17 @@ export default function ShopAdminView({ shop, name }: Props) {
   }
 
   function onPicPointerDown(e: PtrEv<HTMLDivElement>, i: number) {
-    if (deleting || (open?.photos || []).length < 2) return;
+    if (deleting) return;
     const t = e.target as HTMLElement;
-    if (t.closest("button, .pic-more, .menu-pop, .pic-retry")) return;
+    if (t.closest("button, .pic-retry")) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     dragRef.current = { from: i, over: i, x: e.clientX, y: e.clientY, moved: false };
-    setDragFrom(i);
-    setDragOver(i);
+    if ((open?.photos || []).length > 1) { setDragFrom(i); setDragOver(i); }
   }
 
   function onPicPointerMove(e: PtrEv<HTMLDivElement>) {
     const d = dragRef.current;
-    if (!d) return;
+    if (!d || (open?.photos || []).length < 2) return;
     if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 10) return;
     d.moved = true;
     const hit = document.elementsFromPoint(e.clientX, e.clientY)
@@ -589,8 +595,9 @@ export default function ShopAdminView({ shop, name }: Props) {
     dragRef.current = null;
     setDragFrom(null);
     setDragOver(null);
-    if (!d?.moved || !open || d.over === d.from) return;
-    void reorderPhotos(open, d.from, d.over);
+    if (!d || !open) return;
+    if (!d.moved) { const src = open.photos?.[d.from]; if (src) setViewPic(src); return; }
+    if (d.over !== d.from) void reorderPhotos(open, d.from, d.over);
   }
 
   function saveLogin(e: { preventDefault(): void }) {
@@ -605,21 +612,18 @@ export default function ShopAdminView({ shop, name }: Props) {
   }
 
   function publish() {
+    const href = `/s/${shop}`;
+    if (pub === "see") { router.push(href); return; }
     if (pub === "off" && !(contactMode === "line" ? lineInvite.trim() : phone.trim())) {
       const msg = `${contactMode === "line" ? "LINE招待リンク" : "電話番号"}を入力してください`;
-      setErr(msg); show(msg, "err");
-      return;
+      setErr(msg); show(msg, "err"); return;
     }
-    const href = `/s/${shop}`;
-    const url = `${SITE_URL}${href}`;
-    const first = pub === "off";
-    setPub("ok");
-    show(`${first ? "公開しました" : "コピーしました"}\n${url}`, "ok", { label: "見る", onClick: () => router.push(href) });
-    setTimeout(() => setPub("on"), 1600);
+    const first = pub === "off", url = `${SITE_URL}${href}`;
+    setPub("see");
+    try { sessionStorage.setItem(`ss-copied-${shop}`, "1"); } catch { /* private */ }
+    show(first ? "公開しました" : "コピーしました", "ok");
     void navigator.clipboard?.writeText(url).catch(() => undefined);
-    if (first) void act({ action: "publish" }).then((ok) => {
-      if (!ok) setPub("off");
-    });
+    if (first) void act({ action: "publish" }).then((ok) => { if (!ok) setPub("off"); });
   }
 
   async function saveSlots(next: string[]) {
@@ -653,7 +657,7 @@ export default function ShopAdminView({ shop, name }: Props) {
         <span className="spacer" aria-hidden="true" />
         <button type="button" className="req"
           onClick={logged ? publish : () => { setLineDraft(getName()); setLoginOpen(true); }}>
-          {logged ? (pub === "ok" ? "コピー済" : pub === "on" ? "URLコピー" : "公開する") : "ログインして保存"}
+          {logged ? (pub === "see" ? "見る" : pub === "on" ? "URLコピー" : "公開する") : "ログインして保存"}
         </button>
       </header>
 
@@ -773,8 +777,8 @@ export default function ShopAdminView({ shop, name }: Props) {
 
       {!empty && (
         <>
-          <ListingTools dir={priceDir} onDir={setPriceDir} />
-          <Listings items={items} onSelect={openDetail}
+          <ListingTools dir={priceDir} onDir={setPriceDir} dense={dense} onDense={setDense} />
+          <Listings items={items} dense={dense} onSelect={openDetail}
             disabledFor={(it) => deleting === it.id}
             classNameFor={(it) => (deleting === it.id || it.paused ? "dim" : "")} />
         </>
@@ -861,66 +865,35 @@ export default function ShopAdminView({ shop, name }: Props) {
             e.stopPropagation();
             e.preventDefault();
           }}>
-          <div className="sheet edit" onClick={(e) => { e.stopPropagation(); if (sheetMenu) setSheetMenu(null); }}>
-            <h2>編集</h2>
+          <div className="sheet edit" onClick={(e) => { e.stopPropagation(); if (itemMenu) setItemMenu(false); }}>
             <div className="pics">
               {pics.map((src, i) => {
                 const st = picBusy[src];
-                const cls = [
-                  "pic-wrap",
-                  pics.length > 1 ? "sortable" : "",
-                  dragFrom === i ? "dragging" : "",
-                  dragOver === i && dragFrom !== i ? "drag-over" : "",
-                  st === "uploading" ? "uploading" : "",
-                  st === "error" ? "error" : "",
-                ].filter(Boolean).join(" ");
                 return (
-                  <div key={src} className={cls} data-pic-idx={i}
+                  <div key={src} data-pic-idx={i}
+                    className={`pic-wrap${pics.length > 1 ? " sortable" : ""}${dragFrom === i ? " dragging" : ""}${dragOver === i && dragFrom !== i ? " drag-over" : ""}${st === "uploading" ? " uploading" : ""}${st === "error" ? " error" : ""}`}
                     onPointerDown={(e) => onPicPointerDown(e, i)}
                     onPointerMove={onPicPointerMove}
                     onPointerUp={onPicPointerUp}
                     onPointerCancel={onPicPointerUp}>
                     <img src={src} alt="" loading="lazy" decoding="async" draggable={false} />
                     {st === "uploading" && <span className="pic-status" aria-label="アップロード中">…</span>}
-                    {st === "error" && (
-                      <button type="button" className="pic-retry" onClick={() => retryPic(src)}>再試行</button>
-                    )}
-                    <div className="pic-more">
-                      <IconBtn name="more" label="写真メニュー" disabled={busyOpen || !!st} size={22} className="more"
-                        onClick={() => setSheetMenu(sheetMenu === src ? null : src)} />
-                      {sheetMenu === src && (
-                        <div className="menu-pop">
-                          <button type="button" className="danger" disabled={busyOpen}
-                            onClick={() => { setSheetMenu(null); void deletePhoto(open, src); }}>
-                            <Icon name="trash" size={16} /> 写真を削除
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                    {st === "error" && <button type="button" className="pic-retry" onClick={() => retryPic(src)}>再試行</button>}
                   </div>
                 );
               })}
-              <button type="button" className={`pic-add${busyOpen ? " busy" : ""}`}
-                aria-label="写真を追加" disabled={busyOpen}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCamItemId(open.id);
-                  setCamOpen(true);
-                }}>
+              <button type="button" className={`pic-add${busyOpen ? " busy" : ""}`} aria-label="写真を追加"
+                disabled={busyOpen} onClick={(e) => { e.stopPropagation(); setCamItemId(open.id); setCamOpen(true); }}>
                 <Icon name="plus" size={18} />
               </button>
             </div>
             <div className="name-price">
-              <label className="float">
-                <span>名前</span>
+              <label className="float"><span>名前</span>
                 <input value={editName} disabled={busyOpen}
-                  onChange={(e) => patchEdit("name", e.target.value)} />
-              </label>
-              <label className="float price">
-                <span>価格</span>
+                  onChange={(e) => patchEdit("name", e.target.value)} /></label>
+              <label className="float price"><span>価格</span>
                 <input type="number" min={0} inputMode="numeric" value={editPrice} disabled={busyOpen}
-                  onChange={(e) => patchEdit("price", e.target.value)} />
-              </label>
+                  onChange={(e) => patchEdit("price", e.target.value)} /></label>
             </div>
             <label className="float">
               <span>メモ</span>
@@ -934,11 +907,11 @@ export default function ShopAdminView({ shop, name }: Props) {
             <div className="save-row" onClick={(e) => e.stopPropagation()}>
               <div className="save-more">
                 <IconBtn name="more" label="品目メニュー" disabled={busyOpen} size={24} className="more"
-                  onClick={() => setSheetMenu(sheetMenu === "item" ? null : "item")} />
-                {sheetMenu === "item" && (
+                  onClick={() => setItemMenu((v) => !v)} />
+                {itemMenu && (
                   <div className="menu-pop up">
                     <button type="button" className="danger" disabled={busyOpen}
-                      onClick={() => { setSheetMenu(null); void deleteItem(open); }}>
+                      onClick={() => { setItemMenu(false); void deleteItem(open); }}>
                       <Icon name="trash" size={16} /> 品目を削除
                     </button>
                   </div>
@@ -946,6 +919,13 @@ export default function ShopAdminView({ shop, name }: Props) {
               </div>
             </div>
           </div>
+        </div>
+      )}
+      {viewPic && open && (
+        <div className="mask lb" role="dialog" aria-modal="true" aria-label="写真" onClick={() => setViewPic(null)}>
+          <img src={viewPic} alt="" onClick={(e) => e.stopPropagation()} />
+          <button type="button" className="cta soft" disabled={busyOpen}
+            onClick={(e) => { e.stopPropagation(); void deletePhoto(open, viewPic); }}>削除</button>
         </div>
       )}
       <AppNav />

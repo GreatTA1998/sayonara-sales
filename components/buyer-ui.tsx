@@ -174,8 +174,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         <p>コード: <b>{receipt.code}</b></p>
         <p>日付: {dayLbl(receipt.day)}</p>
         <p>時間: {receipt.slot}</p>
-        <p>合計: {money(receipt.total ?? 0)}</p>
-        <p className="hint">現金・WiseどちらでもOK</p>
+        <p>現金合計: {money(receipt.total ?? 0)}</p>
         <p>エリア: {receipt.address}</p>
         {receipt.contact ? <p>LINE名: {receipt.contact}</p> : null}
         <ul>{receipt.items.map((n) => <li key={n}>{n}</li>)}</ul>
@@ -207,10 +206,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   return (
     <main className={`buy${embed ? " embed" : ""}`}>
       <header className="bar">
-        <span className="who">
-          <span className="shop">{name}</span>
-          <span className="area">{(state?.address || "").trim() || "区"}</span>
-        </span>
+        <span className="area">{(state?.address || "").trim() || "区"}</span>
         <span className="span">{barDates}</span>
         <button type="button" className="share" onClick={copyShare}>
           URLコピー
@@ -225,20 +221,19 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         </button>
       </header>
       {bioShow ? <p className="hint bio">{bioShow}</p> : null}
-      {(state?.jimotyUrl || yt) && (
-        <p className="ext-links">
-          {state?.jimotyUrl && (
-            <a className="ext-link" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">
-              <img className="ext-ico" src="/jimoty.png" alt="" />Jimoty profile
-            </a>
-          )}
-          {yt && (
-            <a className="ext-link" href={yt} target="_blank" rel="noopener noreferrer">
-              <img className="ext-ico" src="/youtube.svg" alt="" />内見動画
-            </a>
-          )}
-        </p>
-      )}
+      <p className="ext-links">
+        <span className="hint">{name}</span>
+        {state?.jimotyUrl && (
+          <a className="ext-link" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">
+            <img className="ext-ico" src="/jimoty.png" alt="" />Jimoty profile
+          </a>
+        )}
+        {yt && (
+          <a className="ext-link" href={yt} target="_blank" rel="noopener noreferrer">
+            <img className="ext-ico" src="/youtube.svg" alt="" />内見動画
+          </a>
+        )}
+      </p>
       {err && !checkout && !open && <div className="err">{err}</div>}
       {gridItems.length > 0 && (
         <ListingTools dir={priceDir} onDir={setPriceDir} dense={dense} onDense={setDense} />
@@ -313,7 +308,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
               </div>
             </div>
             {!freeSlots.length && <p className="sw">この日は空きがありません。</p>}
-            <p className="total">合計 {money(pickedItems.reduce((n, i) => n + (i.price ?? 0), 0))} <span className="hint">現金・WiseどちらでもOK</span></p>
+            <p className="total">現金合計 {money(pickedItems.reduce((n, i) => n + (i.price ?? 0), 0))}</p>
             <div className="field"><span>連絡方法</span>
               {(canLine || canPhone) && (
                 <div className="slots pair">
