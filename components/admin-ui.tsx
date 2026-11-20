@@ -18,7 +18,8 @@ type Claim = {
   itemIds: string[]; status: string;
 };
 type AdminState = {
-  address: string; bio?: string; jimotyUrl?: string; slots?: string[];
+  address: string; bio?: string; jimotyUrl?: string;
+  lineInviteUrl?: string; phone?: string; slots?: string[];
   pickupFrom?: string; pickupTo?: string; moveOut?: string; published?: boolean;
   items: Item[]; claims: Claim[];
 };
@@ -75,6 +76,8 @@ export default function ShopAdminView({ shop, name }: Props) {
   const bioRef = useRef<HTMLTextAreaElement>(null);
   const [bio, setBio] = useState("");
   const [jimoty, setJimoty] = useState("");
+  const [lineInvite, setLineInvite] = useState("");
+  const [phone, setPhone] = useState("");
   const [slots, setSlots] = useState<string[]>([...PICKUP_SLOTS]);
   const [slotA, setSlotA] = useState("11:00");
   const [slotB, setSlotB] = useState("11:15");
@@ -118,6 +121,8 @@ export default function ShopAdminView({ shop, name }: Props) {
     const local = getProfile();
     setBio(body.bio || local.bio || "");
     setJimoty(body.jimotyUrl || local.jimotyUrl || "");
+    setLineInvite(body.lineInviteUrl || "");
+    setPhone(body.phone || "");
     setSlots(body.slots?.length ? body.slots : [...PICKUP_SLOTS]);
     setPickupFrom(body.pickupFrom || DEF_FROM);
     setPickupTo(body.pickupTo || body.moveOut || DEF_TO);
@@ -247,10 +252,17 @@ export default function ShopAdminView({ shop, name }: Props) {
     addrTimer.current = setTimeout(() => { void saveAddress(stem); }, 450);
   }
 
-  async function persistProfile(nextBio: string, nextJimoty: string) {
+  async function persistProfile(
+    nextBio: string, nextJimoty: string, nextLine = lineInvite, nextPhone = phone,
+  ) {
     saveProfile({ bio: nextBio, jimotyUrl: nextJimoty });
-    await act({ action: "profile", bio: nextBio, jimotyUrl: nextJimoty });
+    await act({
+      action: "profile", bio: nextBio, jimotyUrl: nextJimoty,
+      lineInviteUrl: nextLine, phone: nextPhone,
+    });
   }
+
+  const contactOk = !!(lineInvite.trim() || phone.trim());
 
   function openDetail(item: Item) {
     setSheetMenu(null);
@@ -595,6 +607,11 @@ export default function ShopAdminView({ shop, name }: Props) {
   }
 
   function publish() {
+    if (pub === "off" && !contactOk) {
+      const msg = "LINE招待リンクか電話番号のどちらかを入力してください";
+      setErr(msg); show(msg, "err");
+      return;
+    }
     const href = shop === "elton" ? "/s/elton" : `/s/${shop}`;
     const url = `${SITE_URL}${href}`;
     const first = pub === "off";
@@ -602,7 +619,9 @@ export default function ShopAdminView({ shop, name }: Props) {
     show(`${first ? "公開しました" : "コピーしました"}\n${url}`, "ok");
     setTimeout(() => setPub("on"), 1600);
     void navigator.clipboard?.writeText(url).catch(() => undefined);
-    if (first) void act({ action: "publish" });
+    if (first) void act({ action: "publish" }).then((ok) => {
+      if (!ok) setPub("off");
+    });
   }
 
   async function saveSlots(next: string[]) {
@@ -673,6 +692,15 @@ export default function ShopAdminView({ shop, name }: Props) {
           <input value={jimoty} onChange={(e) => setJimoty(e.target.value)}
             onBlur={() => void persistProfile(bio, jimoty)}
             placeholder="https://jmty.jp/…" inputMode="url" /></label>
+        <p className="hint">買い手連絡 — LINEか電話のどちらか必須</p>
+        <label className="float"><span>LINE招待リンク</span>
+          <input value={lineInvite} onChange={(e) => setLineInvite(e.target.value)}
+            onBlur={() => void persistProfile(bio, jimoty, lineInvite, phone)}
+            placeholder="https://line.me/ti/p/…" inputMode="url" autoComplete="off" /></label>
+        <label className="float"><span>電話番号</span>
+          <input value={phone} onChange={(e) => setPhone(e.target.value)}
+            onBlur={() => void persistProfile(bio, jimoty, lineInvite, phone)}
+            placeholder="080-0000-0000" inputMode="tel" autoComplete="tel" /></label>
         <div className="slot-add">
           <label className="float"><span>受取開始</span>
             <input type="date" value={pickupFrom} aria-label="受取開始"

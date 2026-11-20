@@ -2,7 +2,8 @@ import { promises as fs } from "fs";
 import path from "path";
 import { put, get } from "@vercel/blob";
 import { daysBetween, isLateOnly, lateFrom, rangeLbl } from "./days";
-import { LATE_FROM, PICKUP_DAYS, PICKUP_SLOTS } from "./sale";
+import { CANON_LINE, CANON_PHONE, LATE_FROM, PICKUP_DAYS, PICKUP_SLOTS } from "./sale";
+export { CANON_LINE, CANON_PHONE, telHref } from "./sale";
 
 export type Item = {
   id: string; name: string; price: number | null; note?: string; claimId?: string | null;
@@ -16,6 +17,8 @@ export type Claim = {
 };
 export type Store = {
   address: string; bio?: string; jimotyUrl?: string;
+  /** Buyer contact: LINE invite URL and/or phone — at least one required to publish. */
+  lineInviteUrl?: string; phone?: string;
   /** Custom pickup windows; omit → PICKUP_SLOTS defaults. */
   slots?: string[];
   /** Pickup range + final move-out (YYYY-MM-DD); omit → PICKUP_DAYS defaults. */
@@ -27,6 +30,20 @@ export type Store = {
 
 export const shopPublished = (shop: string, s: Store) =>
   !!s.published || shop === ELTON_SHOP;
+
+/** Resolved buyer contact for a shop (Elton falls back to canonical). */
+export function shopContact(shop: string, s: Store) {
+  const line = (s.lineInviteUrl || "").trim();
+  const phone = (s.phone || "").trim();
+  if (line || phone) return { lineInviteUrl: line, phone };
+  if (shop === ELTON_SHOP) return { lineInviteUrl: CANON_LINE, phone: CANON_PHONE };
+  return { lineInviteUrl: "", phone: "" };
+}
+
+export const hasBuyerContact = (shop: string, s: Store) => {
+  const c = shopContact(shop, s);
+  return !!(c.lineInviteUrl || c.phone);
+};
 
 export { LATE_FROM, PICKUP_DAYS, PICKUP_SLOTS, isLateOnly };
 
@@ -92,6 +109,8 @@ const localPath = (shop: string) =>
 
 const eltonSeed = (): Store => ({
   address: "目黒区",
+  lineInviteUrl: CANON_LINE,
+  phone: CANON_PHONE,
   items: [
     { id: "i1", name: "IKEA desk", price: 3000, photos: ["https://picsum.photos/seed/desk/600/400"] },
     { id: "i2", name: "Office chair", price: 2000, note: "slight wear" },

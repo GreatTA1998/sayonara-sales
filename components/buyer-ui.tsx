@@ -5,6 +5,7 @@ import { byPrice, Listings, ListingTools, money, useDense, usePriceDir } from "@
 import { Snack, useSnack } from "@/components/snack";
 import { dayLbl, pickupSpan, rangeLbl } from "@/lib/days";
 import { AUTH_EVT, applyLineSession, getName, openShop } from "@/lib/shop";
+import { telHref } from "@/lib/sale";
 import { SITE_URL } from "@/lib/site";
 
 type Item = {
@@ -14,7 +15,7 @@ type Item = {
 type State = {
   address: string; bio?: string; jimotyUrl?: string;
   days: string[]; slots: string[]; taken: Record<string, string[]>;
-  lineInviteUrl?: string | null; items: Item[];
+  lineInviteUrl?: string | null; phone?: string | null; items: Item[];
 };
 type Receipt = {
   code: string; day: string; slot: string; address: string; items: string[];
@@ -23,9 +24,6 @@ type Receipt = {
 type Method = "line" | "phone";
 type Props = { shop: string; name: string; /** Hide bottom nav when embedded on home. */ embed?: boolean };
 
-const LINE_FALLBACK = "https://line.me/ti/p/yBg2x2X_ut";
-const PHONE_DISPLAY = "080-4919-2027";
-const PHONE_TEL = "tel:+818049192027";
 const api = (shop: string, path: string) => `${path}?shop=${encodeURIComponent(shop)}`;
 const wlKey = (shop: string) => `ss-wl-${shop}`;
 const loadWl = (shop: string) => {
@@ -57,7 +55,10 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [dense, toggleDense] = useDense();
   const { snack, show } = useSnack();
   const maskPtr = useRef(false);
-  const lineUrl = state?.lineInviteUrl || LINE_FALLBACK;
+  const lineUrl = (state?.lineInviteUrl || "").trim();
+  const phoneDisp = (state?.phone || "").trim();
+  const canLine = !!lineUrl;
+  const canPhone = !!phoneDisp;
   const barDates = pickupSpan(state?.days || []);
   const shareUrl = `${SITE_URL}${shop === "elton" ? "/s/elton" : `/s/${shop}`}`;
   const loggedIn = !!knownName;
@@ -109,7 +110,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   );
   const blocked = useMemo(() => pickedItems.filter((i) => !dayOk(i, day)), [pickedItems, day]);
   const canSend = !!slot && !!method && !!lineName.trim() && picked.size > 0 && !blocked.length
-    && (method !== "line" || lineOk);
+    && ((method === "line" && canLine && lineOk) || (method === "phone" && canPhone));
 
   function toggle(id: string) {
     const it = state?.items.find((i) => i.id === id);
@@ -188,9 +189,12 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         <ul>{receipt.items.map((n) => <li key={n}>{n}</li>)}</ul>
         <section className="field">
           <span>{viaLine ? "連絡：LINE（未追加なら招待リンク）" : "連絡：電話"}</span>
-          {viaLine
+          {viaLine && lineUrl
             ? <a className="linelink" href={lineUrl} target="_blank" rel="noopener noreferrer">LINE招待リンク</a>
-            : <a className="linelink" href={PHONE_TEL}>{PHONE_DISPLAY}</a>}
+            : null}
+          {!viaLine && phoneDisp
+            ? <a className="linelink" href={telHref(phoneDisp)}>{phoneDisp}</a>
+            : null}
         </section>
         <button type="button" className="dark" onClick={() => setReceipt(null)}>一覧に戻る</button>
         {!embed && <AppNav />}
@@ -220,7 +224,9 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         </button>
         <button type="button" className="req"
           onClick={() => {
-            syncName(); setOpen(null); setSlot(null); setMethod("line"); setLineOk(false); setErr(null); setCheckout(true);
+            syncName(); setOpen(null); setSlot(null);
+            setMethod(canLine ? "line" : canPhone ? "phone" : "line");
+            setLineOk(false); setErr(null); setCheckout(true);
           }}>
           {picked.size ? `引き取りを依頼 (${picked.size})` : "引き取りを依頼"}
         </button>
@@ -313,18 +319,29 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             {!freeSlots.length && <p className="sw">この日は空きがありません。</p>}
             <p className="total">合計 {money(pickedItems.reduce((n, i) => n + (i.price ?? 0), 0))} <span className="hint">現金・WiseどちらでもOK</span></p>
             <div className="field"><span>連絡方法</span>
-              <div className="slots pair">
-                <button type="button" className={method === "line" ? "slot on" : "slot"}
-                  onClick={() => { setMethod("line"); setLineOk(false); }}>LINE</button>
-                <button type="button" className={method === "phone" ? "slot on" : "slot"}
-                  onClick={() => setMethod("phone")}>電話</button>
-              </div>
-              {method === "line" && <div className="linebox">
+              {(canLine || canPhone) && (
+                <div className="slots pair">
+                  {canLine && (
+                    <button type="button" className={method === "line" ? "slot on" : "slot"}
+                      onClick={() => { setMethod("line"); setLineOk(false); }}>LINE</button>
+                  )}
+                  {canPhone && (
+                    <button type="button" className={method === "phone" ? "slot on" : "slot"}
+                      onClick={() => setMethod("phone")}>電話</button>
+                  )}
+                </div>
+              )}
+              {method === "line" && canLine && <div className="linebox">
                 <a className="linelink" href={lineUrl} target="_blank" rel="noopener noreferrer">LINE招待リンク</a>
                 <label className="late-check"><input type="checkbox" checked={lineOk}
                   onChange={(e) => setLineOk(e.target.checked)} />LINEで友だち追加しました</label>
               </div>}
-              {method === "phone" && <a className="linelink" href={PHONE_TEL}>{PHONE_DISPLAY}</a>}
+              {method === "phone" && canPhone && (
+                <a className="linelink" href={telHref(phoneDisp)}>{phoneDisp}</a>
+              )}
+              {!canLine && !canPhone && (
+                <p className="sw">出品者の連絡先が未設定です。しばらくしてから再度お試しください。</p>
+              )}
             </div>
             {!loggedIn && (
               <label className="float"><span>LINE名</span>
