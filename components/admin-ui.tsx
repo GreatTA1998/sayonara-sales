@@ -74,6 +74,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   /** null = create-from-photo (1枚＝1出品); set = append photos to that listing. */
   const [camItemId, setCamItemId] = useState<string | null>(null);
   const bioRef = useRef<HTMLTextAreaElement>(null);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
   const [bio, setBio] = useState("");
   const [jimoty, setJimoty] = useState("");
   const [youtube, setYoutube] = useState("");
@@ -152,13 +153,15 @@ export default function ShopAdminView({ shop, name }: Props) {
     if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
   }, []);
 
-  function fitBio() {
-    const el = bioRef.current;
+  function fitTa(el: HTMLTextAreaElement | null) {
     if (!el) return;
     el.style.height = "0px";
     el.style.height = `${el.scrollHeight}px`;
   }
+  function fitBio() { fitTa(bioRef.current); }
+  function fitNote() { fitTa(noteRef.current); }
   useEffect(() => { fitBio(); }, [bio]);
+  useEffect(() => { fitNote(); }, [editNote, openId]);
 
   // Pending camera uploads float to top so create-from-photo is visible immediately.
   const items = useMemo(() => {
@@ -943,8 +946,9 @@ export default function ShopAdminView({ shop, name }: Props) {
             </div>
             <label className="float">
               <span>メモ</span>
-              <textarea value={editNote} disabled={busyOpen} rows={6}
-                onChange={(e) => patchEdit("note", e.target.value)} />
+              <textarea ref={noteRef} className="grow" value={editNote} disabled={busyOpen} rows={1}
+                onChange={(e) => patchEdit("note", e.target.value)}
+                onInput={fitNote} />
             </label>
             <label className="late-check">
               <input type="checkbox" checked={editLate} disabled={busyOpen}
