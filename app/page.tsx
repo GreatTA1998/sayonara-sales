@@ -33,7 +33,6 @@ export default function HomePage() {
 
   const active = cards.find((c) => c.id === selected) || cards[0];
   const shopId = active?.id || ELTON_ID;
-  const shopName = active?.name || ELTON_LABEL;
 
   return (
     <>
@@ -53,11 +52,11 @@ export default function HomePage() {
             ))}
             {!cards.length && <span className="shop-tab ph">読み込み中…</span>}
           </div>
-
           <div className="home-shop">
-            <ShopBuyerView key={shopId} shop={shopId} name={shopName} embed />
+            <ShopBuyerView key={shopId} shop={shopId} name={active?.name || ELTON_LABEL} embed />
           </div>
         </div>
+        <footer className="soft-promo hint">made by <a href="https://linelton.dev" target="_blank" rel="noopener noreferrer">エルトン</a></footer>
       </main>
     </>
   );
