@@ -10,24 +10,28 @@ type Props = {
   onAuth?: () => void;
 };
 
-type Exp = 1 | 2 | 3;
+type N = 1 | 2 | 3; // nav exp · nav3 edge: 1 none · 2 thin · 3 figma
 const NAV_KEY = "sayonara-nav-exp";
+const EDGE_KEY = "sayonara-nav3-edge";
 
-function readExp(): Exp {
+function readParam(key: string, lsKey: string, fallback: N): N {
   try {
-    const q = new URLSearchParams(location.search).get("nav");
-    if (q === "1" || q === "2" || q === "3") return +q as Exp;
-    const ls = localStorage.getItem(NAV_KEY);
-    if (ls === "1" || ls === "2" || ls === "3") return +ls as Exp;
+    const q = new URLSearchParams(location.search).get(key);
+    if (q === "1" || q === "2" || q === "3") {
+      localStorage.setItem(lsKey, q);
+      return +q as N;
+    }
+    const ls = localStorage.getItem(lsKey);
+    if (ls === "1" || ls === "2" || ls === "3") return +ls as N;
   } catch { /* SSR / private */ }
-  return 1;
+  return fallback;
 }
 
-function writeExp(n: Exp) {
+function writeParam(key: string, lsKey: string, n: N) {
   try {
-    localStorage.setItem(NAV_KEY, String(n));
+    localStorage.setItem(lsKey, String(n));
     const u = new URL(location.href);
-    u.searchParams.set("nav", String(n));
+    u.searchParams.set(key, String(n));
     history.replaceState(null, "", u);
   } catch { /* ignore */ }
 }
@@ -41,7 +45,8 @@ export default function AppNav({ top, onAuth }: Props) {
   const [draft, setDraft] = useState("");
   const [bio, setBio] = useState("");
   const [jimoty, setJimoty] = useState("");
-  const [exp, setExp] = useState<Exp>(1);
+  const [exp, setExp] = useState<N>(1);
+  const [edge, setEdge] = useState<N>(2);
 
   function sync() {
     const n = getName();
@@ -53,19 +58,19 @@ export default function AppNav({ top, onAuth }: Props) {
   }
   useEffect(() => {
     sync();
-    const n = readExp();
-    setExp(n);
-    try {
-      const q = new URLSearchParams(location.search).get("nav");
-      if (q === "1" || q === "2" || q === "3") localStorage.setItem(NAV_KEY, q);
-    } catch { /* ignore */ }
+    setExp(readParam("nav", NAV_KEY, 1));
+    setEdge(readParam("nav3", EDGE_KEY, 2));
     window.addEventListener(AUTH_EVT, sync);
     return () => window.removeEventListener(AUTH_EVT, sync);
   }, []);
 
-  function pickExp(n: Exp) {
+  function pickExp(n: N) {
     setExp(n);
-    writeExp(n);
+    writeParam("nav", NAV_KEY, n);
+  }
+  function pickEdge(n: N) {
+    setEdge(n);
+    writeParam("nav3", EDGE_KEY, n);
   }
 
   function saveLogin(e: { preventDefault(): void }) {
@@ -87,7 +92,7 @@ export default function AppNav({ top, onAuth }: Props) {
 
   return (
     <>
-      <nav className={`app-nav${top ? " top" : " bot"} nav-exp-${exp}`} aria-label="アプリ">
+      <nav className={`app-nav${top ? " top" : " bot"} nav-exp-${exp}${exp === 3 ? ` nav3-e${edge}` : ""}`} aria-label="アプリ">
         <a href="/" className="brand" aria-label="サヨナラ ホーム">
           <img className="logo" src="/sun-logo.png" alt="" width={52} height={27} />
           <span>サヨナラ</span>
@@ -108,10 +113,17 @@ export default function AppNav({ top, onAuth }: Props) {
       </nav>
 
       <div className="nav-exp-sw" role="group" aria-label="ナビ実験">
-        {([1, 2, 3] as Exp[]).map((n) => (
+        {([1, 2, 3] as N[]).map((n) => (
           <button key={n} type="button" className={exp === n ? "on" : undefined}
             aria-pressed={exp === n} onClick={() => pickExp(n)}>{n}</button>
         ))}
+        {exp === 3 && (<>
+          <hr className="sep" />
+          {([[1, "∅", "縁なし"], [2, "─", "細い線"], [3, "·", "Figma風"]] as const).map(([n, lab, a]) => (
+            <button key={n} type="button" className={edge === n ? "on" : undefined}
+              aria-pressed={edge === n} aria-label={a} onClick={() => pickEdge(n)}>{lab}</button>
+          ))}
+        </>)}
       </div>
 
       {loginOpen && (
