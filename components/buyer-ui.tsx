@@ -240,13 +240,13 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         <p className="ext-links">
           {state?.jimotyUrl ? (
             <a className="ext-link" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">
-              <img className="ext-ico" src="/jimoty.png" alt="" width={16} height={16} />
+              <img className="ext-ico" src="/jimoty.png" alt="" />
               Jimoty profile
             </a>
           ) : null}
           {yt ? (
             <a className="ext-link" href={yt} target="_blank" rel="noopener noreferrer">
-              <img className="ext-ico" src="/youtube.svg" alt="" width={16} height={16} />
+              <img className="ext-ico" src="/youtube.svg" alt="" />
               内見動画
             </a>
           ) : null}
