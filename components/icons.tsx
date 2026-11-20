@@ -48,6 +48,6 @@ export function IconBtn({
   );
 }
 export function DateField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  return <label className="float date-field"><span>{label}</span>
-    <input type="date" value={value} aria-label={label} onClick={(e) => { try { e.currentTarget.showPicker?.(); } catch {} }} onChange={(e) => onChange(e.target.value)} /></label>;
+  return <label className="float date-field"><span>{label}</span><span className="date-ctl">
+    <input type="date" value={value} aria-label={label} onClick={(e) => { try { e.currentTarget.showPicker?.(); } catch {} }} onChange={(e) => onChange(e.target.value)} /></span></label>;
 }
