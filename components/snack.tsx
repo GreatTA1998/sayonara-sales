@@ -24,9 +24,7 @@ export function Snack({ snack }: { snack: SnackState }) {
   return (
     <div role="status" className="snack text-base" style={{ background: bg }}>
       <span>{snack.msg}</span>
-      {snack.action && (
-        <button type="button" className="snack-act" onClick={snack.action.onClick}>{snack.action.label}</button>
-      )}
+      {snack.action && <button type="button" className="snack-act" onClick={snack.action.onClick}>{snack.action.label}</button>}
     </div>
   );
 }

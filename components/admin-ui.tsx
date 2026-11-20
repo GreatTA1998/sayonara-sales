@@ -96,7 +96,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const dragRef = useRef<{ from: number; over: number; x: number; y: number; moved: boolean } | null>(null);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
-  const [pub, setPub] = useState<"off" | "on" | "ok">("off");
+  const [pub, setPub] = useState<"off" | "on" | "see">("off");
   const { snack, show } = useSnack();
   const [addrDraft, setAddrDraft] = useState("");
   const addrDraftRef = useRef("");
@@ -135,7 +135,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     setSlots(body.slots?.length ? body.slots : [...PICKUP_SLOTS]);
     setPickupFrom(body.pickupFrom || DEF_FROM);
     setPickupTo(body.pickupTo || body.moveOut || DEF_TO);
-    if (body.published) setPub((p) => (p === "ok" ? p : "on"));
+    if (body.published) setPub((p) => { try { return p === "see" || sessionStorage.getItem(`ss-copied-${shop}`) ? "see" : "on"; } catch { return p === "see" ? "see" : "on"; } });
   }, [shop, show]);
 
   useEffect(() => { void load(); }, [load]);
@@ -606,21 +606,18 @@ export default function ShopAdminView({ shop, name }: Props) {
   }
 
   function publish() {
+    const href = `/s/${shop}`;
+    if (pub === "see") { router.push(href); return; }
     if (pub === "off" && !(contactMode === "line" ? lineInvite.trim() : phone.trim())) {
       const msg = `${contactMode === "line" ? "LINE招待リンク" : "電話番号"}を入力してください`;
-      setErr(msg); show(msg, "err");
-      return;
+      setErr(msg); show(msg, "err"); return;
     }
-    const href = `/s/${shop}`;
-    const url = `${SITE_URL}${href}`;
-    const first = pub === "off";
-    setPub("ok");
-    show(`${first ? "公開しました" : "コピーしました"}\n${url}`, "ok", { label: "見る", onClick: () => router.push(href) });
-    setTimeout(() => setPub("on"), 1600);
+    const first = pub === "off", url = `${SITE_URL}${href}`;
+    setPub("see");
+    try { sessionStorage.setItem(`ss-copied-${shop}`, "1"); } catch { /* private */ }
+    show(first ? "公開しました" : "コピーしました", "ok");
     void navigator.clipboard?.writeText(url).catch(() => undefined);
-    if (first) void act({ action: "publish" }).then((ok) => {
-      if (!ok) setPub("off");
-    });
+    if (first) void act({ action: "publish" }).then((ok) => { if (!ok) setPub("off"); });
   }
 
   async function saveSlots(next: string[]) {
@@ -654,7 +651,7 @@ export default function ShopAdminView({ shop, name }: Props) {
         <span className="spacer" aria-hidden="true" />
         <button type="button" className="req"
           onClick={logged ? publish : () => { setLineDraft(getName()); setLoginOpen(true); }}>
-          {logged ? (pub === "ok" ? "コピー済" : pub === "on" ? "URLコピー" : "公開する") : "ログインして保存"}
+          {logged ? (pub === "see" ? "見る" : pub === "on" ? "URLコピー" : "公開する") : "ログインして保存"}
         </button>
       </header>
 
