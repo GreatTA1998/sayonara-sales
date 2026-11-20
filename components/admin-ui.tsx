@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AppNav from "@/components/app-nav";
 import { Icon, IconBtn } from "@/components/icons";
+import { LineLoginLink, useLineOAuthReturn } from "@/components/line-oauth";
 import { Listings, type PhotoItem } from "@/components/photo-listing";
 import { Snack, useSnack } from "@/components/snack";
 import { dayLbl, isLateOnly } from "@/lib/days";
@@ -103,6 +104,11 @@ export default function ShopAdminView({ shop, name }: Props) {
     window.addEventListener(AUTH_EVT, sync);
     return () => window.removeEventListener(AUTH_EVT, sync);
   }, []);
+  useLineOAuthReturn(() => {
+    const n = getName();
+    setLogged(!!n);
+    if (n) setLabel(n);
+  });
   useEffect(() => () => {
     if (addrTimer.current) clearTimeout(addrTimer.current);
     if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
@@ -567,7 +573,8 @@ export default function ShopAdminView({ shop, name }: Props) {
               <input value={lineDraft} onChange={(e) => setLineDraft(e.target.value)}
                 placeholder="表示名" autoComplete="nickname" autoFocus /></label>
             <button type="submit" className="cta go" disabled={!lineDraft.trim()}>サインイン</button>
-            <p className="hint" style={{ marginTop: 10 }}>より安全なLINE連携は準備中</p>
+            <p className="hint" style={{ marginTop: 10 }}>より安全に使う場合はLINE連携</p>
+            <LineLoginLink />
           </form>
         </div>
       )}

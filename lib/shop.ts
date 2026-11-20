@@ -2,6 +2,8 @@
 export const NAME_KEY = "ss-line-name";
 export const ID_KEY = "ss-shop-id";
 const MAP_KEY = "ss-shop-map";
+const UID_KEY = "ss-line-uid";
+const UID_MAP = "ss-line-uid-map";
 const PROF_KEY = "ss-profile";
 export const AUTH_EVT = "ss-auth";
 
@@ -63,6 +65,11 @@ export const ensureShopId = () => {
   return id;
 };
 
+const readUidMap = (): Record<string, string> => {
+  try { return JSON.parse(localStorage.getItem(UID_MAP) || "{}") as Record<string, string>; }
+  catch { return {}; }
+};
+
 /** Persist LINE名 → id; known sellers reclaim; else reuse guest dig5. */
 export const openShop = (n: string) => {
   if (typeof window === "undefined") return "";
@@ -81,6 +88,39 @@ export const openShop = (n: string) => {
   localStorage.setItem(ID_KEY, id);
   notifyAuth();
   return id;
+};
+
+/** Bind LINE userId → current/guest shop; soft-upgrade display name. */
+export const bindLineUser = (uid: string, displayName: string) => {
+  if (typeof window === "undefined" || !uid.trim()) return "";
+  const umap = readUidMap();
+  const cur = getId();
+  let id = umap[uid] || (isShop(cur) ? cur : "");
+  const name = displayName.trim();
+  if (!isShop(id)) id = openShop(name || "LINE") || ensureShopId();
+  else if (name) {
+    const map = readMap();
+    map[norm(name)] = id;
+    localStorage.setItem(MAP_KEY, JSON.stringify(map));
+    localStorage.setItem(NAME_KEY, name);
+    localStorage.setItem(ID_KEY, id);
+    notifyAuth();
+  }
+  umap[uid] = id;
+  localStorage.setItem(UID_MAP, JSON.stringify(umap));
+  localStorage.setItem(UID_KEY, uid);
+  return id;
+};
+
+/** After OAuth redirect (?line_ok=1): pull session and soft-upgrade. */
+export const applyLineSession = async () => {
+  if (typeof window === "undefined") return null;
+  const res = await fetch("/api/auth/session", { cache: "no-store" });
+  if (!res.ok) return null;
+  const body = await res.json() as { ok?: boolean; uid?: string; name?: string };
+  if (!body.ok || !body.uid || !body.name) return null;
+  bindLineUser(body.uid, body.name);
+  return body;
 };
 
 /** Hub sales: Elton in 目黒区 + local soft-identity shops. */

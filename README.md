@@ -7,6 +7,12 @@ Phone-first move-out sale. Hub `/`: **買う** = Elton listings + ward map/sales
 | Variable | Required | Purpose |
 |---|---|---|
 | `BLOB_READ_WRITE_TOKEN` | prod | Vercel Blob persistence (auto when Blob linked) |
+| `LINE_CHANNEL_ID` | optional | LINE Login channel ID (real OAuth) |
+| `LINE_CHANNEL_SECRET` | optional | LINE Login channel secret |
+| `LINE_CALLBACK_URL` | optional | Callback URI; default `{origin}/api/auth/line/callback` |
+| `NEXT_PUBLIC_SITE_URL` | optional | Canonical origin (default `https://sayonara.tokyo`) |
+
+Soft LINE名 login always works. Real LINE Login is optional; console steps live in the project store doc `docs/line-login-setup.md`.
 
 ## Dev
 
