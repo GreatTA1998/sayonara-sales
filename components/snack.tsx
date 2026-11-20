@@ -5,7 +5,6 @@ export type SnackKind = "ok" | "err" | "busy";
 export type SnackAction = { label: string; onClick: () => void };
 export type SnackState = { msg: string; kind: SnackKind; action?: SnackAction } | null;
 
-/** Tiny phone-first toast for admin feedback. */
 export function useSnack() {
   const [snack, setSnack] = useState<SnackState>(null);
   const show = useCallback((msg: string, kind: SnackKind = "ok", action?: SnackAction) => {
