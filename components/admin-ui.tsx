@@ -739,23 +739,21 @@ export default function ShopAdminView({ shop, name }: Props) {
       </section>
 
       <div className="add-dual">
-        <div className="add-row">
-          <button type="button" className="cta"
-            disabled={!data || listBusy}
-            onClick={() => {
-              setListOpen((v) => {
-                if (v) { setListDraft(""); return false; }
-                setListDraft("");
-                requestAnimationFrame(() => listRef.current?.focus());
-                return true;
-              });
-            }}>リスト入力</button>
-          <button type="button" className="cta"
-            disabled={!data}
-            onClick={() => { setCamItemId(null); setCamOpen(true); }}>
-            <Icon name="camera" size={18} />写真入力
-          </button>
-        </div>
+        <button type="button" className="cta"
+          disabled={!data || listBusy}
+          onClick={() => {
+            setListOpen((v) => {
+              if (v) { setListDraft(""); return false; }
+              setListDraft("");
+              requestAnimationFrame(() => listRef.current?.focus());
+              return true;
+            });
+          }}>リスト入力</button>
+        <button type="button" className="cta"
+          disabled={!data}
+          onClick={() => { setCamItemId(null); setCamOpen(true); }}>
+          <Icon name="camera" size={18} />写真入力
+        </button>
         {listOpen && (
           <div className="list-row">
             <input ref={listRef} value={listDraft} disabled={listBusy}
