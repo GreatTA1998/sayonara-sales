@@ -299,6 +299,8 @@ export default function ShopAdminView({ shop, name }: Props) {
     const draft = editDraftRef.current;
     const saved = editSavedRef.current;
     if (!id || !saved || saved.id !== id) return;
+    // Optimistic tmp- cards are not on the server yet — hold draft until real id remaps.
+    if (id.startsWith("tmp-")) return;
     const price = draft.price === "" ? 0 : Number(draft.price);
     const note = draft.note.trim();
     const payload: Record<string, unknown> = { action: "edit", id };
@@ -315,7 +317,16 @@ export default function ShopAdminView({ shop, name }: Props) {
     show("保存しました", "ok", { label: "元に戻す", onClick: () => { void undoEdit(prev); } });
   }
 
+  /** After create-from-photo lands, remap open/edit refs from tmp- → real id and flush held draft. */
+  function remapTempItem(tmpId: string, realId: string) {
+    if (editIdRef.current === tmpId) editIdRef.current = realId;
+    if (editSavedRef.current?.id === tmpId) editSavedRef.current = { ...editSavedRef.current, id: realId };
+    setOpenId((oid) => (oid === tmpId ? realId : oid));
+    void flushEdit();
+  }
+
   async function undoEdit(prev: { id: string; name: string; price: number; note: string }) {
+    if (prev.id.startsWith("tmp-")) return;
     if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
     editReq.current++;
     const ok = await act({
@@ -425,10 +436,7 @@ export default function ShopAdminView({ shop, name }: Props) {
           const items = d.items.filter((i) => i.id !== job.itemId);
           return { ...d, items: [...items, body.item as Item] };
         });
-        if (openId === job.itemId) {
-          editIdRef.current = body.item.id;
-          setOpenId(body.item.id);
-        }
+        remapTempItem(job.itemId, body.item.id);
       } else {
         const body = await postUpload(job.file, job.itemId);
         const remote = String(body.url || (body.item?.photos || []).slice(-1)[0] || "");

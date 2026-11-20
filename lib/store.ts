@@ -1,6 +1,6 @@
 import { promises as fs } from "fs";
 import path from "path";
-import { put, get } from "@vercel/blob";
+import { put, get, head, BlobNotFoundError, BlobPreconditionFailedError } from "@vercel/blob";
 import { daysBetween } from "./days";
 import { CANON_LINE, CANON_PHONE, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "./sale";
 export { CANON_LINE, CANON_PHONE, telHref, ytUrl } from "./sale";
@@ -120,31 +120,56 @@ const eltonSeed = (): Store => ({
   claims: [],
 });
 const emptySeed = (): Store => ({ address: "目黒区", items: [], claims: [] });
+const seedFor = (shop: string) => (shop === ELTON_SHOP ? eltonSeed() : emptySeed());
 
-const mem = new Map<string, Store>();
+/** In-process write queue (one serverless instance). Cross-instance safety = etag ifMatch. */
 const chains = new Map<string, Promise<unknown>>();
 const useBlob = () => !!process.env.BLOB_READ_WRITE_TOKEN;
+const CAS_TRIES = 8;
 
-async function readRaw(shop: string): Promise<Store> {
-  if (useBlob()) {
-    const res = await get(blobKey(shop), { access: "public" });
-    if (!res) return shop === ELTON_SHOP ? eltonSeed() : emptySeed();
-    return (await new Response(res.stream).json()) as Store;
+type Snap = { store: Store; etag?: string };
+
+async function readBlob(key: string, shop: string): Promise<Snap> {
+  // Prefer private + uncached origin read (store JSON is never a public asset).
+  const priv = await get(key, { access: "private", useCache: false });
+  if (priv?.statusCode === 200 && priv.stream) {
+    return { store: (await new Response(priv.stream).json()) as Store, etag: priv.blob.etag };
   }
-  try { return JSON.parse(await fs.readFile(localPath(shop), "utf8")) as Store; }
-  catch {
-    const s = shop === ELTON_SHOP ? eltonSeed() : emptySeed();
+  // Legacy public blob: head() for a fresh etag, body via cache-bust (CDN max-age was 30d).
+  try {
+    const meta = await head(key);
+    const url = new URL(meta.url);
+    url.searchParams.set("cache", "0");
+    const res = await fetch(url, { cache: "no-store", headers: { "Cache-Control": "no-cache" } });
+    if (res.ok) return { store: (await res.json()) as Store, etag: meta.etag };
+  } catch (e) {
+    if (!(e instanceof BlobNotFoundError)) throw e;
+  }
+  return { store: seedFor(shop) };
+}
+
+async function readRaw(shop: string): Promise<Snap> {
+  if (useBlob()) return readBlob(blobKey(shop), shop);
+  try {
+    return { store: JSON.parse(await fs.readFile(localPath(shop), "utf8")) as Store };
+  } catch {
+    const store = seedFor(shop);
     await fs.mkdir(path.dirname(localPath(shop)), { recursive: true });
-    await fs.writeFile(localPath(shop), JSON.stringify(s, null, 2));
-    return s;
+    await fs.writeFile(localPath(shop), JSON.stringify(store, null, 2));
+    return { store };
   }
 }
 
-async function writeRaw(shop: string, s: Store) {
-  mem.set(shop, s);
+async function writeRaw(shop: string, s: Store, etag?: string) {
   if (useBlob()) {
     await put(blobKey(shop), JSON.stringify(s), {
-      access: "public", addRandomSuffix: false, allowOverwrite: true, contentType: "application/json",
+      access: "private",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      contentType: "application/json",
+      // Min CDN TTL; private+useCache:false is the real consistency path.
+      cacheControlMaxAge: 60,
+      ...(etag ? { ifMatch: etag } : {}),
     });
     return;
   }
@@ -156,11 +181,20 @@ export function withStore<T>(shop: string, fn: (s: Store) => T | Promise<T>): Pr
   const key = parseShop(shop);
   const prev = chains.get(key) || Promise.resolve();
   const run = prev.then(async () => {
-    const s = scrub(await readRaw(key));
-    mem.set(key, s);
-    const result = await fn(s);
-    await writeRaw(key, s);
-    return result;
+    let last: unknown;
+    for (let i = 0; i < CAS_TRIES; i++) {
+      const { store, etag } = await readRaw(key);
+      const s = scrub(store);
+      const result = await fn(s);
+      try {
+        await writeRaw(key, s, etag);
+        return result;
+      } catch (e) {
+        if (e instanceof BlobPreconditionFailedError) { last = e; continue; }
+        throw e;
+      }
+    }
+    throw last instanceof Error ? last : new Error("Store write conflict");
   });
   chains.set(key, run.then(() => undefined, () => undefined));
   return run;
@@ -183,10 +217,11 @@ function scrub(s: Store) {
   return s;
 }
 
+/** Always re-read — no per-instance GET cache (stale snapshots caused lost admin writes). */
 export async function getStore(shop: string = ELTON_SHOP): Promise<Store> {
   const key = parseShop(shop);
-  if (!mem.has(key)) mem.set(key, scrub(await readRaw(key)));
-  return structuredClone(mem.get(key)!);
+  const { store } = await readRaw(key);
+  return structuredClone(scrub(store));
 }
 
 /** Occupied by pending request or confirmed/done booking (not cancelled). */
