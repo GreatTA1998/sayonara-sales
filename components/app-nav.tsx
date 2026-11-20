@@ -66,25 +66,28 @@ export default function AppNav({ top, onAuth }: Props) {
   return (
     <>
       <nav className={`app-nav${top ? " top" : " bot"}`} aria-label="アプリ">
-        {/* Brand is identity, not a tab — never show active orange dot on home. */}
-        <Link href="/" className="brand" prefetch aria-label="サヨナラ ホーム">
-          <img className="logo" src="/sun-logo.png" alt="" width={52} height={27} decoding="async" />
-          <span>サヨナラ</span>
-        </Link>
-        <Link className={`nav-a${sellOn ? " on" : ""}`} href={sellHref} prefetch
-          aria-current={sellOn ? "page" : undefined}
-          onClick={(e) => {
-            if (shopId) return;
-            e.preventDefault();
-            const id = ensureShopId();
-            setShopId(id);
-            router.push(adminPath(id));
-          }}>{sellLabel}</Link>
-        {logged ? (
-          <button type="button" className="nav-a" onClick={() => setProfOpen(true)}>{name}</button>
-        ) : (
-          <button type="button" className="nav-a" onClick={() => { setDraft(getName()); setLoginOpen(true); }}>ログイン</button>
-        )}
+        {/* Cream bar is full-bleed; inner row matches page/shop content column. */}
+        <div className="app-nav-inner">
+          {/* Brand is identity, not a tab — never show active orange dot on home. */}
+          <Link href="/" className="brand" prefetch aria-label="サヨナラ ホーム">
+            <img className="logo" src="/sun-logo.png" alt="" width={52} height={27} decoding="async" />
+            <span>サヨナラ</span>
+          </Link>
+          <Link className={`nav-a${sellOn ? " on" : ""}`} href={sellHref} prefetch
+            aria-current={sellOn ? "page" : undefined}
+            onClick={(e) => {
+              if (shopId) return;
+              e.preventDefault();
+              const id = ensureShopId();
+              setShopId(id);
+              router.push(adminPath(id));
+            }}>{sellLabel}</Link>
+          {logged ? (
+            <button type="button" className="nav-a" onClick={() => setProfOpen(true)}>{name}</button>
+          ) : (
+            <button type="button" className="nav-a" onClick={() => { setDraft(getName()); setLoginOpen(true); }}>ログイン</button>
+          )}
+        </div>
       </nav>
 
       {loginOpen && (
