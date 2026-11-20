@@ -56,7 +56,7 @@ export default function HomePage() {
             <ShopBuyerView key={shopId} shop={shopId} name={active?.name || ELTON_LABEL} embed />
           </div>
         </div>
-        <footer className="soft-promo hint">made by <a href="https://linelton.dev" target="_blank" rel="noopener noreferrer">エルトン</a></footer>
+        <footer className="soft-promo hint">Made by エルトン</footer>
       </main>
     </>
   );
