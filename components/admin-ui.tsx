@@ -70,6 +70,8 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [lineDraft, setLineDraft] = useState("");
   const [label, setLabel] = useState(/^\d{5}$/.test(name) ? "" : name);
   const [camOpen, setCamOpen] = useState(false);
+  /** null = create-from-photo (1枚＝1出品); set = append photos to that listing. */
+  const [camItemId, setCamItemId] = useState<string | null>(null);
   const bioRef = useRef<HTMLTextAreaElement>(null);
   const [bio, setBio] = useState("");
   const [jimoty, setJimoty] = useState("");
@@ -726,7 +728,7 @@ export default function ShopAdminView({ shop, name }: Props) {
           <div className="add-photo">
             <button type="button" className="cta"
               disabled={!data}
-              onClick={() => setCamOpen(true)}>
+              onClick={() => { setCamItemId(null); setCamOpen(true); }}>
               <Icon name="camera" size={18} />写真を追加
             </button>
             <p className="hint add-tip">1枚＝1出品。名前はあとで。</p>
@@ -745,8 +747,11 @@ export default function ShopAdminView({ shop, name }: Props) {
         )}
       </div>
       <SquareCam open={camOpen} accept={IMG_ACCEPT}
-        onClose={() => setCamOpen(false)}
-        onShot={(file) => addFromPhotos([file])} />
+        onClose={() => { setCamOpen(false); setCamItemId(null); }}
+        onShot={(file) => {
+          if (camItemId) queueAppend(camItemId, [file]);
+          else addFromPhotos([file]);
+        }} />
 
       {!empty && (
         <>
@@ -880,16 +885,15 @@ export default function ShopAdminView({ shop, name }: Props) {
                   </div>
                 );
               })}
-              <label className={`pic-add${busyOpen ? " busy" : ""}`}
-                aria-label="写真を追加" onClick={(e) => e.stopPropagation()}>
+              <button type="button" className={`pic-add${busyOpen ? " busy" : ""}`}
+                aria-label="写真を追加" disabled={busyOpen}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCamItemId(open.id);
+                  setCamOpen(true);
+                }}>
                 <Icon name="plus" size={18} />
-                <input type="file" accept={IMG_ACCEPT} multiple hidden disabled={busyOpen}
-                  onChange={(e) => {
-                    const files = Array.from(e.target.files || []);
-                    e.target.value = "";
-                    if (files.length) queueAppend(open.id, files);
-                  }} />
-              </label>
+              </button>
             </div>
             <div className="name-price">
               <label className="float">
