@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import AppNav from "@/components/app-nav";
 import { Listings, money } from "@/components/photo-listing";
-import { dayLbl, pickupSpan, rangeLbl } from "@/lib/days";
+import { dayLbl, dayShort, pickupSpan, rangeLbl } from "@/lib/days";
 import { getName, openShop } from "@/lib/shop";
 import { SITE_URL } from "@/lib/site";
 
@@ -11,7 +11,7 @@ type Item = {
   photos?: string[]; availableFrom?: string; availableTo?: string; lateOnly?: boolean;
 };
 type State = {
-  address: string; bio?: string; jimotyUrl?: string;
+  address: string; bio?: string; jimotyUrl?: string; moveOut?: string;
   days: string[]; slots: string[]; taken: Record<string, string[]>;
   lineInviteUrl?: string | null; items: Item[];
 };
@@ -55,6 +55,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [waited, setWaited] = useState<Set<string>>(new Set());
   const lineUrl = state?.lineInviteUrl || LINE_FALLBACK;
   const span = pickupSpan(state?.days || []);
+  const barDates = state?.moveOut ? `${span} · 退去${dayShort(state.moveOut)}` : span;
   const shareUrl = `${SITE_URL}${shop === "elton" ? "/s/elton" : `/s/${shop}`}`;
 
   const load = useCallback(async () => {
@@ -167,7 +168,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
           <span className="shop">{name}</span>
           <span className="area">{(state?.address || "").trim() || "区"}</span>
         </span>
-        <span className="span">{span}</span>
+        <span className="span">{barDates}</span>
         <button type="button" className="share" onClick={() => { setShared(false); setShareOpen(true); }}>
           URLコピー
         </button>

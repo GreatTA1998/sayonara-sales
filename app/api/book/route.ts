@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { PICKUP_DAYS, itemStatus, shortCode, shopFromUrl, shopSlots, takenSlots, uid, withStore } from "@/lib/store";
+import { itemStatus, shortCode, shopDays, shopFromUrl, shopSlots, takenSlots, uid, withStore } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
@@ -11,10 +11,11 @@ export async function POST(req: Request) {
   const contactMethod = body.contactMethod === "phone" ? "phone" as const : body.contactMethod === "line" ? "line" as const : undefined;
   const contact = String(body.contact || "").trim();
   const itemIds: string[] = Array.isArray(body.itemIds) ? body.itemIds.map(String) : [];
-  if (!PICKUP_DAYS.includes(day) || !slot || !itemIds.length || !contactMethod || !contact)
+  if (!day || !slot || !itemIds.length || !contactMethod || !contact)
     return NextResponse.json({ error: "日付・時間・LINE名・連絡方法・品目を確認してください" }, { status: 400 });
   try {
     const result = await withStore(shop, (s) => {
+      if (!shopDays(s).includes(day)) throw new Error("その日は選べません");
       if (!shopSlots(s).includes(slot)) throw new Error("その時間帯は選べません");
       if (takenSlots(s, day).includes(slot)) throw new Error("その時間帯は埋まっています");
       for (const id of itemIds) {

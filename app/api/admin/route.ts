@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getStore, normalizeSlots, setLateOnly, shopFromUrl, shopSlots, uid, withStore } from "@/lib/store";
+import { applyDates, getStore, normalizeSlots, setLateOnly, shopDays, shopFromUrl, shopMoveOut, shopSlots, uid, withStore } from "@/lib/store";
+import { lateFrom } from "@/lib/days";
 
 export const dynamic = "force-dynamic";
 const numPrice = (v: unknown) => {
@@ -10,8 +11,10 @@ const numPrice = (v: unknown) => {
 export async function GET(req: Request) {
   const shop = shopFromUrl(req);
   const s = await getStore(shop);
+  const days = shopDays(s);
   return NextResponse.json({
     address: s.address, bio: s.bio || "", jimotyUrl: s.jimotyUrl || "",
+    pickupFrom: days[0], pickupTo: days[days.length - 1], moveOut: shopMoveOut(s),
     slots: shopSlots(s), items: s.items, claims: s.claims, shop,
   });
 }
@@ -36,7 +39,7 @@ export async function POST(req: Request) {
           if (body.name != null) item.name = String(body.name).trim();
           if ("price" in body) item.price = numPrice(body.price);
           if ("note" in body) item.note = body.note ? String(body.note) : undefined;
-          if ("lateOnly" in body) setLateOnly(item, !!body.lateOnly);
+          if ("lateOnly" in body) setLateOnly(item, !!body.lateOnly, lateFrom(shopDays(s)));
           else {
             if ("availableFrom" in body) item.availableFrom = body.availableFrom || undefined;
             if ("availableTo" in body) item.availableTo = body.availableTo || undefined;
@@ -52,6 +55,8 @@ export async function POST(req: Request) {
           if ("bio" in body) s.bio = String(body.bio || "").trim();
           if ("jimotyUrl" in body) s.jimotyUrl = String(body.jimotyUrl || "").trim();
           return { bio: s.bio || "", jimotyUrl: s.jimotyUrl || "" };
+        case "dates":
+          return applyDates(s, body);
         case "slots": {
           s.slots = normalizeSlots(body.slots);
           return { slots: s.slots };
