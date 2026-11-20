@@ -674,12 +674,14 @@ export default function ShopAdminView({ shop, name }: Props) {
             onBlur={() => void persistProfile(bio, jimoty)}
             placeholder="https://jmty.jp/…" inputMode="url" /></label>
         <div className="slot-add">
-          <label className="float" style={{ flex: 1, margin: 0 }}><span>受取開始</span>
+          <label className="float"><span>受取開始</span>
             <input type="date" value={pickupFrom} aria-label="受取開始"
+              onClick={(e) => { try { e.currentTarget.showPicker?.(); } catch { /* already open / unsupported */ } }}
               onChange={(e) => { const v = e.target.value; setPickupFrom(v); void saveDates(v, pickupTo); }} /></label>
           <span aria-hidden="true">〜</span>
-          <label className="float" style={{ flex: 1, margin: 0 }}><span>退去日</span>
+          <label className="float"><span>退去日</span>
             <input type="date" value={pickupTo} aria-label="退去日"
+              onClick={(e) => { try { e.currentTarget.showPicker?.(); } catch { /* already open / unsupported */ } }}
               onChange={(e) => { const v = e.target.value; setPickupTo(v); void saveDates(pickupFrom, v); }} /></label>
         </div>
         <div className="slot-edit" role="list" aria-label="受取時間">
