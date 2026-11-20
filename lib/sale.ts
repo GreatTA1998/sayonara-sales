@@ -9,11 +9,9 @@ export const LATE_FROM = PICKUP_DAYS[PICKUP_DAYS.length - 4];
 /** Static shop label (Elton). */
 export const SHOP_NAME = "エルトン";
 
-/** Canonical Elton buyer contact (legacy Blob may omit fields). */
 export const CANON_LINE = "https://line.me/ti/p/yBg2x2X_ut";
 export const CANON_PHONE = "080-4919-2027";
 
-/** tel: href from a JP display number. */
 export const telHref = (phone: string) => {
   const d = phone.replace(/\D/g, "");
   if (!d) return "tel:";
