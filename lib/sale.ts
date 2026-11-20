@@ -9,6 +9,19 @@ export const LATE_FROM = PICKUP_DAYS[PICKUP_DAYS.length - 4];
 /** Static shop label (Elton). */
 export const SHOP_NAME = "エルトン";
 
+/** Canonical Elton buyer contact (legacy Blob may omit fields). */
+export const CANON_LINE = "https://line.me/ti/p/yBg2x2X_ut";
+export const CANON_PHONE = "080-4919-2027";
+
+/** tel: href from a JP display number. */
+export const telHref = (phone: string) => {
+  const d = phone.replace(/\D/g, "");
+  if (!d) return "tel:";
+  if (d.startsWith("0")) return `tel:+81${d.slice(1)}`;
+  if (d.startsWith("81")) return `tel:+${d}`;
+  return `tel:${d}`;
+};
+
 /** Listing grid price order — default cheapest first; 0/unset always last. */
 export type PriceDir = "asc" | "desc";
 const priced = (p: number | null | undefined) => p != null && p > 0;
