@@ -917,16 +917,12 @@ export default function ShopAdminView({ shop, name }: Props) {
               </button>
             </div>
             <div className="name-price">
-              <label className="float">
-                <span>名前</span>
+              <label className="float"><span>名前</span>
                 <input value={editName} disabled={busyOpen}
-                  onChange={(e) => patchEdit("name", e.target.value)} />
-              </label>
-              <label className="float price">
-                <span>価格</span>
+                  onChange={(e) => patchEdit("name", e.target.value)} /></label>
+              <label className="float price"><span>価格</span>
                 <input type="number" min={0} inputMode="numeric" value={editPrice} disabled={busyOpen}
-                  onChange={(e) => patchEdit("price", e.target.value)} />
-              </label>
+                  onChange={(e) => patchEdit("price", e.target.value)} /></label>
             </div>
             <label className="float">
               <span>メモ</span>
