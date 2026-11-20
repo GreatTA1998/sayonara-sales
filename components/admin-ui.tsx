@@ -274,13 +274,13 @@ export default function ShopAdminView({ shop, name }: Props) {
   useEffect(() => {
     if (!openId) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || busyOpen) return;
+      if (e.key !== "Escape" || deleting === openId) return;
       e.preventDefault();
       closeEdit();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [openId, busyOpen]);
+  }, [openId, deleting]);
 
   function upsertItem(item: Item) {
     setData((d) => {
