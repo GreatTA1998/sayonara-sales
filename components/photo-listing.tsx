@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { byPrice, type PriceDir } from "@/lib/sale";
 import "./photo-layout.css";
 
@@ -9,76 +9,51 @@ export { byPrice, type PriceDir };
 const PRICE_DIR_KEY = "ss-price-dir";
 const DENSE_KEY = "ss-dense";
 
-export function usePriceDir(): [PriceDir, () => void] {
-  const [dir, setDir] = useState<PriceDir>("asc");
-  useEffect(() => {
-    try {
-      const v = localStorage.getItem(PRICE_DIR_KEY);
-      if (v === "asc" || v === "desc") setDir(v);
-    } catch { /* ignore */ }
-  }, []);
-  const toggle = useCallback(() => {
-    setDir((cur) => {
-      const next: PriceDir = cur === "asc" ? "desc" : "asc";
-      try { localStorage.setItem(PRICE_DIR_KEY, next); } catch { /* ignore */ }
-      return next;
-    });
-  }, []);
-  return [dir, toggle];
+function useLS(key: string, init: string) {
+  const [v, setV] = useState(init);
+  useEffect(() => { try { const x = localStorage.getItem(key); if (x != null) setV(x); } catch { /* ignore */ } }, [key]);
+  return [v, (n: string) => { setV(n); try { localStorage.setItem(key, n); } catch { /* ignore */ } }] as const;
 }
 
-export function useDense(): [boolean, () => void] {
-  const [on, setOn] = useState(false);
-  useEffect(() => {
-    try { setOn(localStorage.getItem(DENSE_KEY) === "1"); } catch { /* ignore */ }
-  }, []);
-  const toggle = useCallback(() => {
-    setOn((cur) => {
-      const next = !cur;
-      try { localStorage.setItem(DENSE_KEY, next ? "1" : "0"); } catch { /* ignore */ }
-      return next;
-    });
-  }, []);
-  return [on, toggle];
+export function usePriceDir(): [PriceDir, (d: PriceDir) => void] {
+  const [v, set] = useLS(PRICE_DIR_KEY, "asc");
+  return [v === "desc" ? "desc" : "asc", set as (d: PriceDir) => void];
 }
 
-/** Compact 安→高 / 高→安 toggle. */
-export function PriceSortBtn({ dir, onToggle }: { dir: PriceDir; onToggle: () => void }) {
+export function useDense(): [boolean, (on: boolean) => void] {
+  const [v, set] = useLS(DENSE_KEY, "0");
+  return [v === "1", (on) => set(on ? "1" : "0")];
+}
+
+/** Dual-option pill — selected = current mode (not flip-to). */
+function Seg({ label, opts, value, onPick }: {
+  label: string; opts: [string, string][]; value: string; onPick: (v: string) => void;
+}) {
   return (
-    <button type="button" className="psort" onClick={onToggle}
-      aria-label={dir === "asc" ? "安い順。タップで高い順" : "高い順。タップで安い順"}>
-      {dir === "asc" ? "安→高" : "高→安"}
-    </button>
-  );
-}
-
-/** Dense browse toggle — icon chip, persists `ss-dense`. */
-export function DenseBtn({ on, onToggle }: { on: boolean; onToggle: () => void }) {
-  return (
-    <button type="button" className={`dense-btn${on ? " on" : ""}`} onClick={onToggle}
-      aria-pressed={on}
-      aria-label={on ? "密集表示オン。タップで通常表示" : "通常表示。タップで密集表示"}>
-      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-        <rect x="1.5" y="1.5" width="6" height="6" rx="1" fill="currentColor" />
-        <rect x="10.5" y="1.5" width="6" height="6" rx="1" fill="currentColor" />
-        <rect x="1.5" y="10.5" width="6" height="6" rx="1" fill="currentColor" />
-        <rect x="10.5" y="10.5" width="6" height="6" rx="1" fill="currentColor" />
-      </svg>
-    </button>
+    <div className="seg" role="group" aria-label={label}>
+      {opts.map(([v, t]) => (
+        <button key={v} type="button" className={value === v ? "on" : undefined}
+          aria-pressed={value === v} onClick={() => onPick(v)}>{t}</button>
+      ))}
+    </div>
   );
 }
 
 /** Shared tools row (dense optional — buyer only). */
 export function ListingTools({
-  dir, onToggleDir, dense, onToggleDense,
+  dir, onDir, dense, onDense,
 }: {
-  dir: PriceDir; onToggleDir: () => void;
-  dense?: boolean; onToggleDense?: () => void;
+  dir: PriceDir; onDir: (d: PriceDir) => void;
+  dense?: boolean; onDense?: (on: boolean) => void;
 }) {
   return (
     <div className="psort-row">
-      {onToggleDense ? <DenseBtn on={!!dense} onToggle={onToggleDense} /> : null}
-      <PriceSortBtn dir={dir} onToggle={onToggleDir} />
+      {onDense ? (
+        <Seg label="表示" value={dense ? "1" : "0"} onPick={(v) => onDense(v === "1")}
+          opts={[["0", "通常"], ["1", "密集"]]} />
+      ) : null}
+      <Seg label="価格順" value={dir} onPick={(v) => onDir(v as PriceDir)}
+        opts={[["asc", "安→高"], ["desc", "高→安"]]} />
     </div>
   );
 }
