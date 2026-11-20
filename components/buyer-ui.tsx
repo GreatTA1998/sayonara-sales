@@ -176,7 +176,6 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
           {picked.size ? `引き取りを依頼 (${picked.size})` : "引き取りを依頼"}
         </button>
       </header>
-      <p className="hint intro">引っ越しのため出品 / 特記なき限り動作確認済み<br />車あり・まとめ買いの方は予約枠を優先</p>
       {state?.bio ? <p className="hint bio">{state.bio}</p> : null}
       {state?.jimotyUrl ? (
         <p className="hint bio"><a className="linelink" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">ジモティー</a></p>

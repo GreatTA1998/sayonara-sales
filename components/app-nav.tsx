@@ -103,7 +103,7 @@ export default function AppNav({ top, onAuth }: Props) {
         {logged ? (
           <button type="button" className="nav-a" onClick={() => setProfOpen(true)}>{name}</button>
         ) : (
-          <button type="button" className="nav-a" onClick={() => { setDraft(""); setLoginOpen(true); }}>ログイン</button>
+          <button type="button" className="nav-a" onClick={() => { setDraft(getName()); setLoginOpen(true); }}>ログイン</button>
         )}
       </nav>
 
@@ -123,7 +123,7 @@ export default function AppNav({ top, onAuth }: Props) {
             <label className="float"><span>LINE名</span>
               <input value={draft} onChange={(e) => setDraft(e.target.value)}
                 placeholder="表示名" autoComplete="nickname" autoFocus /></label>
-            <button type="submit" className="cta go" disabled={!draft.trim()}>保存</button>
+            <button type="submit" className="cta go" disabled={!draft.trim()}>サインイン</button>
             <p className="hint" style={{ marginTop: 10 }}>より安全なLINE連携は準備中</p>
           </form>
         </div>
