@@ -55,6 +55,8 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [pickupFrom, setPickupFrom] = useState(DEF_FROM);
   const [pickupTo, setPickupTo] = useState(DEF_TO);
   const [moveOut, setMoveOut] = useState(DEF_TO);
+  const [listOpen, setListOpen] = useState(false);
+  const [listDraft, setListDraft] = useState("");
   const [pub, setPub] = useState<"off" | "on" | "ok">("off");
   const { snack, show } = useSnack();
   const [addrDraft, setAddrDraft] = useState("");
@@ -262,6 +264,22 @@ export default function ShopAdminView({ shop, name }: Props) {
     if (ok) show(ok === 1 ? "品目を追加しました" : `${ok}件追加しました`, "ok");
   }
 
+  async function addFromList() {
+    const names = listDraft.split(/\n/).map((l) => l.trim()).filter(Boolean);
+    if (!names.length) return;
+    setUploading("list"); setErr(null);
+    let ok = 0;
+    for (const name of names) {
+      if (await act({ action: "add", name })) ok++;
+    }
+    setUploading(null);
+    if (ok) {
+      setListDraft("");
+      setListOpen(false);
+      show(ok === 1 ? "品目を追加しました" : `${ok}件追加しました`, "ok");
+    }
+  }
+
   async function deleteItem(item: Item) {
     if (!confirm(`「${item.name || "無題"}」を削除しますか？`)) return;
     setDeleting(item.id); show("削除中…", "busy");
@@ -426,12 +444,28 @@ export default function ShopAdminView({ shop, name }: Props) {
           onClick={() => void saveSlots([...PICKUP_SLOTS])}>初期設定に戻す（10・14・20時）</button>
       </section>
 
-      <button type="button" className="cta add-photos"
-        disabled={!data || uploading === "batch"}
-        onClick={() => fileRef.current?.click()}>写真を追加</button>
-      <p className="hint add-tip">1枚＝1出品。名前はあとで。</p>
+      <div className="add-dual">
+        <button type="button" className="cta"
+          disabled={!data || !!uploading}
+          onClick={() => setListOpen((v) => !v)}>リスト入力</button>
+        {listOpen && (
+          <>
+            <label className="float"><span>1行に1品</span>
+              <textarea value={listDraft} rows={4} disabled={!!uploading}
+                onChange={(e) => setListDraft(e.target.value)}
+                placeholder={"椅子\n机\n電子レンジ"} /></label>
+            <button type="button" className="cta"
+              disabled={!data || !!uploading || !listDraft.trim()}
+              onClick={() => void addFromList()}>リスト追加</button>
+          </>
+        )}
+        <button type="button" className="cta"
+          disabled={!data || !!uploading}
+          onClick={() => fileRef.current?.click()}>写真を追加</button>
+        <p className="hint add-tip">1枚＝1出品。名前はあとで。</p>
+      </div>
       <input ref={fileRef} type="file" accept={IMG_ACCEPT} multiple hidden
-        disabled={!data || uploading === "batch"}
+        disabled={!data || !!uploading}
         onChange={(e) => { const f = e.target.files; e.target.value = ""; if (f?.length) void addFromPhotos(Array.from(f)); }} />
 
       {!empty && (
