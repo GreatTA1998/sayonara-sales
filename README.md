@@ -2,6 +2,8 @@
 
 Phone-first move-out sale. Hub `/`: **買う** = Elton listings + ward map/sales list; **売る** = real admin UI + 「ログインして保存」(LINE名). Independent shops: `/s/{5-digit}` + `/s/{id}/admin` (own Blob key). Elton: `/s/elton`, `/admin` (legacy Blob).
 
+**Production:** https://sayonara.tokyo (apex; `www` 308→apex)
+
 ## Env (Vercel)
 
 | Variable | Required | Purpose |
