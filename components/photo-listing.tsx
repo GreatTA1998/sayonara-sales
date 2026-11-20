@@ -39,19 +39,17 @@ export function Seg({ label, opts, value, onPick }: {
   );
 }
 
-/** Shared tools row (dense optional — buyer only). */
+/** Shared tools: 通常|密集 + 安→高|高→安 (buyer + admin). */
 export function ListingTools({
   dir, onDir, dense, onDense,
 }: {
   dir: PriceDir; onDir: (d: PriceDir) => void;
-  dense?: boolean; onDense?: (on: boolean) => void;
+  dense: boolean; onDense: (on: boolean) => void;
 }) {
   return (
     <div className="psort-row">
-      {onDense ? (
-        <Seg label="表示" value={dense ? "1" : "0"} onPick={(v) => onDense(v === "1")}
-          opts={[["0", "通常"], ["1", "密集"]]} />
-      ) : null}
+      <Seg label="表示" value={dense ? "1" : "0"} onPick={(v) => onDense(v === "1")}
+        opts={[["0", "通常"], ["1", "密集"]]} />
       <Seg label="価格順" value={dir} onPick={(v) => onDir(v as PriceDir)}
         opts={[["asc", "安→高"], ["desc", "高→安"]]} />
     </div>
@@ -134,38 +132,25 @@ type ListProps<T extends PhotoItem> = {
   dense?: boolean;
 };
 
-export function PhotoGrid<T extends PhotoItem>({
-  items, onSelect, classNameFor, disabledFor, dense,
-}: ListProps<T>) {
-  if (!items.length) return null;
-  return (
-    <div className={`xgrid${dense ? " dense" : ""}`}>
-      {items.map((item) => (
-        <PhotoCard key={item.id} item={item} dense={dense}
-          onClick={onSelect ? () => onSelect(item) : undefined}
-          className={classNameFor?.(item)}
-          disabled={disabledFor?.(item)} />
-      ))}
-    </div>
-  );
-}
-
 /** Photo cards first, then photoless tiles — same on buyer + admin. */
-export function Listings<T extends PhotoItem>(props: ListProps<T>) {
+export function Listings<T extends PhotoItem>(p: ListProps<T>) {
   const withPh: T[] = [];
   const noPh: T[] = [];
-  for (const i of props.items) ((i.photos || []).length ? withPh : noPh).push(i);
+  for (const i of p.items) ((i.photos || []).length ? withPh : noPh).push(i);
+  const props = (item: T) => ({
+    item, dense: p.dense, className: p.classNameFor?.(item), disabled: p.disabledFor?.(item),
+    onClick: p.onSelect ? () => p.onSelect!(item) : undefined,
+  });
   return (
     <>
-      <PhotoGrid {...props} items={withPh} />
+      {withPh.length > 0 && (
+        <div className={`xgrid${p.dense ? " dense" : ""}`}>
+          {withPh.map((item) => <PhotoCard key={item.id} {...props(item)} />)}
+        </div>
+      )}
       {noPh.length > 0 && (
-        <div className={`xgrid text${props.dense ? " dense" : ""}`}>
-          {noPh.map((item) => (
-            <TextTile key={item.id} item={item} dense={props.dense}
-              onClick={props.onSelect ? () => props.onSelect!(item) : undefined}
-              className={props.classNameFor?.(item)}
-              disabled={props.disabledFor?.(item)} />
-          ))}
+        <div className={`xgrid text${p.dense ? " dense" : ""}`}>
+          {noPh.map((item) => <TextTile key={item.id} {...props(item)} />)}
         </div>
       )}
     </>
