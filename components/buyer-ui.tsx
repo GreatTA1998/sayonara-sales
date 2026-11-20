@@ -247,7 +247,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
           {yt ? (
             <a className="ext-link" href={yt} target="_blank" rel="noopener noreferrer">
               <img className="ext-ico" src="/youtube.svg" alt="" width={16} height={16} />
-              YouTube
+              内見動画
             </a>
           ) : null}
         </p>
