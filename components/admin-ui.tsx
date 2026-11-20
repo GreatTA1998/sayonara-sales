@@ -596,11 +596,12 @@ export default function ShopAdminView({ shop, name }: Props) {
 
   function publish() {
     const href = shop === "elton" ? "/s/elton" : `/s/${shop}`;
+    const url = `${SITE_URL}${href}`;
     const first = pub === "off";
     setPub("ok");
-    show(first ? "公開しました" : "コピーしました", "ok");
+    show(`${first ? "公開しました" : "コピーしました"}\n${url}`, "ok");
     setTimeout(() => setPub("on"), 1600);
-    void navigator.clipboard?.writeText(`${SITE_URL}${href}`).catch(() => undefined);
+    void navigator.clipboard?.writeText(url).catch(() => undefined);
     if (first) void act({ action: "publish" });
   }
 
