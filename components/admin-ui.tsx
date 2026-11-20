@@ -104,7 +104,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const editDraftRef = useRef({ name: "", price: "0", note: "", late: false });
   const editSavedRef = useRef<{ id: string; name: string; price: number; note: string; late: boolean } | null>(null);
   const editReq = useRef(0);
-  const [priceDir, togglePriceDir] = usePriceDir();
+  const [priceDir, setPriceDir] = usePriceDir();
 
   const load = useCallback(async () => {
     const res = await fetch(api(shop, "/api/admin"), { cache: "no-store" });
@@ -782,7 +782,7 @@ export default function ShopAdminView({ shop, name }: Props) {
 
       {!empty && (
         <>
-          <ListingTools dir={priceDir} onToggleDir={togglePriceDir} />
+          <ListingTools dir={priceDir} onDir={setPriceDir} />
           <Listings items={items} onSelect={openDetail}
             disabledFor={(it) => deleting === it.id}
             classNameFor={(it) => (deleting === it.id ? "dim" : "")} />

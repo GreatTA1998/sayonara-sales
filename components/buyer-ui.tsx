@@ -51,8 +51,8 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [err, setErr] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [waited, setWaited] = useState<Set<string>>(new Set());
-  const [priceDir, togglePriceDir] = usePriceDir();
-  const [dense, toggleDense] = useDense();
+  const [priceDir, setPriceDir] = usePriceDir();
+  const [dense, setDense] = useDense();
   const { snack, show } = useSnack();
   const maskPtr = useRef(false);
   const lineUrl = (state?.lineInviteUrl || "").trim();
@@ -254,7 +254,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
       ) : null}
       {err && !checkout && !open && <div className="err">{err}</div>}
       {gridItems.length > 0 && (
-        <ListingTools dir={priceDir} onToggleDir={togglePriceDir} dense={dense} onToggleDense={toggleDense} />
+        <ListingTools dir={priceDir} onDir={setPriceDir} dense={dense} onDense={setDense} />
       )}
       <Listings items={gridItems} dense={dense} onSelect={(it) => { setErr(null); setOpen(it); }}
         classNameFor={(item) => `${picked.has(item.id) ? "on" : ""}${item.taken ? " sold" : ""}`.trim()} />
