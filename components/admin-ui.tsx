@@ -510,18 +510,14 @@ export default function ShopAdminView({ shop, name }: Props) {
       {open && (
         <div className="mask" role="dialog" aria-modal="true" aria-label="品目を編集"
           onClick={() => { if (!busyOpen) { setSheetMenu(null); setOpenId(null); } }}>
-          <div className="sheet" onClick={(e) => { e.stopPropagation(); if (sheetMenu) setSheetMenu(null); }}
-            style={{ maxHeight: "90vh", overflowY: "auto" }}>
-            <div className="add-head">
-              <h2>編集</h2>
-              <IconBtn name="close" label="閉じる" disabled={busyOpen} onClick={() => setOpenId(null)} className="ghost-border" />
-            </div>
+          <div className="sheet edit" onClick={(e) => { e.stopPropagation(); if (sheetMenu) setSheetMenu(null); }}>
+            <h2>編集</h2>
             <div className="pics">
               {pics.map((src) => (
                 <div key={src} className="pic-wrap" onClick={(e) => e.stopPropagation()}>
                   <img src={src} alt="" loading="lazy" decoding="async" />
                   <div className="pic-more">
-                    <IconBtn name="more" label="写真メニュー" disabled={busyOpen} size={16} className="ghost-border"
+                    <IconBtn name="more" label="写真メニュー" disabled={busyOpen} size={22} className="more"
                       onClick={() => setSheetMenu(sheetMenu === src ? null : src)} />
                     {sheetMenu === src && (
                       <div className="menu-pop">
@@ -536,7 +532,7 @@ export default function ShopAdminView({ shop, name }: Props) {
               ))}
               <label className={`pic-add${uploading === open.id || busyOpen ? " busy" : ""}`}
                 aria-label="写真を追加" onClick={(e) => e.stopPropagation()}>
-                <Icon name="plus" size={22} />
+                <Icon name="plus" size={18} />
                 <input type="file" accept={IMG_ACCEPT} hidden disabled={busyOpen || uploading === open.id}
                   onChange={(e) => {
                     const f = e.target.files?.[0];
@@ -549,14 +545,14 @@ export default function ShopAdminView({ shop, name }: Props) {
               <span>名前</span>
               <input value={editName} onChange={(e) => setEditName(e.target.value)} disabled={busyOpen} />
             </label>
-            <label className="float">
+            <label className="float price">
               <span>価格</span>
               <input type="number" min={0} inputMode="numeric" value={editPrice}
                 onChange={(e) => setEditPrice(e.target.value)} disabled={busyOpen} />
             </label>
             <label className="float">
               <span>メモ</span>
-              <textarea value={editNote} onChange={(e) => setEditNote(e.target.value)} disabled={busyOpen} rows={3} />
+              <textarea value={editNote} onChange={(e) => setEditNote(e.target.value)} disabled={busyOpen} rows={6} />
             </label>
             <label className="late-check">
               <input type="checkbox" checked={editLate} disabled={busyOpen}
@@ -567,7 +563,7 @@ export default function ShopAdminView({ shop, name }: Props) {
               <button type="button" className="cta" disabled={busyOpen} onClick={() => void saveDetail()}
                 style={{ background: "#111", color: "#fff", flex: 1, margin: 0 }}>保存</button>
               <div className="save-more">
-                <IconBtn name="more" label="品目メニュー" disabled={busyOpen} className="ghost-border"
+                <IconBtn name="more" label="品目メニュー" disabled={busyOpen} size={24} className="more"
                   onClick={() => setSheetMenu(sheetMenu === "item" ? null : "item")} />
                 {sheetMenu === "item" && (
                   <div className="menu-pop up">
