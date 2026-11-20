@@ -1,8 +1,14 @@
-/* Shared photo listings — B card @ 16px; responsive cols + gentle max cell */
+/* Shared photo listings — B card @ 16px; phone 2 → tablet 3 → desktop 4+; gentle max cell */
 .xgrid{--x-cell-max:210px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:0 6px 8px;align-items:stretch;justify-content:center}
+/* Columns follow .buy container width (works in home side panel too) */
+@container buy (min-width:520px){.xgrid:not(.text){grid-template-columns:repeat(3,minmax(0,var(--x-cell-max)))}}
+@container buy (min-width:840px){.xgrid:not(.text){grid-template-columns:repeat(4,minmax(0,var(--x-cell-max)))}}
+@container buy (min-width:980px){.xgrid:not(.text){grid-template-columns:repeat(auto-fill,minmax(min(100%,180px),var(--x-cell-max)))}}
+@supports not (container-type:inline-size){
 @media(min-width:640px){.xgrid:not(.text){grid-template-columns:repeat(3,minmax(0,var(--x-cell-max)))}}
-@media(min-width:960px){.xgrid:not(.text){grid-template-columns:repeat(4,minmax(0,var(--x-cell-max)))}}
-@media(min-width:1280px){.xgrid:not(.text){grid-template-columns:repeat(auto-fill,minmax(min(100%,180px),var(--x-cell-max)))}}
+@media(min-width:900px){.xgrid:not(.text){grid-template-columns:repeat(4,minmax(0,var(--x-cell-max)))}}
+@media(min-width:1200px){.xgrid:not(.text){grid-template-columns:repeat(auto-fill,minmax(min(100%,180px),var(--x-cell-max)))}}
+}
 .xmore{position:absolute;right:5px;bottom:5px;z-index:1;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;background:rgba(0,0,0,.42);color:#fff;pointer-events:none}
 .xcard{display:flex;flex-direction:column;height:100%;width:100%;max-width:var(--x-cell-max);padding:0;border:1px solid #e5e5e5;border-radius:16px;background:#fff;overflow:hidden;cursor:pointer;font:inherit;color:inherit;text-align:left;justify-self:center}
 .xcard.on{border-color:#ff9900;background:#fff8ee}
