@@ -52,6 +52,7 @@ function claimSummary(c: Claim, all: Item[]) {
   const top = itemLabel(list[0]);
   return n <= 1 ? `1点 · ${top}` : `${n}点 · ${top}…`;
 }
+const claimWhen = (c: Claim) => `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}`;
 
 export default function ShopAdminView({ shop, name }: Props) {
   const router = useRouter();
@@ -663,13 +664,10 @@ export default function ShopAdminView({ shop, name }: Props) {
           <div className="claims-h">引き取り予定</div>
           <ol className="timeline">
             {pending.map((c) => (
-              <li key={c.id} className="tl-item">
-                <button type="button" className="tl-open" onClick={() => setClaimId(c.id)}>
-                  <div className="tl-time">
-                    <b>{dayLbl(c.day)}</b>
-                    {c.slot ? <span>{c.slot}</span> : null}
-                  </div>
-                  <div className="tl-sum text-base">{claimSummary(c, data?.items || [])}</div>
+              <li key={c.id}>
+                <button type="button" className="tl-card" onClick={() => setClaimId(c.id)}>
+                  <b className="tl-when">{claimWhen(c)}</b>
+                  <span className="tl-sum">{claimSummary(c, data?.items || [])}</span>
                 </button>
               </li>
             ))}
@@ -810,10 +808,7 @@ export default function ShopAdminView({ shop, name }: Props) {
         <div className="mask" role="dialog" aria-modal="true" aria-label="予約詳細"
           onClick={() => setClaimId(null)}>
           <div className="sheet claim-sheet" onClick={(e) => e.stopPropagation()}>
-            <div className="tl-time">
-              <b>{dayLbl(claimOpen.day)}</b>
-              {claimOpen.slot ? <span>{claimOpen.slot}</span> : null}
-            </div>
+            <b className="tl-when">{claimWhen(claimOpen)}</b>
             {claimContact ? <div className="text-sm text-muted" style={{ marginBottom: 8 }}>{claimContact}</div> : null}
             <ul className="claim-items">
               {claimList.map((it) => (
