@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import AppNav from "@/components/app-nav";
 import { byPrice, Listings, ListingTools, money, useDense, usePriceDir } from "@/components/photo-listing";
 import { Snack, useSnack } from "@/components/snack";
@@ -89,21 +89,13 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, checkout]);
 
-  const freeSlots = useMemo(() => {
-    const taken = new Set(state?.taken?.[day] || []);
-    return (state?.slots || []).filter((s) => !taken.has(s));
-  }, [state, day]);
-  useEffect(() => { if (slot && !freeSlots.includes(slot)) setSlot(null); }, [freeSlots, slot]);
-
-  const gridItems = useMemo(
-    () => [...(state?.items || [])].sort(byPrice(priceDir)),
-    [state?.items, priceDir],
-  );
-  const pickedItems = useMemo(
-    () => (state?.items || []).filter((i) => picked.has(i.id)),
-    [state, picked],
-  );
-  const canSend = !!slot && !!method && !!lineName.trim() && picked.size > 0
+  const freeSlots = (state?.slots || []).filter((s) => !(state?.taken?.[day] || []).includes(s));
+  useEffect(() => {
+    if (slot && (!(state?.slots || []).includes(slot) || (state?.taken?.[day] || []).includes(slot))) setSlot(null);
+  }, [state, day, slot]);
+  const gridItems = [...(state?.items || [])].sort(byPrice(priceDir));
+  const pickedItems = (state?.items || []).filter((i) => picked.has(i.id) && !i.taken);
+  const canSend = !!slot && !!method && !!lineName.trim() && pickedItems.length > 0
     && ((method === "line" && canLine && lineOk) || (method === "phone" && canPhone));
 
   function toggle(id: string) {
@@ -146,13 +138,14 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
 
   async function book() {
     const name = lineName.trim();
-    if (!picked.size || !slot || !method || !name || busy || (method === "line" && !lineOk)) return;
+    const itemIds = pickedItems.map((i) => i.id);
+    if (!itemIds.length || !slot || !method || !name || busy || (method === "line" && !lineOk)) return;
     setBusy(true); setErr(null);
     try {
       const res = await fetch(api(shop, "/api/book"), {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          day, slot, itemIds: [...picked], contactMethod: method, contact: name,
+          day, slot, itemIds, contactMethod: method, contact: name,
         }),
       });
       const data = await res.json();
@@ -217,7 +210,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             setMethod(canLine ? "line" : canPhone ? "phone" : "line");
             setLineOk(false); setErr(null); setCheckout(true);
           }}>
-          {picked.size ? `引き取りを依頼 (${picked.size})` : "引き取りを依頼"}
+          {pickedItems.length ? `引き取りを依頼 (${pickedItems.length})` : "引き取りを依頼"}
         </button>
       </header>
       {bioShow ? <p className="hint bio">{bioShow}</p> : null}
@@ -309,6 +302,9 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             </div>
             {!freeSlots.length && <p className="sw">この日は空きがありません。</p>}
             <p className="total">現金合計 {money(pickedItems.reduce((n, i) => n + (i.price ?? 0), 0))}</p>
+            <ul className="claim-items">{pickedItems.map((i) => (
+              <li key={i.id}><span>{i.name?.trim() || "無題"}</span><span>{money(i.price)}</span></li>
+            ))}</ul>
             <div className="field"><span>連絡方法</span>
               {(canLine || canPhone) && (
                 <div className="slots pair">
