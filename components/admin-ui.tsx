@@ -763,7 +763,7 @@ export default function ShopAdminView({ shop, name }: Props) {
               onChange={(e) => setListDraft(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void onListEnter(); } }} />
             <span className="list-hint" aria-hidden="true">
-              {listDraft.trim() ? "Enterで追加" : "Enterで閉じる"}
+              {listDraft.trim() ? "Enterで追加" : "Enterで完了"}
             </span>
           </div>
         )}
