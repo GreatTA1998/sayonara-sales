@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import AppNav from "@/components/app-nav";
 import { Icon, IconBtn } from "@/components/icons";
 import { LineLoginLink, useLineOAuthReturn } from "@/components/line-oauth";
-import { byPrice, Listings, ListingTools, Seg, usePriceDir, type PhotoItem } from "@/components/photo-listing";
+import { byPrice, Listings, ListingTools, Seg, useDense, usePriceDir, type PhotoItem } from "@/components/photo-listing";
 import SquareCam from "@/components/square-cam";
 import { Snack, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
@@ -108,6 +108,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const editSavedRef = useRef<{ id: string; name: string; price: number; note: string } | null>(null);
   const editReq = useRef(0);
   const [priceDir, setPriceDir] = usePriceDir();
+  const [dense, setDense] = useDense();
 
   const load = useCallback(async () => {
     const res = await fetch(api(shop, "/api/admin"), { cache: "no-store" });
@@ -782,8 +783,8 @@ export default function ShopAdminView({ shop, name }: Props) {
 
       {!empty && (
         <>
-          <ListingTools dir={priceDir} onDir={setPriceDir} />
-          <Listings items={items} onSelect={openDetail}
+          <ListingTools dir={priceDir} onDir={setPriceDir} dense={dense} onDense={setDense} />
+          <Listings items={items} dense={dense} onSelect={openDetail}
             disabledFor={(it) => deleting === it.id}
             classNameFor={(it) => (deleting === it.id || it.paused ? "dim" : "")} />
         </>
