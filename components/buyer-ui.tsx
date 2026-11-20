@@ -174,8 +174,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         <p>コード: <b>{receipt.code}</b></p>
         <p>日付: {dayLbl(receipt.day)}</p>
         <p>時間: {receipt.slot}</p>
-        <p>合計: {money(receipt.total ?? 0)}</p>
-        <p className="hint">現金・WiseどちらでもOK</p>
+        <p>現金合計: {money(receipt.total ?? 0)}</p>
         <p>エリア: {receipt.address}</p>
         {receipt.contact ? <p>LINE名: {receipt.contact}</p> : null}
         <ul>{receipt.items.map((n) => <li key={n}>{n}</li>)}</ul>
@@ -313,7 +312,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
               </div>
             </div>
             {!freeSlots.length && <p className="sw">この日は空きがありません。</p>}
-            <p className="total">合計 {money(pickedItems.reduce((n, i) => n + (i.price ?? 0), 0))} <span className="hint">現金・WiseどちらでもOK</span></p>
+            <p className="total">現金合計 {money(pickedItems.reduce((n, i) => n + (i.price ?? 0), 0))}</p>
             <div className="field"><span>連絡方法</span>
               {(canLine || canPhone) && (
                 <div className="slots pair">
