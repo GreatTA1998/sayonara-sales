@@ -17,7 +17,7 @@ type Claim = {
 };
 type AdminState = {
   address: string; bio?: string; jimotyUrl?: string; slots?: string[];
-  pickupFrom?: string; pickupTo?: string; moveOut?: string;
+  pickupFrom?: string; pickupTo?: string; moveOut?: string; published?: boolean;
   items: Item[]; claims: Claim[];
 };
 type Props = { shop: string; name: string };
@@ -53,11 +53,12 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [slots, setSlots] = useState<string[]>([...PICKUP_SLOTS]);
   const [slotA, setSlotA] = useState("11:00");
   const [slotB, setSlotB] = useState("11:15");
+  const [slotOpen, setSlotOpen] = useState(false);
   const [pickupFrom, setPickupFrom] = useState(DEF_FROM);
   const [pickupTo, setPickupTo] = useState(DEF_TO);
-  const [moveOut, setMoveOut] = useState(DEF_TO);
   const [listOpen, setListOpen] = useState(false);
-  const [listDraft, setListDraft] = useState("");
+  const [listRows, setListRows] = useState<string[]>([""]);
+  const listRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [pub, setPub] = useState<"off" | "on" | "ok">("off");
   const { snack, show } = useSnack();
   const [addrDraft, setAddrDraft] = useState("");
@@ -89,8 +90,8 @@ export default function ShopAdminView({ shop, name }: Props) {
     setJimoty(body.jimotyUrl || local.jimotyUrl || "");
     setSlots(body.slots?.length ? body.slots : [...PICKUP_SLOTS]);
     setPickupFrom(body.pickupFrom || DEF_FROM);
-    setPickupTo(body.pickupTo || DEF_TO);
-    setMoveOut(body.moveOut || body.pickupTo || DEF_TO);
+    setPickupTo(body.pickupTo || body.moveOut || DEF_TO);
+    if (body.published) setPub((p) => (p === "ok" ? p : "on"));
   }, [shop, show]);
 
   useEffect(() => { void load(); }, [load]);
@@ -270,6 +271,17 @@ export default function ShopAdminView({ shop, name }: Props) {
     void flushEdit();
   }
 
+  useEffect(() => {
+    if (!openId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || deleting === openId) return;
+      e.preventDefault();
+      closeEdit();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [openId, deleting]);
+
   function upsertItem(item: Item) {
     setData((d) => {
       if (!d) return d;
@@ -330,20 +342,22 @@ export default function ShopAdminView({ shop, name }: Props) {
     if (ok) show(ok === 1 ? "品目を追加しました" : `${ok}件追加しました`, "ok");
   }
 
-  async function addFromList() {
-    const names = listDraft.split(/\n/).map((l) => l.trim()).filter(Boolean);
-    if (!names.length) return;
-    setUploading("list"); setErr(null);
-    let ok = 0;
-    for (const name of names) {
-      if (await act({ action: "add", name })) ok++;
-    }
-    setUploading(null);
-    if (ok) {
-      setListDraft("");
+  async function onListEnter(i: number) {
+    const v = listRows[i].trim();
+    if (!v) {
       setListOpen(false);
-      show(ok === 1 ? "品目を追加しました" : `${ok}件追加しました`, "ok");
+      setListRows([""]);
+      return;
     }
+    if (uploading) return;
+    setUploading("list");
+    const ok = await act({ action: "add", name: v }, "品目を追加しました");
+    setUploading(null);
+    if (!ok) return;
+    const drafts = listRows.map((r, j) => (j === i ? "" : r)).map((s) => s.trim()).filter(Boolean);
+    const next = [...drafts, ""];
+    setListRows(next);
+    requestAnimationFrame(() => listRefs.current[next.length - 1]?.focus());
   }
 
   async function deleteItem(item: Item) {
@@ -371,6 +385,16 @@ export default function ShopAdminView({ shop, name }: Props) {
     } finally { setDeleting(null); }
   }
 
+  async function reorderPhotos(item: Item, from: number, to: number) {
+    if (from === to || from < 0 || to < 0) return;
+    const photos = [...(item.photos || [])];
+    if (to >= photos.length) return;
+    const [moved] = photos.splice(from, 1);
+    photos.splice(to, 0, moved);
+    upsertItem({ ...item, photos });
+    await act({ action: "edit", id: item.id, photos });
+  }
+
   function saveLogin(e: { preventDefault(): void }) {
     e.preventDefault();
     const id = openShop(lineDraft);
@@ -392,6 +416,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     show(first ? "公開しました" : "コピーしました", "ok");
     setTimeout(() => setPub("on"), 1600);
     void navigator.clipboard?.writeText(`${SITE_URL}${href}`).catch(() => undefined);
+    if (first) void act({ action: "publish" });
   }
 
   async function saveSlots(next: string[]) {
@@ -399,12 +424,11 @@ export default function ShopAdminView({ shop, name }: Props) {
     if (body?.slots) setSlots(body.slots as string[]);
   }
 
-  async function saveDates(from: string, to: string, out: string) {
-    const body = await act({ action: "dates", pickupFrom: from, pickupTo: to, moveOut: out }, "保存しました");
+  async function saveDates(from: string, to: string) {
+    const body = await act({ action: "dates", pickupFrom: from, pickupTo: to, moveOut: to }, "保存しました");
     if (!body) return;
     setPickupFrom(String(body.pickupFrom || from));
-    setPickupTo(String(body.pickupTo || to));
-    setMoveOut(String(body.moveOut || out));
+    setPickupTo(String(body.pickupTo || body.moveOut || to));
   }
 
   const busyOpen = open ? deleting === open.id : false;
@@ -479,17 +503,13 @@ export default function ShopAdminView({ shop, name }: Props) {
         <div className="slot-add">
           <label className="float" style={{ flex: 1, margin: 0 }}><span>受取開始</span>
             <input type="date" value={pickupFrom} aria-label="受取開始"
-              onChange={(e) => { const v = e.target.value; setPickupFrom(v); void saveDates(v, pickupTo, moveOut); }} /></label>
+              onChange={(e) => { const v = e.target.value; setPickupFrom(v); void saveDates(v, pickupTo); }} /></label>
           <span aria-hidden="true">〜</span>
-          <label className="float" style={{ flex: 1, margin: 0 }}><span>受取終了</span>
-            <input type="date" value={pickupTo} aria-label="受取終了"
-              onChange={(e) => { const v = e.target.value; setPickupTo(v); void saveDates(pickupFrom, v, moveOut); }} /></label>
+          <label className="float" style={{ flex: 1, margin: 0 }}><span>退去日</span>
+            <input type="date" value={pickupTo} aria-label="退去日"
+              onChange={(e) => { const v = e.target.value; setPickupTo(v); void saveDates(pickupFrom, v); }} /></label>
         </div>
-        <label className="float"><span>最終退去日</span>
-          <input type="date" value={moveOut} aria-label="最終退去日"
-            onChange={(e) => { const v = e.target.value; setMoveOut(v); void saveDates(pickupFrom, pickupTo, v); }} /></label>
         <div className="claims-h" style={{ marginTop: 8 }}>受取時間</div>
-        <p className="hint">依頼中・確定済みの枠は購入者に出ません。</p>
         <div className="slot-edit" role="list">
           {slots.map((s) => (
             <button key={s} type="button" className="slot" role="listitem"
@@ -499,40 +519,65 @@ export default function ShopAdminView({ shop, name }: Props) {
                 void saveSlots(slots.filter((x) => x !== s));
               }}>{s} ×</button>
           ))}
-        </div>
-        <div className="slot-add">
-          <input type="time" aria-label="開始" value={slotA} onChange={(e) => setSlotA(e.target.value)} />
-          <span aria-hidden="true">〜</span>
-          <input type="time" aria-label="終了" value={slotB} onChange={(e) => setSlotB(e.target.value)} />
-          <button type="button" className="slot" disabled={!slotA || !slotB || slotB <= slotA}
-            onClick={() => {
-              const label = fmtSlot(slotA, slotB);
-              if (slots.includes(label)) { show("すでにあります", "err"); return; }
-              void saveSlots([...slots, label].sort());
-            }}>追加</button>
+          <span className="slot-add-wrap">
+            <button type="button" className="slot" onClick={() => setSlotOpen((v) => !v)}>時間を追加</button>
+            {slotOpen && (
+              <div className="slot-pop" role="dialog" aria-label="時間を追加">
+                <input type="time" aria-label="開始" value={slotA} onChange={(e) => setSlotA(e.target.value)} />
+                <span aria-hidden="true">〜</span>
+                <input type="time" aria-label="終了" value={slotB} onChange={(e) => setSlotB(e.target.value)} />
+                <button type="button" className="slot" disabled={!slotA || !slotB || slotB <= slotA}
+                  onClick={() => {
+                    const label = fmtSlot(slotA, slotB);
+                    if (slots.includes(label)) { show("すでにあります", "err"); return; }
+                    void saveSlots([...slots, label].sort());
+                    setSlotOpen(false);
+                  }}>追加</button>
+              </div>
+            )}
+          </span>
         </div>
         <button type="button" className="text-sm text-muted" style={{ border: 0, background: "transparent", padding: 0, cursor: "pointer" }}
           onClick={() => void saveSlots([...PICKUP_SLOTS])}>初期設定に戻す（10・14・20時）</button>
       </section>
 
       <div className="add-dual">
-        <button type="button" className="cta"
-          disabled={!data || !!uploading}
-          onClick={() => setListOpen((v) => !v)}>リスト入力</button>
+        <div className="add-row">
+          <button type="button" className="cta"
+            disabled={!data || !!uploading}
+            onClick={() => {
+              setListOpen((v) => {
+                if (v) { setListRows([""]); return false; }
+                setListRows([""]);
+                requestAnimationFrame(() => listRefs.current[0]?.focus());
+                return true;
+              });
+            }}>リスト入力</button>
+          <button type="button" className="cta"
+            disabled={!data || !!uploading}
+            onClick={() => fileRef.current?.click()}>写真を追加</button>
+        </div>
         {listOpen && (
-          <>
-            <label className="float"><span>1行に1品</span>
-              <textarea value={listDraft} rows={4} disabled={!!uploading}
-                onChange={(e) => setListDraft(e.target.value)}
-                placeholder={"椅子\n机\n電子レンジ"} /></label>
-            <button type="button" className="cta"
-              disabled={!data || !!uploading || !listDraft.trim()}
-              onClick={() => void addFromList()}>リスト追加</button>
-          </>
+          <ol className="list-rows">
+            {listRows.map((row, i) => (
+              <li key={i}>
+                <span className="n" aria-hidden="true">{i + 1}.</span>
+                <input ref={(el) => { listRefs.current[i] = el; }}
+                  value={row} disabled={!!uploading} placeholder="品名"
+                  aria-label={`品名${i + 1}`}
+                  onChange={(e) => setListRows((rows) => rows.map((r, j) => (j === i ? e.target.value : r)))}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onListEnter(i); } }} />
+              </li>
+            ))}
+            <li className="list-more">
+              <button type="button" className="text-sm" disabled={!!uploading}
+                onClick={() => {
+                  setListRows((rows) => [...rows, ""]);
+                  requestAnimationFrame(() => listRefs.current[listRows.length]?.focus());
+                }}>＋追加</button>
+            </li>
+          </ol>
         )}
-        <button type="button" className="cta"
-          disabled={!data || !!uploading}
-          onClick={() => fileRef.current?.click()}>写真を追加</button>
         <p className="hint add-tip">1枚＝1出品。名前はあとで。</p>
       </div>
       <input ref={fileRef} type="file" accept={IMG_ACCEPT} multiple hidden
@@ -585,9 +630,17 @@ export default function ShopAdminView({ shop, name }: Props) {
           <div className="sheet edit" onClick={(e) => { e.stopPropagation(); if (sheetMenu) setSheetMenu(null); }}>
             <h2>編集</h2>
             <div className="pics">
-              {pics.map((src) => (
-                <div key={src} className="pic-wrap" onClick={(e) => e.stopPropagation()}>
-                  <img src={src} alt="" loading="lazy" decoding="async" />
+              {pics.map((src, i) => (
+                <div key={src} className="pic-wrap" draggable={!busyOpen && pics.length > 1}
+                  onClick={(e) => e.stopPropagation()}
+                  onDragStart={(e) => { e.dataTransfer.setData("text/plain", String(i)); e.dataTransfer.effectAllowed = "move"; }}
+                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const from = Number(e.dataTransfer.getData("text/plain"));
+                    if (!Number.isNaN(from)) void reorderPhotos(open, from, i);
+                  }}>
+                  <img src={src} alt="" loading="lazy" decoding="async" draggable={false} />
                   <div className="pic-more">
                     <IconBtn name="more" label="写真メニュー" disabled={busyOpen} size={22} className="more"
                       onClick={() => setSheetMenu(sheetMenu === src ? null : src)} />
@@ -613,16 +666,18 @@ export default function ShopAdminView({ shop, name }: Props) {
                   }} />
               </label>
             </div>
-            <label className="float">
-              <span>名前</span>
-              <input value={editName} disabled={busyOpen}
-                onChange={(e) => patchEdit("name", e.target.value)} />
-            </label>
-            <label className="float price">
-              <span>価格</span>
-              <input type="number" min={0} inputMode="numeric" value={editPrice} disabled={busyOpen}
-                onChange={(e) => patchEdit("price", e.target.value)} />
-            </label>
+            <div className="name-price">
+              <label className="float">
+                <span>名前</span>
+                <input value={editName} disabled={busyOpen}
+                  onChange={(e) => patchEdit("name", e.target.value)} />
+              </label>
+              <label className="float price">
+                <span>価格</span>
+                <input type="number" min={0} inputMode="numeric" value={editPrice} disabled={busyOpen}
+                  onChange={(e) => patchEdit("price", e.target.value)} />
+              </label>
+            </div>
             <label className="float">
               <span>メモ</span>
               <textarea value={editNote} disabled={busyOpen} rows={6}

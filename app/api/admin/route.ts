@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { applyDates, getStore, normalizeSlots, setLateOnly, shopDays, shopFromUrl, shopMoveOut, shopSlots, uid, withStore } from "@/lib/store";
+import { applyDates, getStore, normalizeSlots, setLateOnly, shopDays, shopFromUrl, shopMoveOut, shopPublished, shopSlots, uid, withStore } from "@/lib/store";
 import { lateFrom } from "@/lib/days";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +15,8 @@ export async function GET(req: Request) {
   return NextResponse.json({
     address: s.address, bio: s.bio || "", jimotyUrl: s.jimotyUrl || "",
     pickupFrom: days[0], pickupTo: days[days.length - 1], moveOut: shopMoveOut(s),
-    slots: shopSlots(s), items: s.items, claims: s.claims, shop,
+    slots: shopSlots(s), published: shopPublished(shop, s),
+    items: s.items, claims: s.claims, shop,
   });
 }
 
@@ -61,6 +62,9 @@ export async function POST(req: Request) {
           s.slots = normalizeSlots(body.slots);
           return { slots: s.slots };
         }
+        case "publish":
+          s.published = true;
+          return { published: true };
         case "cancel":
         case "release": {
           const keep = body.action === "release" ? String(body.keepId || "") : "";

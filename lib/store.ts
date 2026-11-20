@@ -20,8 +20,13 @@ export type Store = {
   slots?: string[];
   /** Pickup range + final move-out (YYYY-MM-DD); omit → PICKUP_DAYS defaults. */
   pickupFrom?: string; pickupTo?: string; moveOut?: string;
+  /** Once true, admin CTA stays URLコピー (not 公開する). Elton defaults published. */
+  published?: boolean;
   items: Item[]; claims: Claim[];
 };
+
+export const shopPublished = (shop: string, s: Store) =>
+  !!s.published || shop === ELTON_SHOP;
 
 export { LATE_FROM, PICKUP_DAYS, PICKUP_SLOTS, isLateOnly };
 
@@ -53,12 +58,12 @@ export function normalizeSlots(raw: unknown): string[] {
 export function applyDates(s: Store, raw: { pickupFrom?: unknown; pickupTo?: unknown; moveOut?: unknown }) {
   const from = asYmd(raw.pickupFrom) || s.pickupFrom || PICKUP_DAYS[0];
   const to = asYmd(raw.pickupTo) || s.pickupTo || PICKUP_DAYS[PICKUP_DAYS.length - 1];
-  if (to < from) throw new Error("受取終了は開始以降にしてください");
+  if (to < from) throw new Error("退去日は開始以降にしてください");
   if (!daysBetween(from, to).length) throw new Error("受取日が不正です");
   s.pickupFrom = from;
   s.pickupTo = to;
-  const mo = asYmd(raw.moveOut);
-  s.moveOut = mo || to;
+  // End/departure are one field in admin; keep Blob moveOut in sync with pickupTo.
+  s.moveOut = asYmd(raw.moveOut) || to;
   return { pickupFrom: s.pickupFrom, pickupTo: s.pickupTo, moveOut: s.moveOut };
 }
 
