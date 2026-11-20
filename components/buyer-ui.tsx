@@ -63,6 +63,18 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     setDay((d) => d && data.days?.includes(d) ? d : (data.days?.[0] || ""));
   }, [shop]);
   useEffect(() => { void load(); setWaited(loadWl(shop)); const n = getName(); if (n) setLineName(n); }, [load, shop]);
+  useEffect(() => {
+    if (!open && !checkout && !shareOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      if (checkout) setCheckout(false);
+      else if (shareOpen) setShareOpen(false);
+      else setOpen(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, checkout, shareOpen]);
 
   const freeSlots = useMemo(() => {
     const taken = new Set(state?.taken?.[day] || []);
