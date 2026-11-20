@@ -286,7 +286,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             {openAvail ? <p className="sm">{openAvail}</p> : null}
             {takenOpen ? (
               <>
-                <p className="sw sold">確定済み — 他の方が引き取り予定</p>
+                <p className="sw sold">予約済 — 他の方が引き取り予定</p>
                 {needWlName && (
                   <label className="float"><span>LINE名</span>
                     <input value={lineName} onChange={(e) => setLineName(e.target.value)}
