@@ -13,31 +13,6 @@ type Props = {
   onAuth?: () => void;
 };
 
-type N = 1 | 2 | 3;
-const NAV_KEY = "sayonara-nav-exp";
-
-function readParam(fallback: N): N {
-  try {
-    const q = new URLSearchParams(location.search).get("nav");
-    if (q === "1" || q === "2" || q === "3") {
-      localStorage.setItem(NAV_KEY, q);
-      return +q as N;
-    }
-    const ls = localStorage.getItem(NAV_KEY);
-    if (ls === "1" || ls === "2" || ls === "3") return +ls as N;
-  } catch { /* SSR / private */ }
-  return fallback;
-}
-
-function writeParam(n: N) {
-  try {
-    localStorage.setItem(NAV_KEY, String(n));
-    const u = new URL(location.href);
-    u.searchParams.set("nav", String(n));
-    history.replaceState(null, "", u);
-  } catch { /* ignore */ }
-}
-
 /** State-aware app chrome: logo+サヨナラ | 出品/マイ出品 | login/LINE名 (+ profile popover). */
 export default function AppNav({ top, onAuth }: Props) {
   const router = useRouter();
@@ -48,7 +23,6 @@ export default function AppNav({ top, onAuth }: Props) {
   const [draft, setDraft] = useState("");
   const [bio, setBio] = useState("");
   const [jimoty, setJimoty] = useState("");
-  const [exp, setExp] = useState<N>(2);
   const [path, setPath] = useState("");
 
   function sync() {
@@ -61,7 +35,6 @@ export default function AppNav({ top, onAuth }: Props) {
   }
   useEffect(() => {
     sync();
-    setExp(readParam(2));
     setPath(location.pathname);
     window.addEventListener(AUTH_EVT, sync);
     return () => window.removeEventListener(AUTH_EVT, sync);
@@ -92,7 +65,7 @@ export default function AppNav({ top, onAuth }: Props) {
 
   return (
     <>
-      <nav className={`app-nav${top ? " top" : " bot"} nav-exp-${exp}`} aria-label="アプリ">
+      <nav className={`app-nav${top ? " top" : " bot"}`} aria-label="アプリ">
         {/* Brand is identity, not a tab — never show active orange dot on home. */}
         <Link href="/" className="brand" prefetch aria-label="サヨナラ ホーム">
           <img className="logo" src="/sun-logo.png" alt="" width={52} height={27} decoding="async" />
@@ -113,13 +86,6 @@ export default function AppNav({ top, onAuth }: Props) {
           <button type="button" className="nav-a" onClick={() => { setDraft(getName()); setLoginOpen(true); }}>ログイン</button>
         )}
       </nav>
-
-      <div className="nav-exp-sw" role="group" aria-label="ナビ実験">
-        {([1, 2, 3] as N[]).map((n) => (
-          <button key={n} type="button" className={exp === n ? "on" : undefined}
-            aria-pressed={exp === n} onClick={() => { setExp(n); writeParam(n); }}>{n}</button>
-        ))}
-      </div>
 
       {loginOpen && (
         <div className="mask" role="dialog" aria-modal="true" aria-label="ログイン"
