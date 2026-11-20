@@ -22,11 +22,11 @@ export const telHref = (phone: string) => {
   return `tel:${d}`;
 };
 
-/** Listing grid price order — default cheapest first; 0/unset always last. */
+/** Listing grid price order — default cheapest first; unset/null last (¥0 is real). */
 export type PriceDir = "asc" | "desc";
-const priced = (p: number | null | undefined) => p != null && p > 0;
+const priced = (p: number | null | undefined) => p != null;
 
-/** Asc/desc by price; 0/null last; stable secondary by id. */
+/** Asc/desc by price; null/unset last; explicit 0 sorts with cheapest; stable by id. */
 export function byPrice(dir: PriceDir) {
   return <T extends { id: string; price: number | null }>(a: T, b: T) => {
     const pa = priced(a.price);
