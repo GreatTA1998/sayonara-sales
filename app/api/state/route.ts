@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { byPrice } from "@/lib/sale";
-import { getStore, isLateOnly, shopDays, shopFromUrl, shopMoveOut, shopSlots, takenSlots } from "@/lib/store";
+import { getStore, isLateOnly, shopContact, shopDays, shopFromUrl, shopMoveOut, shopSlots, takenSlots } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +9,7 @@ export async function GET(req: Request) {
   const s = await getStore(shop);
   const days = shopDays(s);
   const slots = shopSlots(s);
+  const contact = shopContact(shop, s);
   const taken: Record<string, string[]> = {};
   for (const d of days) taken[d] = takenSlots(s, d);
   return NextResponse.json({
@@ -21,7 +22,8 @@ export async function GET(req: Request) {
     moveOut: shopMoveOut(s),
     slots,
     taken,
-    lineInviteUrl: "https://line.me/ti/p/yBg2x2X_ut",
+    lineInviteUrl: contact.lineInviteUrl || null,
+    phone: contact.phone || null,
     // Client may re-sort via toggle; default = cheapest first, 0/unset last.
     items: [...s.items]
       .sort(byPrice("asc"))

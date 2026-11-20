@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { applyDates, getStore, normalizeSlots, setLateOnly, shopDays, shopFromUrl, shopMoveOut, shopPublished, shopSlots, uid, withStore } from "@/lib/store";
+import { applyDates, getStore, hasBuyerContact, normalizeSlots, setLateOnly, shopContact, shopDays, shopFromUrl, shopMoveOut, shopPublished, shopSlots, uid, withStore } from "@/lib/store";
 import { lateFrom } from "@/lib/days";
 
 export const dynamic = "force-dynamic";
@@ -12,8 +12,10 @@ export async function GET(req: Request) {
   const shop = shopFromUrl(req);
   const s = await getStore(shop);
   const days = shopDays(s);
+  const contact = shopContact(shop, s);
   return NextResponse.json({
     address: s.address, bio: s.bio || "", jimotyUrl: s.jimotyUrl || "", youtubeUrl: s.youtubeUrl || "",
+    lineInviteUrl: contact.lineInviteUrl, phone: contact.phone,
     pickupFrom: days[0], pickupTo: days[days.length - 1], moveOut: shopMoveOut(s),
     slots: shopSlots(s), published: shopPublished(shop, s),
     items: s.items, claims: s.claims, shop,
@@ -56,7 +58,12 @@ export async function POST(req: Request) {
           if ("bio" in body) s.bio = String(body.bio || "").trim();
           if ("jimotyUrl" in body) s.jimotyUrl = String(body.jimotyUrl || "").trim();
           if ("youtubeUrl" in body) s.youtubeUrl = String(body.youtubeUrl || "").trim();
-          return { bio: s.bio || "", jimotyUrl: s.jimotyUrl || "", youtubeUrl: s.youtubeUrl || "" };
+          if ("lineInviteUrl" in body) s.lineInviteUrl = String(body.lineInviteUrl || "").trim();
+          if ("phone" in body) s.phone = String(body.phone || "").trim();
+          return {
+            bio: s.bio || "", jimotyUrl: s.jimotyUrl || "", youtubeUrl: s.youtubeUrl || "",
+            lineInviteUrl: s.lineInviteUrl || "", phone: s.phone || "",
+          };
         case "dates":
           return applyDates(s, body);
         case "slots": {
@@ -64,6 +71,9 @@ export async function POST(req: Request) {
           return { slots: s.slots };
         }
         case "publish":
+          if (!hasBuyerContact(shop, s)) {
+            throw new Error("LINE招待リンクか電話番号のどちらかを入力してください");
+          }
           s.published = true;
           return { published: true };
         case "cancel":
