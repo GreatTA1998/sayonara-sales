@@ -47,6 +47,15 @@ function fakeStream(): MediaStream {
   return stream;
 }
 
+async function encodeSquare(canvas: HTMLCanvasElement, stem: string): Promise<File> {
+  const blob = await new Promise<Blob | null>((res) => {
+    canvas.toBlob(res, "image/webp", Q);
+  }).then(async (b) => b && b.size > 0 ? b : new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", Q)));
+  if (!blob) throw new Error("キャプチャ失敗");
+  const ext = blob.type === "image/webp" ? "webp" : "jpg";
+  return new File([blob], `${stem}-${Date.now()}.${ext}`, { type: blob.type, lastModified: Date.now() });
+}
+
 async function squareFromVideo(video: HTMLVideoElement): Promise<File> {
   const vw = video.videoWidth, vh = video.videoHeight;
   if (!vw || !vh) throw new Error("カメラ準備中");
@@ -59,15 +68,30 @@ async function squareFromVideo(video: HTMLVideoElement): Promise<File> {
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("キャプチャ失敗");
   ctx.drawImage(video, sx, sy, side, side, 0, 0, out, out);
-  const blob = await new Promise<Blob | null>((res) => {
-    canvas.toBlob(res, "image/webp", Q);
-  }).then(async (b) => b && b.size > 0 ? b : new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", Q)));
-  if (!blob) throw new Error("キャプチャ失敗");
-  const ext = blob.type === "image/webp" ? "webp" : "jpg";
-  return new File([blob], `cam-${Date.now()}.${ext}`, { type: blob.type, lastModified: Date.now() });
+  return encodeSquare(canvas, "cam");
 }
 
-/** Mercari-like 1:1 camera: live preview, square shutter crop, multi-shot strip, album fallback. */
+/** Center-crop any album image to a real 1:1 file (same as shutter). */
+async function squareFromFile(file: File): Promise<File> {
+  const bmp = await createImageBitmap(file);
+  try {
+    const side = Math.min(bmp.width, bmp.height);
+    if (!side) throw new Error("画像を読めません");
+    const sx = (bmp.width - side) / 2, sy = (bmp.height - side) / 2;
+    const out = Math.min(side, MAX);
+    const canvas = document.createElement("canvas");
+    canvas.width = out;
+    canvas.height = out;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("キャプチャ失敗");
+    ctx.drawImage(bmp, sx, sy, side, side, 0, 0, out, out);
+    return encodeSquare(canvas, "alb");
+  } finally {
+    bmp.close();
+  }
+}
+
+/** Mercari-like 1:1 camera: live preview, real square files (shutter + album), rounded viewfinder affordance. */
 export default function SquareCam({ open, onClose, onShot, accept }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -189,13 +213,23 @@ export default function SquareCam({ open, onClose, onShot, accept }: Props) {
     onClose();
   }
 
-  function onAlbum(files: File[]) {
-    for (const file of files) {
-      const url = URL.createObjectURL(file);
-      setShots((s) => [...s, { url, file }]);
-      onShot(file);
+  async function onAlbum(files: File[]) {
+    setBusy(true);
+    try {
+      for (const raw of files) {
+        try {
+          const file = await squareFromFile(raw);
+          const url = URL.createObjectURL(file);
+          setShots((s) => [...s, { url, file }]);
+          onShot(file);
+        } catch (e) {
+          setErr(e instanceof Error ? e.message : "アルバム写真の処理に失敗しました");
+        }
+      }
+    } finally {
+      setBusy(false);
+      setTab("cam");
     }
-    setTab("cam");
   }
 
   if (!open) return null;
@@ -248,7 +282,7 @@ export default function SquareCam({ open, onClose, onShot, accept }: Props) {
         onChange={(e) => {
           const files = Array.from(e.target.files || []);
           e.target.value = "";
-          if (files.length) onAlbum(files);
+          if (files.length) void onAlbum(files);
         }} />
     </div>
   );
