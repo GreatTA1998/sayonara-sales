@@ -39,9 +39,8 @@ export default function HomePage() {
     <>
       <AppNav top onAuth={() => void refresh()} />
       <main className="home">
-        <h1 className="slogan">まとめて買って、売って。</h1>
-        <p className="subhero">ジモティの補完に。引っ越しリンクを共有し、まとめて選んで枠で引き取る。確定してからLINE。</p>
-
+        <h1 className="slogan">お引越しセール</h1>
+        <p className="subhero">まとめて買って、売って。ジモティの補完に。引っ越しリンクを共有し、まとめて選んで枠で引き取る。確定してからLINE。</p>
         <div className="home-browse">
           <div className="shop-tabs" role="tablist" aria-label="ショップ一覧">
             {cards.map((c) => (
