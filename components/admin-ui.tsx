@@ -722,14 +722,11 @@ export default function ShopAdminView({ shop, name }: Props) {
                 return true;
               });
             }}>リスト入力</button>
-          <div className="add-photo">
-            <button type="button" className="cta"
-              disabled={!data}
-              onClick={() => { setCamItemId(null); setCamOpen(true); }}>
-              <Icon name="camera" size={18} />写真を追加
-            </button>
-            <p className="hint add-tip">1枚＝1出品。名前はあとで。</p>
-          </div>
+          <button type="button" className="cta"
+            disabled={!data}
+            onClick={() => { setCamItemId(null); setCamOpen(true); }}>
+            <Icon name="camera" size={18} />写真入力
+          </button>
         </div>
         {listOpen && (
           <div className="list-row">
@@ -744,6 +741,8 @@ export default function ShopAdminView({ shop, name }: Props) {
         )}
       </div>
       <SquareCam open={camOpen} accept={IMG_ACCEPT}
+        tip={camItemId ? undefined : "1枚＝1出品。名前はあとで。"}
+        sharp={!!camItemId}
         onClose={() => { setCamOpen(false); setCamItemId(null); }}
         onShot={(file) => {
           if (camItemId) queueAppend(camItemId, [file]);
