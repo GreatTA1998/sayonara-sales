@@ -13,7 +13,7 @@ type Item = {
   photos?: string[]; availableFrom?: string; availableTo?: string; lateOnly?: boolean;
 };
 type State = {
-  address: string; bio?: string; jimotyUrl?: string;
+  address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
   days: string[]; slots: string[]; taken: Record<string, string[]>;
   lineInviteUrl?: string | null; phone?: string | null; items: Item[];
 };
@@ -232,8 +232,21 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         </button>
       </header>
       {state?.bio ? <p className="hint bio">{state.bio}</p> : null}
-      {state?.jimotyUrl ? (
-        <p className="hint bio"><a className="linelink" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">ジモティー</a></p>
+      {(state?.jimotyUrl || state?.youtubeUrl) ? (
+        <p className="ext-links">
+          {state.jimotyUrl ? (
+            <a className="ext-link" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">
+              <img src="/jimoty.svg" alt="" width={16} height={16} />
+              Jimoty profile
+            </a>
+          ) : null}
+          {state.youtubeUrl ? (
+            <a className="ext-link" href={state.youtubeUrl} target="_blank" rel="noopener noreferrer">
+              <img src="/youtube.svg" alt="" width={16} height={16} />
+              YouTube
+            </a>
+          ) : null}
+        </p>
       ) : null}
       {err && !checkout && !open && <div className="err">{err}</div>}
       {gridItems.length > 0 && (

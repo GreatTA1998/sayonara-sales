@@ -23,6 +23,7 @@ export default function AppNav({ top, onAuth }: Props) {
   const [draft, setDraft] = useState("");
   const [bio, setBio] = useState("");
   const [jimoty, setJimoty] = useState("");
+  const [youtube, setYoutube] = useState("");
   const [path, setPath] = useState("");
 
   function sync() {
@@ -32,6 +33,7 @@ export default function AppNav({ top, onAuth }: Props) {
     const p = getProfile();
     setBio(p.bio);
     setJimoty(p.jimotyUrl);
+    setYoutube(p.youtubeUrl);
   }
   useEffect(() => {
     sync();
@@ -54,7 +56,7 @@ export default function AppNav({ top, onAuth }: Props) {
 
   function saveProf(e: { preventDefault(): void }) {
     e.preventDefault();
-    saveProfile({ bio, jimotyUrl: jimoty });
+    saveProfile({ bio, jimotyUrl: jimoty, youtubeUrl: youtube });
     setProfOpen(false);
   }
 
@@ -114,9 +116,12 @@ export default function AppNav({ top, onAuth }: Props) {
             <label className="float"><span>ショップメモ</span>
               <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3}
                 placeholder="動作確認・値引き・引越し・車・まとめ買い優先など" /></label>
-            <label className="float"><span>ジモティーURL（任意）</span>
+            <label className="float"><span>Jimoty profile（任意）</span>
               <input value={jimoty} onChange={(e) => setJimoty(e.target.value)}
                 placeholder="https://jmty.jp/…" inputMode="url" autoComplete="url" /></label>
+            <label className="float"><span>YouTube（アパート・任意）</span>
+              <input value={youtube} onChange={(e) => setYoutube(e.target.value)}
+                placeholder="https://youtu.be/…" inputMode="url" autoComplete="url" /></label>
             <button type="submit" className="cta go">保存</button>
             <p className="hint" style={{ marginTop: 10 }}>より安全に使う場合はLINE連携</p>
             <LineLoginLink />

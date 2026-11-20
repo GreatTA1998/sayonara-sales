@@ -18,7 +18,7 @@ type Claim = {
   itemIds: string[]; status: string;
 };
 type AdminState = {
-  address: string; bio?: string; jimotyUrl?: string;
+  address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
   lineInviteUrl?: string; phone?: string; slots?: string[];
   pickupFrom?: string; pickupTo?: string; moveOut?: string; published?: boolean;
   items: Item[]; claims: Claim[];
@@ -76,6 +76,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const bioRef = useRef<HTMLTextAreaElement>(null);
   const [bio, setBio] = useState("");
   const [jimoty, setJimoty] = useState("");
+  const [youtube, setYoutube] = useState("");
   const [lineInvite, setLineInvite] = useState("");
   const [phone, setPhone] = useState("");
   const [slots, setSlots] = useState<string[]>([...PICKUP_SLOTS]);
@@ -121,6 +122,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     const local = getProfile();
     setBio(body.bio || local.bio || "");
     setJimoty(body.jimotyUrl || local.jimotyUrl || "");
+    setYoutube(body.youtubeUrl || local.youtubeUrl || "");
     setLineInvite(body.lineInviteUrl || "");
     setPhone(body.phone || "");
     setSlots(body.slots?.length ? body.slots : [...PICKUP_SLOTS]);
@@ -253,11 +255,12 @@ export default function ShopAdminView({ shop, name }: Props) {
   }
 
   async function persistProfile(
-    nextBio: string, nextJimoty: string, nextLine = lineInvite, nextPhone = phone,
+    nextBio: string, nextJimoty: string, nextYt = youtube,
+    nextLine = lineInvite, nextPhone = phone,
   ) {
-    saveProfile({ bio: nextBio, jimotyUrl: nextJimoty });
+    saveProfile({ bio: nextBio, jimotyUrl: nextJimoty, youtubeUrl: nextYt });
     await act({
-      action: "profile", bio: nextBio, jimotyUrl: nextJimoty,
+      action: "profile", bio: nextBio, jimotyUrl: nextJimoty, youtubeUrl: nextYt,
       lineInviteUrl: nextLine, phone: nextPhone,
     });
   }
@@ -688,18 +691,22 @@ export default function ShopAdminView({ shop, name }: Props) {
             onInput={fitBio}
             onBlur={() => void persistProfile(bio, jimoty)}
             placeholder="動作確認・値引き・引越し・車・まとめ買い優先など" /></label>
-        <label className="float"><span>ジモティーURL（任意）</span>
+        <label className="float"><span>Jimoty profile（任意）</span>
           <input value={jimoty} onChange={(e) => setJimoty(e.target.value)}
             onBlur={() => void persistProfile(bio, jimoty)}
             placeholder="https://jmty.jp/…" inputMode="url" /></label>
+        <label className="float"><span>YouTube（アパート・任意）</span>
+          <input value={youtube} onChange={(e) => setYoutube(e.target.value)}
+            onBlur={() => void persistProfile(bio, jimoty, youtube)}
+            placeholder="https://youtu.be/…" inputMode="url" /></label>
         <p className="hint">買い手連絡 — LINEか電話のどちらか必須</p>
         <label className="float"><span>LINE招待リンク</span>
           <input value={lineInvite} onChange={(e) => setLineInvite(e.target.value)}
-            onBlur={() => void persistProfile(bio, jimoty, lineInvite, phone)}
+            onBlur={() => void persistProfile(bio, jimoty, youtube, lineInvite, phone)}
             placeholder="https://line.me/ti/p/…" inputMode="url" autoComplete="off" /></label>
         <label className="float"><span>電話番号</span>
           <input value={phone} onChange={(e) => setPhone(e.target.value)}
-            onBlur={() => void persistProfile(bio, jimoty, lineInvite, phone)}
+            onBlur={() => void persistProfile(bio, jimoty, youtube, lineInvite, phone)}
             placeholder="080-0000-0000" inputMode="tel" autoComplete="tel" /></label>
         <div className="slot-add">
           <label className="float"><span>受取開始</span>

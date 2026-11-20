@@ -14,7 +14,7 @@ export async function GET(req: Request) {
   const days = shopDays(s);
   const contact = shopContact(shop, s);
   return NextResponse.json({
-    address: s.address, bio: s.bio || "", jimotyUrl: s.jimotyUrl || "",
+    address: s.address, bio: s.bio || "", jimotyUrl: s.jimotyUrl || "", youtubeUrl: s.youtubeUrl || "",
     lineInviteUrl: contact.lineInviteUrl, phone: contact.phone,
     pickupFrom: days[0], pickupTo: days[days.length - 1], moveOut: shopMoveOut(s),
     slots: shopSlots(s), published: shopPublished(shop, s),
@@ -57,10 +57,11 @@ export async function POST(req: Request) {
         case "profile":
           if ("bio" in body) s.bio = String(body.bio || "").trim();
           if ("jimotyUrl" in body) s.jimotyUrl = String(body.jimotyUrl || "").trim();
+          if ("youtubeUrl" in body) s.youtubeUrl = String(body.youtubeUrl || "").trim();
           if ("lineInviteUrl" in body) s.lineInviteUrl = String(body.lineInviteUrl || "").trim();
           if ("phone" in body) s.phone = String(body.phone || "").trim();
           return {
-            bio: s.bio || "", jimotyUrl: s.jimotyUrl || "",
+            bio: s.bio || "", jimotyUrl: s.jimotyUrl || "", youtubeUrl: s.youtubeUrl || "",
             lineInviteUrl: s.lineInviteUrl || "", phone: s.phone || "",
           };
         case "dates":

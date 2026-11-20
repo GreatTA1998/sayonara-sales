@@ -16,7 +16,7 @@ export type Claim = {
   status: "booked" | "picked_up" | "cancelled"; createdAt: string;
 };
 export type Store = {
-  address: string; bio?: string; jimotyUrl?: string;
+  address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
   /** Buyer contact: LINE invite URL and/or phone — at least one required to publish. */
   lineInviteUrl?: string; phone?: string;
   /** Custom pickup windows; omit → PICKUP_SLOTS defaults. */
