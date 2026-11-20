@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getStore, setLateOnly, shopFromUrl, uid, withStore } from "@/lib/store";
+import { getStore, normalizeSlots, setLateOnly, shopFromUrl, shopSlots, uid, withStore } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 const numPrice = (v: unknown) => {
@@ -12,7 +12,7 @@ export async function GET(req: Request) {
   const s = await getStore(shop);
   return NextResponse.json({
     address: s.address, bio: s.bio || "", jimotyUrl: s.jimotyUrl || "",
-    items: s.items, claims: s.claims, shop,
+    slots: shopSlots(s), items: s.items, claims: s.claims, shop,
   });
 }
 
@@ -52,6 +52,10 @@ export async function POST(req: Request) {
           if ("bio" in body) s.bio = String(body.bio || "").trim();
           if ("jimotyUrl" in body) s.jimotyUrl = String(body.jimotyUrl || "").trim();
           return { bio: s.bio || "", jimotyUrl: s.jimotyUrl || "" };
+        case "slots": {
+          s.slots = normalizeSlots(body.slots);
+          return { slots: s.slots };
+        }
         case "cancel":
         case "release": {
           const keep = body.action === "release" ? String(body.keepId || "") : "";

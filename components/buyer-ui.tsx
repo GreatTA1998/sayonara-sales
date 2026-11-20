@@ -250,14 +250,11 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
                 {(state?.days || []).map((d) => <option key={d} value={d}>{dayLbl(d)}</option>)}
               </select>
               <div className="slots trio" role="group" aria-label="時間帯">
-                {(state?.slots || []).map((s) => {
-                  const free = freeSlots.includes(s);
-                  return (
-                    <button key={s} type="button" disabled={!free}
-                      className={slot === s ? "slot on" : "slot"}
-                      onClick={() => free && setSlot(s)}>{s}</button>
-                  );
-                })}
+                {freeSlots.map((s) => (
+                  <button key={s} type="button"
+                    className={slot === s ? "slot on" : "slot"}
+                    onClick={() => setSlot(s)}>{s}</button>
+                ))}
               </div>
             </div>
             {blocked.length > 0 && (

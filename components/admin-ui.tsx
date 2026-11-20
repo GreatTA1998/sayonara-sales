@@ -5,6 +5,7 @@ import { Icon, IconBtn } from "@/components/icons";
 import { Listings, type PhotoItem } from "@/components/photo-listing";
 import { Snack, useSnack } from "@/components/snack";
 import { dayLbl, isLateOnly } from "@/lib/days";
+import { PICKUP_SLOTS } from "@/lib/sale";
 import { AUTH_EVT, adminPath, getName, getProfile, openShop, saveProfile } from "@/lib/shop";
 
 type Item = PhotoItem & { claimId?: string | null; note?: string; availableFrom?: string; availableTo?: string };
@@ -12,8 +13,9 @@ type Claim = {
   id: string; code: string; day: string; slot?: string; contact?: string; contactMethod?: string;
   itemIds: string[]; status: string;
 };
-type AdminState = { address: string; bio?: string; jimotyUrl?: string; items: Item[]; claims: Claim[] };
+type AdminState = { address: string; bio?: string; jimotyUrl?: string; slots?: string[]; items: Item[]; claims: Claim[] };
 type Props = { shop: string; name: string };
+const fmtSlot = (a: string, b: string) => `${a}–${b}`;
 
 const IMG_ACCEPT = "image/jpeg,image/png,image/heic,image/heif,image/webp,image/gif,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif";
 const api = (shop: string, path: string) => `${path}?shop=${encodeURIComponent(shop)}`;
@@ -40,6 +42,9 @@ export default function ShopAdminView({ shop, name }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [bio, setBio] = useState("");
   const [jimoty, setJimoty] = useState("");
+  const [slots, setSlots] = useState<string[]>([...PICKUP_SLOTS]);
+  const [slotA, setSlotA] = useState("11:00");
+  const [slotB, setSlotB] = useState("11:15");
   const [pubOk, setPubOk] = useState(false);
   const { snack, show } = useSnack();
   const [addrDraft, setAddrDraft] = useState("");
@@ -64,6 +69,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     const local = getProfile();
     setBio(body.bio || local.bio || "");
     setJimoty(body.jimotyUrl || local.jimotyUrl || "");
+    setSlots(body.slots?.length ? body.slots : [...PICKUP_SLOTS]);
   }, [shop, show]);
 
   useEffect(() => { void load(); }, [load]);
@@ -288,6 +294,11 @@ export default function ShopAdminView({ shop, name }: Props) {
     }
   }
 
+  async function saveSlots(next: string[]) {
+    const body = await act({ action: "slots", slots: next }, "保存しました");
+    if (body?.slots) setSlots(body.slots as string[]);
+  }
+
   const busyOpen = open ? deleting === open.id : false;
   const pics = open?.photos || [];
   const empty = !!data && !items.length;
@@ -356,6 +367,31 @@ export default function ShopAdminView({ shop, name }: Props) {
           <input value={jimoty} onChange={(e) => setJimoty(e.target.value)}
             onBlur={() => void persistProfile(bio, jimoty)}
             placeholder="https://jmty.jp/…" inputMode="url" /></label>
+        <div className="claims-h" style={{ marginTop: 8 }}>受取時間</div>
+        <p className="hint">依頼中・確定済みの枠は購入者に出ません。</p>
+        <div className="slot-edit" role="list">
+          {slots.map((s) => (
+            <button key={s} type="button" className="slot" role="listitem"
+              aria-label={`${s}を削除`}
+              onClick={() => {
+                if (slots.length <= 1) { show("時間帯は1つ以上必要です", "err"); return; }
+                void saveSlots(slots.filter((x) => x !== s));
+              }}>{s} ×</button>
+          ))}
+        </div>
+        <div className="slot-add">
+          <input type="time" aria-label="開始" value={slotA} onChange={(e) => setSlotA(e.target.value)} />
+          <span aria-hidden="true">〜</span>
+          <input type="time" aria-label="終了" value={slotB} onChange={(e) => setSlotB(e.target.value)} />
+          <button type="button" className="slot" disabled={!slotA || !slotB || slotB <= slotA}
+            onClick={() => {
+              const label = fmtSlot(slotA, slotB);
+              if (slots.includes(label)) { show("すでにあります", "err"); return; }
+              void saveSlots([...slots, label].sort());
+            }}>追加</button>
+        </div>
+        <button type="button" className="text-sm text-muted" style={{ border: 0, background: "transparent", padding: 0, cursor: "pointer" }}
+          onClick={() => void saveSlots([...PICKUP_SLOTS])}>初期設定に戻す（10・14・20時）</button>
       </section>
 
       <button type="button" className="cta add-photos"

@@ -14,9 +14,26 @@ export type Claim = {
   contact?: string; contactMethod?: "line" | "phone";
   status: "booked" | "picked_up" | "cancelled"; createdAt: string;
 };
-export type Store = { address: string; bio?: string; jimotyUrl?: string; items: Item[]; claims: Claim[] };
+export type Store = {
+  address: string; bio?: string; jimotyUrl?: string;
+  /** Custom pickup windows; omit → PICKUP_SLOTS defaults. */
+  slots?: string[]; items: Item[]; claims: Claim[];
+};
 
 export { LATE_FROM, PICKUP_DAYS, PICKUP_SLOTS, isLateOnly };
+
+/** Shop's offerable slots (custom or defaults). */
+export const shopSlots = (s: Store) => (s.slots?.length ? s.slots : [...PICKUP_SLOTS]);
+
+/** Normalize admin slot labels (en dash, trim, dedupe). */
+export function normalizeSlots(raw: unknown): string[] {
+  if (!Array.isArray(raw)) throw new Error("時間帯が不正です");
+  const out = [...new Set(
+    raw.map((x) => String(x).trim().replace(/\s*[-–—]\s*/g, "–")).filter(Boolean),
+  )];
+  if (!out.length) throw new Error("時間帯を1つ以上指定してください");
+  return out;
+}
 
 export const setLateOnly = (it: Item, on: boolean) => {
   if (on) { it.availableFrom = LATE_FROM; delete it.availableTo; }
@@ -118,8 +135,11 @@ export async function getStore(shop: string = ELTON_SHOP): Promise<Store> {
   return structuredClone(mem.get(key)!);
 }
 
+/** Occupied by pending request or confirmed/done booking (not cancelled). */
 export function takenSlots(s: Store, day: string): string[] {
-  return s.claims.filter((c) => c.day === day && c.status === "booked" && c.slot).map((c) => c.slot);
+  return s.claims
+    .filter((c) => c.day === day && c.status !== "cancelled" && c.slot)
+    .map((c) => c.slot);
 }
 
 export const uid = (p: string) => `${p}${Math.random().toString(36).slice(2, 8)}`;
