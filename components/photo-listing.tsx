@@ -1,7 +1,43 @@
 "use client";
+import { useEffect, useState } from "react";
 import "./photo-layout.css";
 
 export type PhotoItem = { id: string; name: string; price: number | null; note?: string; photos?: string[] };
+
+/** Temporary design scaffold — remove after Elton picks size. */
+const CARD_KEY = "ss-card-exp";
+type CardExp = { cols: number; gap: number };
+const DEF_CARD: CardExp = { cols: 3, gap: 8 };
+
+function readCardExp(): CardExp {
+  try {
+    const p = JSON.parse(localStorage.getItem(CARD_KEY) || "{}") as Partial<CardExp>;
+    const cols = Math.min(4, Math.max(2, Number(p.cols) || DEF_CARD.cols));
+    const gap = Math.min(16, Math.max(2, Number(p.gap) || DEF_CARD.gap));
+    return { cols, gap };
+  } catch { return DEF_CARD; }
+}
+
+function CardSizeScaffold({ cols, gap, onChange }: {
+  cols: number; gap: number; onChange: (next: CardExp) => void;
+}) {
+  return (
+    <div className="card-exp-sw" role="group" aria-label="写真カードサイズ実験">
+      <label className="card-exp-row">
+        <span>列</span>
+        <input type="range" min={2} max={4} step={1} value={cols}
+          aria-label="列数" onChange={(e) => onChange({ cols: +e.target.value, gap })} />
+        <em>{cols}</em>
+      </label>
+      <label className="card-exp-row">
+        <span>隙</span>
+        <input type="range" min={2} max={16} step={1} value={gap}
+          aria-label="隙間" onChange={(e) => onChange({ cols, gap: +e.target.value })} />
+        <em>{gap}</em>
+      </label>
+    </div>
+  );
+}
 
 export const money = (p: number | null) => (p == null ? "無料" : `¥${p.toLocaleString()}`);
 
@@ -79,16 +115,25 @@ type ListProps<T extends PhotoItem> = {
 export function PhotoGrid<T extends PhotoItem>({
   items, onSelect, classNameFor, disabledFor,
 }: ListProps<T>) {
+  const [exp, setExp] = useState<CardExp>(DEF_CARD);
+  useEffect(() => { setExp(readCardExp()); }, []);
+  function setCardExp(next: CardExp) {
+    setExp(next);
+    try { localStorage.setItem(CARD_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+  }
   if (!items.length) return null;
   return (
-    <div className="xgrid">
-      {items.map((item) => (
-        <PhotoCard key={item.id} item={item}
-          onClick={onSelect ? () => onSelect(item) : undefined}
-          className={classNameFor?.(item)}
-          disabled={disabledFor?.(item)} />
-      ))}
-    </div>
+    <>
+      <CardSizeScaffold cols={exp.cols} gap={exp.gap} onChange={setCardExp} />
+      <div className="xgrid" style={{ ["--x-cols" as string]: exp.cols, ["--x-gap" as string]: `${exp.gap}px` }}>
+        {items.map((item) => (
+          <PhotoCard key={item.id} item={item}
+            onClick={onSelect ? () => onSelect(item) : undefined}
+            className={classNameFor?.(item)}
+            disabled={disabledFor?.(item)} />
+        ))}
+      </div>
+    </>
   );
 }
 
