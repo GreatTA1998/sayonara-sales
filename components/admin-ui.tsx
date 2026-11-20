@@ -31,6 +31,19 @@ const byPriceDesc = (a: Item, b: Item) => (b.price ?? -1) - (a.price ?? -1);
 const methodJa = (m?: string) => (m === "phone" ? "電話" : m === "line" ? "LINE" : m || "");
 const kuStem = (v: string) => v.replace(/区$/, "");
 const kuFull = (v: string) => { const s = kuStem(v).trim(); return s ? `${s}区` : ""; };
+const itemLabel = (it?: Item | null) => it?.name?.trim() || "無題";
+/** Claim line items by price desc (missing ids → 無題 stubs). */
+function claimItems(c: Claim, all: Item[]) {
+  return c.itemIds
+    .map((id) => all.find((i) => i.id === id) || { id, name: "無題", price: null as number | null })
+    .sort(byPriceDesc);
+}
+function claimSummary(c: Claim, all: Item[]) {
+  const list = claimItems(c, all);
+  const n = list.length;
+  const top = itemLabel(list[0]);
+  return n <= 1 ? `1点 · ${top}` : `${n}点 · ${top}…`;
+}
 
 export default function ShopAdminView({ shop, name }: Props) {
   const [data, setData] = useState<AdminState | null>(null);
@@ -43,6 +56,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [editNote, setEditNote] = useState("");
   const [editLate, setEditLate] = useState(false);
   const [sheetMenu, setSheetMenu] = useState<string | null>(null);
+  const [claimId, setClaimId] = useState<string | null>(null);
   const [logged, setLogged] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [lineDraft, setLineDraft] = useState("");
@@ -129,6 +143,18 @@ export default function ShopAdminView({ shop, name }: Props) {
   const open = useMemo(() => items.find((i) => i.id === openId) || null, [items, openId]);
   const pending = useMemo(() => (data?.claims || []).filter((c) => c.status === "booked"), [data?.claims]);
   const done = useMemo(() => (data?.claims || []).filter((c) => c.status === "picked_up"), [data?.claims]);
+  const claimOpen = useMemo(
+    () => pending.find((c) => c.id === claimId) || null,
+    [pending, claimId],
+  );
+  const claimList = useMemo(
+    () => (claimOpen && data ? claimItems(claimOpen, data.items) : []),
+    [claimOpen, data],
+  );
+  const claimContact = claimOpen
+    ? [methodJa(claimOpen.contactMethod), claimOpen.contact && claimOpen.contact !== "LINE" ? claimOpen.contact : ""]
+      .filter(Boolean).join(" · ")
+    : "";
 
   function apply(action: string, payload: Record<string, unknown>, body: Record<string, unknown>) {
     setData((d) => {
@@ -469,31 +495,17 @@ export default function ShopAdminView({ shop, name }: Props) {
         <section className="claims pending">
           <div className="claims-h">引き取り予定</div>
           <ol className="timeline">
-            {pending.map((c) => {
-              const names = c.itemIds
-                .map((id) => data?.items.find((i) => i.id === id)?.name?.trim() || "無題")
-                .join("、");
-              const contact = [
-                methodJa(c.contactMethod),
-                c.contact && c.contact !== "LINE" ? c.contact : "",
-              ].filter(Boolean).join(" · ");
-              return (
-                <li key={c.id} className="tl-item">
+            {pending.map((c) => (
+              <li key={c.id} className="tl-item">
+                <button type="button" className="tl-open" onClick={() => setClaimId(c.id)}>
                   <div className="tl-time">
                     <b>{dayLbl(c.day)}</b>
                     {c.slot ? <span>{c.slot}</span> : null}
                   </div>
-                  <div className="tl-body">
-                    <div className="text-base">{names}</div>
-                    {contact ? <div className="text-sm text-muted">{contact}</div> : null}
-                    <div className="claim-acts">
-                      <button type="button" onClick={() => act({ action: "cancel", id: c.id }, "保存しました")}>キャンセル</button>
-                      <button type="button" onClick={() => act({ action: "picked_up", id: c.id }, "受取済み")}>受取済み</button>
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
+                  <div className="tl-sum text-base">{claimSummary(c, data?.items || [])}</div>
+                </button>
+              </li>
+            ))}
           </ol>
         </section>
       )}
@@ -609,6 +621,35 @@ export default function ShopAdminView({ shop, name }: Props) {
             <a className="linelink" href="https://linelton.dev" target="_blank" rel="noopener noreferrer">linelton.dev</a>
           </p>
         </section>
+      )}
+
+      {claimOpen && (
+        <div className="mask" role="dialog" aria-modal="true" aria-label="予約詳細"
+          onClick={() => setClaimId(null)}>
+          <div className="sheet claim-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="tl-time">
+              <b>{dayLbl(claimOpen.day)}</b>
+              {claimOpen.slot ? <span>{claimOpen.slot}</span> : null}
+            </div>
+            {claimContact ? <div className="text-sm text-muted" style={{ marginBottom: 8 }}>{claimContact}</div> : null}
+            <ul className="claim-items">
+              {claimList.map((it) => (
+                <li key={it.id}>
+                  <span>{itemLabel(it)}</span>
+                  {it.price != null ? <span className="text-sm text-muted">¥{it.price.toLocaleString("ja-JP")}</span> : null}
+                </li>
+              ))}
+            </ul>
+            <div className="claim-acts">
+              <button type="button" onClick={() => {
+                void act({ action: "cancel", id: claimOpen.id }, "保存しました").then((ok) => { if (ok) setClaimId(null); });
+              }}>キャンセル</button>
+              <button type="button" onClick={() => {
+                void act({ action: "picked_up", id: claimOpen.id }, "受取済み").then((ok) => { if (ok) setClaimId(null); });
+              }}>受取済み</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {loginOpen && (
