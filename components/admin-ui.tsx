@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import AppNav from "@/components/app-nav";
 import { Icon, IconBtn } from "@/components/icons";
 import { LineLoginLink, useLineOAuthReturn } from "@/components/line-oauth";
-import { byPrice, Listings, ListingTools, Seg, usePriceDir, type PhotoItem } from "@/components/photo-listing";
+import { byPrice, Listings, ListingTools, Seg, useDense, usePriceDir, type PhotoItem } from "@/components/photo-listing";
 import SquareCam from "@/components/square-cam";
 import { Snack, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
@@ -52,7 +52,9 @@ function claimSummary(c: Claim, all: Item[]) {
   const top = itemLabel(list[0]);
   return n <= 1 ? `1点 · ${top}` : `${n}点 · ${top}…`;
 }
-const claimWhen = (c: Claim) => `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}`;
+const claimWhen = (c: Claim) =>
+  [c.contact && c.contact !== "LINE" ? c.contact : "", `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}`]
+    .filter(Boolean).join(" · ");
 
 export default function ShopAdminView({ shop, name }: Props) {
   const router = useRouter();
@@ -108,6 +110,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const editSavedRef = useRef<{ id: string; name: string; price: number; note: string } | null>(null);
   const editReq = useRef(0);
   const [priceDir, setPriceDir] = usePriceDir();
+  const [dense, setDense] = useDense();
 
   const load = useCallback(async () => {
     const res = await fetch(api(shop, "/api/admin"), { cache: "no-store" });
@@ -175,11 +178,6 @@ export default function ShopAdminView({ shop, name }: Props) {
     () => (claimOpen && data ? claimItems(claimOpen, data.items) : []),
     [claimOpen, data],
   );
-  const claimContact = claimOpen
-    ? [methodJa(claimOpen.contactMethod), claimOpen.contact && claimOpen.contact !== "LINE" ? claimOpen.contact : ""]
-      .filter(Boolean).join(" · ")
-    : "";
-
   function apply(action: string, payload: Record<string, unknown>, body: Record<string, unknown>) {
     setData((d) => {
       if (!d) return d;
@@ -782,8 +780,8 @@ export default function ShopAdminView({ shop, name }: Props) {
 
       {!empty && (
         <>
-          <ListingTools dir={priceDir} onDir={setPriceDir} />
-          <Listings items={items} onSelect={openDetail}
+          <ListingTools dir={priceDir} onDir={setPriceDir} dense={dense} onDense={setDense} />
+          <Listings items={items} dense={dense} onSelect={openDetail}
             disabledFor={(it) => deleting === it.id}
             classNameFor={(it) => (deleting === it.id || it.paused ? "dim" : "")} />
         </>
@@ -796,7 +794,7 @@ export default function ShopAdminView({ shop, name }: Props) {
           <ul>
             {done.map((c) => (
               <li key={c.id} className="claim">
-                <div className="text-sm text-muted">{dayLbl(c.day)}{c.slot ? ` · ${c.slot}` : ""} · 受取済</div>
+                <div className="text-sm text-muted">{claimWhen(c)} · 受取済</div>
               </li>
             ))}
           </ul>
@@ -812,7 +810,7 @@ export default function ShopAdminView({ shop, name }: Props) {
           onClick={() => setClaimId(null)}>
           <div className="sheet claim-sheet" onClick={(e) => e.stopPropagation()}>
             <b className="tl-when">{claimWhen(claimOpen)}</b>
-            {claimContact ? <div className="text-sm text-muted" style={{ marginBottom: 8 }}>{claimContact}</div> : null}
+            {claimOpen.contactMethod ? <div className="text-sm text-muted" style={{ marginBottom: 8 }}>{methodJa(claimOpen.contactMethod)}</div> : null}
             <ul className="claim-items">
               {claimList.map((it) => (
                 <li key={it.id}>
