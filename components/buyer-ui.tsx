@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AppNav from "@/components/app-nav";
 import { byPrice, Listings, money, PriceSortBtn, usePriceDir } from "@/components/photo-listing";
 import { dayLbl, pickupSpan, rangeLbl } from "@/lib/days";
@@ -55,6 +55,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [shared, setShared] = useState(false);
   const [waited, setWaited] = useState<Set<string>>(new Set());
   const [priceDir, togglePriceDir] = usePriceDir();
+  const maskPtr = useRef(false);
   const lineUrl = state?.lineInviteUrl || LINE_FALLBACK;
   const barDates = pickupSpan(state?.days || []);
   const shareUrl = `${SITE_URL}${shop === "elton" ? "/s/elton" : `/s/${shop}`}`;
@@ -86,7 +87,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
       e.preventDefault();
       if (checkout) setCheckout(false);
       else if (shareOpen) setShareOpen(false);
-      else setOpen(null);
+      else { maskPtr.current = false; setOpen(null); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -125,6 +126,21 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
       localStorage.setItem(wlKey(shop), JSON.stringify([...next]));
       return next;
     });
+    setOpen(null);
+  }
+
+  function swallowGhostClick() {
+    const stop = (ev: Event) => { ev.preventDefault(); ev.stopPropagation(); };
+    document.addEventListener("click", stop, true);
+    document.addEventListener("pointerup", stop, true);
+    window.setTimeout(() => {
+      document.removeEventListener("click", stop, true);
+      document.removeEventListener("pointerup", stop, true);
+    }, 400);
+  }
+
+  function closeDetail() {
+    maskPtr.current = false;
     setOpen(null);
   }
 
@@ -222,8 +238,27 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         classNameFor={(item) => `${picked.has(item.id) ? "on" : ""}${item.taken ? " sold" : ""}`.trim()} />
       {!state && <p className="text-sm text-muted pad">読み込み中…</p>}
       {open && !checkout && (
-        <div className="mask" role="dialog" aria-modal="true" aria-label={open.name} onClick={() => setOpen(null)}>
-          <div className="sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="mask drawer" role="dialog" aria-modal="true" aria-label={open.name}
+          onPointerDownCapture={(e) => {
+            if (e.target !== e.currentTarget) { maskPtr.current = false; return; }
+            e.stopPropagation();
+            maskPtr.current = true;
+          }}
+          onPointerUpCapture={(e) => {
+            if (e.target !== e.currentTarget) return;
+            e.stopPropagation();
+            if (!maskPtr.current) return;
+            const sel = typeof window !== "undefined" ? window.getSelection()?.toString() : "";
+            if (sel) return;
+            swallowGhostClick();
+            closeDetail();
+          }}
+          onClickCapture={(e) => {
+            if (e.target !== e.currentTarget) return;
+            e.stopPropagation();
+            e.preventDefault();
+          }}>
+          <div className="sheet drawer" onClick={(e) => e.stopPropagation()}>
             {openPics.length > 0 && <div className="pics">{openPics.map((src) => <img key={src} src={src} alt="" loading="lazy" decoding="async" />)}</div>}
             <div className="sp">{money(open.price)}</div>
             <h2>{open.name}</h2>
@@ -245,7 +280,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
               </>
             ) : (
               <button type="button" className={`cta${onOpen ? " soft" : " go"}`}
-                onClick={() => { toggle(open.id); setOpen(null); }}>{onOpen ? "外す" : "追加"}</button>
+                onClick={() => { toggle(open.id); closeDetail(); }}>{onOpen ? "外す" : "追加"}</button>
             )}
           </div>
         </div>
