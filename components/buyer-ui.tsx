@@ -207,10 +207,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   return (
     <main className={`buy${embed ? " embed" : ""}`}>
       <header className="bar">
-        <span className="who">
-          <span className="shop">{name}</span>
-          <span className="area">{(state?.address || "").trim() || "区"}</span>
-        </span>
+        <span className="area">{(state?.address || "").trim() || "区"}</span>
         <span className="span">{barDates}</span>
         <button type="button" className="share" onClick={copyShare}>
           URLコピー
@@ -225,20 +222,21 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         </button>
       </header>
       {bioShow ? <p className="hint bio">{bioShow}</p> : null}
-      {(state?.jimotyUrl || yt) && (
-        <p className="ext-links">
-          {state?.jimotyUrl && (
-            <a className="ext-link" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">
-              <img className="ext-ico" src="/jimoty.png" alt="" />Jimoty profile
-            </a>
-          )}
-          {yt && (
-            <a className="ext-link" href={yt} target="_blank" rel="noopener noreferrer">
-              <img className="ext-ico" src="/youtube.svg" alt="" />内見動画
-            </a>
-          )}
-        </p>
-      )}
+      <p className="ext-links">
+        {lineUrl
+          ? <a className="hint" href={lineUrl} target="_blank" rel="noopener noreferrer">{name}</a>
+          : <span className="hint">{name}</span>}
+        {state?.jimotyUrl && (
+          <a className="ext-link" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">
+            <img className="ext-ico" src="/jimoty.png" alt="" />Jimoty profile
+          </a>
+        )}
+        {yt && (
+          <a className="ext-link" href={yt} target="_blank" rel="noopener noreferrer">
+            <img className="ext-ico" src="/youtube.svg" alt="" />内見動画
+          </a>
+        )}
+      </p>
       {err && !checkout && !open && <div className="err">{err}</div>}
       {gridItems.length > 0 && (
         <ListingTools dir={priceDir} onDir={setPriceDir} dense={dense} onDense={setDense} />
