@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as PtrEv } from "react";
 import { useRouter } from "next/navigation";
 import AppNav from "@/components/app-nav";
-import { Icon, IconBtn } from "@/components/icons";
+import { DateField, Icon, IconBtn } from "@/components/icons";
 import { LineLoginLink, useLineOAuthReturn } from "@/components/line-oauth";
 import { byPrice, Listings, ListingTools, Seg, usePriceDir, type PhotoItem } from "@/components/photo-listing";
 import SquareCam from "@/components/square-cam";
@@ -701,15 +701,9 @@ export default function ShopAdminView({ shop, name }: Props) {
             placeholder={contactMode === "line" ? "https://line.me/ti/p/…" : "080-0000-0000"}
             inputMode={contactMode === "line" ? "url" : "tel"} autoComplete={contactMode === "line" ? "off" : "tel"} /></label>
         <div className="slot-add">
-          <label className="float"><span>受取開始</span>
-            <input type="date" value={pickupFrom} aria-label="受取開始"
-              onClick={(e) => { try { e.currentTarget.showPicker?.(); } catch { /* already open / unsupported */ } }}
-              onChange={(e) => { const v = e.target.value; setPickupFrom(v); void saveDates(v, pickupTo); }} /></label>
+          <DateField label="受取開始" value={pickupFrom} onChange={(v) => { setPickupFrom(v); void saveDates(v, pickupTo); }} />
           <span aria-hidden="true">〜</span>
-          <label className="float"><span>退去日</span>
-            <input type="date" value={pickupTo} aria-label="退去日"
-              onClick={(e) => { try { e.currentTarget.showPicker?.(); } catch { /* already open / unsupported */ } }}
-              onChange={(e) => { const v = e.target.value; setPickupTo(v); void saveDates(pickupFrom, v); }} /></label>
+          <DateField label="退去日" value={pickupTo} onChange={(v) => { setPickupTo(v); void saveDates(pickupFrom, v); }} />
         </div>
         <div className="slot-edit" role="list" aria-label="受取時間">
           {slots.map((s) => (

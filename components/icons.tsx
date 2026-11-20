@@ -47,3 +47,7 @@ export function IconBtn({
     </button>
   );
 }
+export function DateField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return <label className="float date-field"><span>{label}</span>
+    <input type="date" value={value} aria-label={label} onClick={(e) => { try { e.currentTarget.showPicker?.(); } catch {} }} onChange={(e) => onChange(e.target.value)} /></label>;
+}
