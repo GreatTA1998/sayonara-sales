@@ -8,3 +8,21 @@ export const PICKUP_SLOTS = ["10:00–10:15", "14:00–14:15", "20:00–20:15"];
 export const LATE_FROM = PICKUP_DAYS[PICKUP_DAYS.length - 4];
 /** Static shop label (Elton). */
 export const SHOP_NAME = "エルトン";
+
+/** Listing grid price order — default cheapest first; 0/unset always last. */
+export type PriceDir = "asc" | "desc";
+const priced = (p: number | null | undefined) => p != null && p > 0;
+
+/** Asc/desc by price; 0/null last; stable secondary by id. */
+export function byPrice(dir: PriceDir) {
+  return <T extends { id: string; price: number | null }>(a: T, b: T) => {
+    const pa = priced(a.price);
+    const pb = priced(b.price);
+    if (pa !== pb) return pa ? -1 : 1;
+    if (pa && pb) {
+      const d = dir === "asc" ? (a.price! - b.price!) : (b.price! - a.price!);
+      if (d) return d;
+    }
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  };
+}

@@ -1,4 +1,6 @@
 /* Shared photo listings — B card @ 16px; phone 2 → tablet 3 → desktop 4+; gentle max cell */
+.psort-row{display:flex;justify-content:flex-end;padding:0 8px 4px}
+.psort{margin:0;padding:2px 4px;border:0;background:transparent;font:inherit;font-size:var(--t-sm);font-weight:var(--fw);color:var(--c-muted);cursor:pointer;line-height:1.3}
 .xgrid{--x-cell-max:210px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:0 6px 8px;align-items:stretch;justify-content:center}
 /* Columns follow .buy container width (works in home side panel too) */
 @container buy (min-width:520px){.xgrid:not(.text){grid-template-columns:repeat(3,minmax(0,var(--x-cell-max)))}}
