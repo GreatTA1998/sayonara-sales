@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { LineLoginLink, useLineOAuthReturn } from "@/components/line-oauth";
 import {
   AUTH_EVT, adminPath, ensureShopId, getId, getName, getProfile, openShop, saveProfile,
@@ -25,14 +25,6 @@ export default function AppNav({ top, onAuth }: Props) {
   const [jimoty, setJimoty] = useState("");
   const [youtube, setYoutube] = useState("");
   const [path, setPath] = useState("");
-  const bioRef = useRef<HTMLTextAreaElement>(null);
-
-  function fitBio() {
-    const el = bioRef.current;
-    if (!el) return;
-    el.style.height = "0px";
-    el.style.height = `${el.scrollHeight}px`;
-  }
 
   function sync() {
     const n = getName();
@@ -54,7 +46,6 @@ export default function AppNav({ top, onAuth }: Props) {
     router.prefetch(shopId ? adminPath(shopId) : "/admin");
   }, [shopId, router]);
   useLineOAuthReturn(sync);
-  useEffect(() => { if (profOpen) fitBio(); }, [bio, profOpen]);
 
   function saveLogin(e: { preventDefault(): void }) {
     e.preventDefault();
@@ -123,8 +114,8 @@ export default function AppNav({ top, onAuth }: Props) {
           <form className="sheet" onClick={(e) => e.stopPropagation()} onSubmit={saveProf}>
             <h2>{name}</h2>
             <label className="float"><span>ショップメモ</span>
-              <textarea ref={bioRef} className="grow" value={bio} rows={1}
-                onChange={(e) => setBio(e.target.value)} onInput={fitBio}
+              <textarea className="grow" value={bio} rows={1}
+                onChange={(e) => setBio(e.target.value)}
                 placeholder="動作確認・値引き・引越し・車・まとめ買い優先など" /></label>
             <label className="float"><span>Jimoty profile（任意）</span>
               <input value={jimoty} onChange={(e) => setJimoty(e.target.value)}

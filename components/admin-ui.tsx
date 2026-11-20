@@ -73,8 +73,6 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [camOpen, setCamOpen] = useState(false);
   /** null = create-from-photo (1枚＝1出品); set = append photos to that listing. */
   const [camItemId, setCamItemId] = useState<string | null>(null);
-  const bioRef = useRef<HTMLTextAreaElement>(null);
-  const noteRef = useRef<HTMLTextAreaElement>(null);
   const [bio, setBio] = useState("");
   const [jimoty, setJimoty] = useState("");
   const [youtube, setYoutube] = useState("");
@@ -152,16 +150,6 @@ export default function ShopAdminView({ shop, name }: Props) {
     if (addrTimer.current) clearTimeout(addrTimer.current);
     if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
   }, []);
-
-  function fitTa(el: HTMLTextAreaElement | null) {
-    if (!el) return;
-    el.style.height = "0px";
-    el.style.height = `${el.scrollHeight}px`;
-  }
-  function fitBio() { fitTa(bioRef.current); }
-  function fitNote() { fitTa(noteRef.current); }
-  useEffect(() => { fitBio(); }, [bio]);
-  useEffect(() => { fitNote(); }, [editNote, openId]);
 
   // Pending camera uploads float to top so create-from-photo is visible immediately.
   const items = useMemo(() => {
@@ -689,9 +677,8 @@ export default function ShopAdminView({ shop, name }: Props) {
 
       <section className="prof-block">
         <label className="float"><span>ショップメモ</span>
-          <textarea ref={bioRef} className="grow" value={bio} rows={1}
+          <textarea className="grow" value={bio} rows={1}
             onChange={(e) => setBio(e.target.value)}
-            onInput={fitBio}
             onBlur={() => void persistProfile(bio, jimoty)}
             placeholder="動作確認・値引き・引越し・車・まとめ買い優先など" /></label>
         <label className="float"><span>Jimoty profile（任意）</span>
@@ -946,9 +933,8 @@ export default function ShopAdminView({ shop, name }: Props) {
             </div>
             <label className="float">
               <span>メモ</span>
-              <textarea ref={noteRef} className="grow" value={editNote} disabled={busyOpen} rows={1}
-                onChange={(e) => patchEdit("note", e.target.value)}
-                onInput={fitNote} />
+              <textarea className="grow" value={editNote} disabled={busyOpen} rows={1}
+                onChange={(e) => patchEdit("note", e.target.value)} />
             </label>
             <label className="late-check">
               <input type="checkbox" checked={editLate} disabled={busyOpen}
