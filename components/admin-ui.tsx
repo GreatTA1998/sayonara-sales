@@ -65,6 +65,11 @@ export default function ShopAdminView({ shop, name }: Props) {
   const addrSaved = useRef("");
   const addrDirty = useRef(false);
   const addrReq = useRef(0);
+  const editTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const editIdRef = useRef<string | null>(null);
+  const editDraftRef = useRef({ name: "", price: "0", note: "", late: false });
+  const editSavedRef = useRef<{ id: string; name: string; price: number; note: string; late: boolean } | null>(null);
+  const editReq = useRef(0);
 
   const load = useCallback(async () => {
     const res = await fetch(api(shop, "/api/admin"), { cache: "no-store" });
@@ -98,7 +103,10 @@ export default function ShopAdminView({ shop, name }: Props) {
     window.addEventListener(AUTH_EVT, sync);
     return () => window.removeEventListener(AUTH_EVT, sync);
   }, []);
-  useEffect(() => () => { if (addrTimer.current) clearTimeout(addrTimer.current); }, []);
+  useEffect(() => () => {
+    if (addrTimer.current) clearTimeout(addrTimer.current);
+    if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
+  }, []);
 
   const items = useMemo(() => [...(data?.items || [])].sort(byPriceDesc), [data?.items]);
   const open = useMemo(() => items.find((i) => i.id === openId) || null, [items, openId]);
@@ -182,26 +190,78 @@ export default function ShopAdminView({ shop, name }: Props) {
 
   function openDetail(item: Item) {
     setSheetMenu(null);
+    if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
+    if (editIdRef.current && editIdRef.current !== item.id) void flushEdit();
+    const snap = { id: item.id, name: item.name, price: item.price ?? 0, note: item.note || "", late: isLateOnly(item) };
+    editIdRef.current = item.id;
+    editSavedRef.current = snap;
+    editDraftRef.current = { name: snap.name, price: String(snap.price), note: snap.note, late: snap.late };
     setOpenId(item.id);
-    setEditName(item.name);
-    setEditPrice(String(item.price ?? 0));
-    setEditNote(item.note || "");
-    setEditLate(isLateOnly(item));
+    setEditName(snap.name);
+    setEditPrice(String(snap.price));
+    setEditNote(snap.note);
+    setEditLate(snap.late);
   }
 
-  async function saveDetail() {
-    if (!open) return;
-    const nextPrice = editPrice === "" ? 0 : Number(editPrice);
-    const wasLate = isLateOnly(open);
-    const payload: Record<string, unknown> = { action: "edit", id: open.id };
+  function scheduleEdit() {
+    if (editTimer.current) clearTimeout(editTimer.current);
+    editTimer.current = setTimeout(() => { void flushEdit(); }, 450);
+  }
+
+  function patchEdit<K extends keyof typeof editDraftRef.current>(key: K, value: (typeof editDraftRef.current)[K]) {
+    editDraftRef.current = { ...editDraftRef.current, [key]: value };
+    if (key === "name") setEditName(value as string);
+    else if (key === "price") setEditPrice(value as string);
+    else if (key === "note") setEditNote(value as string);
+    else setEditLate(value as boolean);
+    scheduleEdit();
+  }
+
+  async function flushEdit() {
+    if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
+    const id = editIdRef.current;
+    const draft = editDraftRef.current;
+    const saved = editSavedRef.current;
+    if (!id || !saved || saved.id !== id) return;
+    const price = draft.price === "" ? 0 : Number(draft.price);
+    const note = draft.note.trim();
+    const payload: Record<string, unknown> = { action: "edit", id };
     let changed = false;
-    if (editName !== open.name) { payload.name = editName; changed = true; }
-    if (nextPrice !== (open.price ?? 0)) { payload.price = nextPrice; changed = true; }
-    if (editNote !== (open.note || "")) { payload.note = editNote.trim(); changed = true; }
-    if (editLate !== wasLate) { payload.lateOnly = editLate; changed = true; }
-    if (!changed) { setOpenId(null); return; }
-    const ok = await act(payload, "保存しました");
-    if (ok) setOpenId(null);
+    if (draft.name !== saved.name) { payload.name = draft.name; changed = true; }
+    if (price !== saved.price) { payload.price = price; changed = true; }
+    if (note !== saved.note) { payload.note = note; changed = true; }
+    if (draft.late !== saved.late) { payload.lateOnly = draft.late; changed = true; }
+    if (!changed) return;
+    const prev = saved;
+    const req = ++editReq.current;
+    const ok = await act(payload);
+    if (!ok || req !== editReq.current) return;
+    editSavedRef.current = { id, name: draft.name, price, note, late: draft.late };
+    show("保存しました", "ok", { label: "元に戻す", onClick: () => { void undoEdit(prev); } });
+  }
+
+  async function undoEdit(prev: { id: string; name: string; price: number; note: string; late: boolean }) {
+    if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
+    editReq.current++;
+    const ok = await act({
+      action: "edit", id: prev.id, name: prev.name, price: prev.price, note: prev.note, lateOnly: prev.late,
+    });
+    if (!ok) return;
+    editSavedRef.current = prev;
+    if (editIdRef.current === prev.id) {
+      editDraftRef.current = { name: prev.name, price: String(prev.price), note: prev.note, late: prev.late };
+      setEditName(prev.name);
+      setEditPrice(String(prev.price));
+      setEditNote(prev.note);
+      setEditLate(prev.late);
+    }
+    show("元に戻しました", "ok");
+  }
+
+  function closeEdit() {
+    setSheetMenu(null);
+    setOpenId(null);
+    void flushEdit();
   }
 
   function upsertItem(item: Item) {
@@ -285,7 +345,12 @@ export default function ShopAdminView({ shop, name }: Props) {
     setDeleting(item.id); show("削除中…", "busy");
     try {
       const ok = await act({ action: "remove", id: item.id });
-      if (ok && openId === item.id) setOpenId(null);
+      if (ok && (openId === item.id || editIdRef.current === item.id)) {
+        if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
+        editIdRef.current = null;
+        editSavedRef.current = null;
+        setOpenId(null);
+      }
       show(ok ? "削除しました" : "削除に失敗しました", ok ? "ok" : "err");
     } finally { setDeleting(null); }
   }
@@ -509,7 +574,7 @@ export default function ShopAdminView({ shop, name }: Props) {
 
       {open && (
         <div className="mask" role="dialog" aria-modal="true" aria-label="品目を編集"
-          onClick={() => { if (!busyOpen) { setSheetMenu(null); setOpenId(null); } }}>
+          onClick={() => { if (!busyOpen) closeEdit(); }}>
           <div className="sheet edit" onClick={(e) => { e.stopPropagation(); if (sheetMenu) setSheetMenu(null); }}>
             <h2>編集</h2>
             <div className="pics">
@@ -543,25 +608,25 @@ export default function ShopAdminView({ shop, name }: Props) {
             </div>
             <label className="float">
               <span>名前</span>
-              <input value={editName} onChange={(e) => setEditName(e.target.value)} disabled={busyOpen} />
+              <input value={editName} disabled={busyOpen}
+                onChange={(e) => patchEdit("name", e.target.value)} />
             </label>
             <label className="float price">
               <span>価格</span>
-              <input type="number" min={0} inputMode="numeric" value={editPrice}
-                onChange={(e) => setEditPrice(e.target.value)} disabled={busyOpen} />
+              <input type="number" min={0} inputMode="numeric" value={editPrice} disabled={busyOpen}
+                onChange={(e) => patchEdit("price", e.target.value)} />
             </label>
             <label className="float">
               <span>メモ</span>
-              <textarea value={editNote} onChange={(e) => setEditNote(e.target.value)} disabled={busyOpen} rows={6} />
+              <textarea value={editNote} disabled={busyOpen} rows={6}
+                onChange={(e) => patchEdit("note", e.target.value)} />
             </label>
             <label className="late-check">
               <input type="checkbox" checked={editLate} disabled={busyOpen}
-                onChange={(e) => setEditLate(e.target.checked)} />
+                onChange={(e) => patchEdit("late", e.target.checked)} />
               <span>後半のみ（最後の4日）</span>
             </label>
             <div className="save-row" onClick={(e) => e.stopPropagation()}>
-              <button type="button" className="cta" disabled={busyOpen} onClick={() => void saveDetail()}
-                style={{ background: "#111", color: "#fff", flex: 1, margin: 0 }}>保存</button>
               <div className="save-more">
                 <IconBtn name="more" label="品目メニュー" disabled={busyOpen} size={24} className="more"
                   onClick={() => setSheetMenu(sheetMenu === "item" ? null : "item")} />
