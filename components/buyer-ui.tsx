@@ -60,7 +60,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const canLine = !!lineUrl;
   const canPhone = !!phoneDisp;
   const barDates = pickupSpan(state?.days || []);
-  const shareUrl = `${SITE_URL}${shop === "elton" ? "/s/elton" : `/s/${shop}`}`;
+  const shareUrl = `${SITE_URL}/s/${shop}`;
   const loggedIn = !!knownName;
 
   const load = useCallback(async () => {

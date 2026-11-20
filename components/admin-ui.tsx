@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as PtrEv } from "react";
+import { useRouter } from "next/navigation";
 import AppNav from "@/components/app-nav";
 import { Icon, IconBtn } from "@/components/icons";
 import { LineLoginLink, useLineOAuthReturn } from "@/components/line-oauth";
@@ -53,6 +54,7 @@ function claimSummary(c: Claim, all: Item[]) {
 }
 
 export default function ShopAdminView({ shop, name }: Props) {
+  const router = useRouter();
   const [data, setData] = useState<AdminState | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [listBusy, setListBusy] = useState(false);
@@ -596,10 +598,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     setLogged(true);
     setLabel(lineDraft.trim());
     setLoginOpen(false);
-    if (id !== shop) {
-      window.location.href = adminPath(id);
-      return;
-    }
+    if (id !== shop) { router.push(adminPath(id)); return; }
     show("保存しました", "ok");
   }
 
@@ -609,11 +608,11 @@ export default function ShopAdminView({ shop, name }: Props) {
       setErr(msg); show(msg, "err");
       return;
     }
-    const href = shop === "elton" ? "/s/elton" : `/s/${shop}`;
+    const href = `/s/${shop}`;
     const url = `${SITE_URL}${href}`;
     const first = pub === "off";
     setPub("ok");
-    show(`${first ? "公開しました" : "コピーしました"}\n${url}`, "ok");
+    show(`${first ? "公開しました" : "コピーしました"}\n${url}`, "ok", { label: "見る", onClick: () => router.push(href) });
     setTimeout(() => setPub("on"), 1600);
     void navigator.clipboard?.writeText(url).catch(() => undefined);
     if (first) void act({ action: "publish" }).then((ok) => {
