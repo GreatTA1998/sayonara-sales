@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AppNav from "@/components/app-nav";
 import { byPrice, Listings, money, PriceSortBtn, usePriceDir } from "@/components/photo-listing";
+import { Snack, useSnack } from "@/components/snack";
 import { dayLbl, pickupSpan, rangeLbl } from "@/lib/days";
 import { AUTH_EVT, applyLineSession, getName, openShop } from "@/lib/shop";
 import { SITE_URL } from "@/lib/site";
@@ -51,10 +52,9 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
-  const [shareOpen, setShareOpen] = useState(false);
-  const [shared, setShared] = useState(false);
   const [waited, setWaited] = useState<Set<string>>(new Set());
   const [priceDir, togglePriceDir] = usePriceDir();
+  const { snack, show } = useSnack();
   const maskPtr = useRef(false);
   const lineUrl = state?.lineInviteUrl || LINE_FALLBACK;
   const barDates = pickupSpan(state?.days || []);
@@ -81,17 +81,16 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     return () => window.removeEventListener(AUTH_EVT, syncName);
   }, [load, shop, syncName]);
   useEffect(() => {
-    if (!open && !checkout && !shareOpen) return;
+    if (!open && !checkout) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       e.preventDefault();
       if (checkout) setCheckout(false);
-      else if (shareOpen) setShareOpen(false);
       else { maskPtr.current = false; setOpen(null); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, checkout, shareOpen]);
+  }, [open, checkout]);
 
   const freeSlots = useMemo(() => {
     const taken = new Set(state?.taken?.[day] || []);
@@ -144,12 +143,9 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     setOpen(null);
   }
 
-  async function copyShare() {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setShared(true);
-      setTimeout(() => setShared(false), 1600);
-    } catch { /* ignore */ }
+  function copyShare() {
+    void navigator.clipboard?.writeText(shareUrl).catch(() => undefined);
+    show(`コピーしました\n${shareUrl}`, "ok");
   }
 
   async function book() {
@@ -218,7 +214,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
           <span className="area">{(state?.address || "").trim() || "区"}</span>
         </span>
         <span className="span">{barDates}</span>
-        <button type="button" className="share" onClick={() => { setShared(false); setShareOpen(true); }}>
+        <button type="button" className="share" onClick={copyShare}>
           URLコピー
         </button>
         <button type="button" className="req"
@@ -285,18 +281,6 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
           </div>
         </div>
       )}
-      {shareOpen && (
-        <div className="mask" role="dialog" aria-modal="true" aria-label="URLコピー"
-          onClick={() => setShareOpen(false)}>
-          <div className="sheet" onClick={(e) => e.stopPropagation()}>
-            <h2>URLコピー</h2>
-            <p className="share-url">{shareUrl}</p>
-            <button type="button" className="cta go" onClick={() => void copyShare()}>
-              {shared ? "コピー済" : "コピー"}
-            </button>
-          </div>
-        </div>
-      )}
       {checkout && (
         <div className="mask" role="dialog" aria-modal="true" aria-label="引き取り日程"
           onClick={() => { setCheckout(false); setErr(null); }}>
@@ -351,6 +335,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         </div>
       )}
       {!embed && <AppNav />}
+      <Snack snack={snack} />
     </main>
   );
 }
