@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import AppNav from "@/components/app-nav";
-import { Listings, money } from "@/components/photo-listing";
+import { byPrice, Listings, money, PriceSortBtn, usePriceDir } from "@/components/photo-listing";
 import { dayLbl, pickupSpan, rangeLbl } from "@/lib/days";
 import { AUTH_EVT, applyLineSession, getName, openShop } from "@/lib/shop";
 import { SITE_URL } from "@/lib/site";
@@ -54,6 +54,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [shareOpen, setShareOpen] = useState(false);
   const [shared, setShared] = useState(false);
   const [waited, setWaited] = useState<Set<string>>(new Set());
+  const [priceDir, togglePriceDir] = usePriceDir();
   const lineUrl = state?.lineInviteUrl || LINE_FALLBACK;
   const barDates = pickupSpan(state?.days || []);
   const shareUrl = `${SITE_URL}${shop === "elton" ? "/s/elton" : `/s/${shop}`}`;
@@ -97,6 +98,10 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   }, [state, day]);
   useEffect(() => { if (slot && !freeSlots.includes(slot)) setSlot(null); }, [freeSlots, slot]);
 
+  const gridItems = useMemo(
+    () => [...(state?.items || [])].sort(byPrice(priceDir)),
+    [state?.items, priceDir],
+  );
   const pickedItems = useMemo(
     () => (state?.items || []).filter((i) => picked.has(i.id)),
     [state, picked],
@@ -212,7 +217,8 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         <p className="hint bio"><a className="linelink" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">ジモティー</a></p>
       ) : null}
       {err && !checkout && !open && <div className="err">{err}</div>}
-      <Listings items={state?.items || []} onSelect={(it) => { setErr(null); setOpen(it); }}
+      {gridItems.length > 0 && <PriceSortBtn dir={priceDir} onToggle={togglePriceDir} />}
+      <Listings items={gridItems} onSelect={(it) => { setErr(null); setOpen(it); }}
         classNameFor={(item) => `${picked.has(item.id) ? "on" : ""}${item.taken ? " sold" : ""}`.trim()} />
       {!state && <p className="text-sm text-muted pad">読み込み中…</p>}
       {open && !checkout && (

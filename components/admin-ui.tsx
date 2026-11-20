@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as
 import AppNav from "@/components/app-nav";
 import { Icon, IconBtn } from "@/components/icons";
 import { LineLoginLink, useLineOAuthReturn } from "@/components/line-oauth";
-import { Listings, type PhotoItem } from "@/components/photo-listing";
+import { byPrice, Listings, PriceSortBtn, usePriceDir, type PhotoItem } from "@/components/photo-listing";
 import SquareCam from "@/components/square-cam";
 import { Snack, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
@@ -30,7 +30,6 @@ const DEF_TO = PICKUP_DAYS[PICKUP_DAYS.length - 1];
 // image/* + image/jpg: Android camera often sends non-standard image/jpg or empty MIME.
 const IMG_ACCEPT = "image/*,image/jpeg,image/jpg,image/png,image/heic,image/heif,image/webp,image/gif,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif";
 const api = (shop: string, path: string) => `${path}?shop=${encodeURIComponent(shop)}`;
-const byPriceDesc = (a: Item, b: Item) => (b.price ?? -1) - (a.price ?? -1);
 const methodJa = (m?: string) => (m === "phone" ? "電話" : m === "line" ? "LINE" : m || "");
 const kuStem = (v: string) => v.replace(/区$/, "");
 const kuFull = (v: string) => { const s = kuStem(v).trim(); return s ? `${s}区` : ""; };
@@ -39,11 +38,11 @@ const isRemote = (u: string) => /^https?:\/\//i.test(u);
 const tempId = () => `tmp-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 type PicStatus = "uploading" | "error";
 type PicJob = { file: File; itemId: string; kind: "append" | "create" };
-/** Claim line items by price desc (missing ids → 無題 stubs). */
+/** Claim line items high→low for summary (missing ids → 無題 stubs). */
 function claimItems(c: Claim, all: Item[]) {
   return c.itemIds
     .map((id) => all.find((i) => i.id === id) || { id, name: "無題", price: null as number | null })
-    .sort(byPriceDesc);
+    .sort(byPrice("desc"));
 }
 function claimSummary(c: Claim, all: Item[]) {
   const list = claimItems(c, all);
@@ -100,6 +99,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const editDraftRef = useRef({ name: "", price: "0", note: "", late: false });
   const editSavedRef = useRef<{ id: string; name: string; price: number; note: string; late: boolean } | null>(null);
   const editReq = useRef(0);
+  const [priceDir, togglePriceDir] = usePriceDir();
 
   const load = useCallback(async () => {
     const res = await fetch(api(shop, "/api/admin"), { cache: "no-store" });
@@ -154,10 +154,11 @@ export default function ShopAdminView({ shop, name }: Props) {
   // Pending camera uploads float to top so create-from-photo is visible immediately.
   const items = useMemo(() => {
     const all = data?.items || [];
+    const cmp = byPrice(priceDir);
     const pending = all.filter((i) => i.id.startsWith("tmp-"));
-    const rest = all.filter((i) => !i.id.startsWith("tmp-")).sort(byPriceDesc);
-    return pending.length ? [...pending, ...rest] : [...all].sort(byPriceDesc);
-  }, [data?.items]);
+    const rest = all.filter((i) => !i.id.startsWith("tmp-")).sort(cmp);
+    return pending.length ? [...pending, ...rest] : [...all].sort(cmp);
+  }, [data?.items, priceDir]);
   const open = useMemo(() => items.find((i) => i.id === openId) || null, [items, openId]);
   const pending = useMemo(() => (data?.claims || []).filter((c) => c.status === "booked"), [data?.claims]);
   const done = useMemo(() => (data?.claims || []).filter((c) => c.status === "picked_up"), [data?.claims]);
@@ -748,9 +749,12 @@ export default function ShopAdminView({ shop, name }: Props) {
         onShot={(file) => addFromPhotos([file])} />
 
       {!empty && (
-        <Listings items={items} onSelect={openDetail}
-          disabledFor={(it) => deleting === it.id}
-          classNameFor={(it) => (deleting === it.id ? "dim" : "")} />
+        <>
+          <PriceSortBtn dir={priceDir} onToggle={togglePriceDir} />
+          <Listings items={items} onSelect={openDetail}
+            disabledFor={(it) => deleting === it.id}
+            classNameFor={(it) => (deleting === it.id ? "dim" : "")} />
+        </>
       )}
 
       {done.length > 0 && (

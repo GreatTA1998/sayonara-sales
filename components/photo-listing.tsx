@@ -1,7 +1,42 @@
 "use client";
+import { useCallback, useEffect, useState } from "react";
+import { byPrice, type PriceDir } from "@/lib/sale";
 import "./photo-layout.css";
 
 export type PhotoItem = { id: string; name: string; price: number | null; note?: string; photos?: string[] };
+export { byPrice, type PriceDir };
+
+const PRICE_DIR_KEY = "ss-price-dir";
+
+export function usePriceDir(): [PriceDir, () => void] {
+  const [dir, setDir] = useState<PriceDir>("asc");
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem(PRICE_DIR_KEY);
+      if (v === "asc" || v === "desc") setDir(v);
+    } catch { /* ignore */ }
+  }, []);
+  const toggle = useCallback(() => {
+    setDir((cur) => {
+      const next: PriceDir = cur === "asc" ? "desc" : "asc";
+      try { localStorage.setItem(PRICE_DIR_KEY, next); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+  return [dir, toggle];
+}
+
+/** Compact 安→高 / 高→安 toggle (shared buyer + admin). */
+export function PriceSortBtn({ dir, onToggle }: { dir: PriceDir; onToggle: () => void }) {
+  return (
+    <div className="psort-row">
+      <button type="button" className="psort" onClick={onToggle}
+        aria-label={dir === "asc" ? "安い順。タップで高い順" : "高い順。タップで安い順"}>
+        {dir === "asc" ? "安→高" : "高→安"}
+      </button>
+    </div>
+  );
+}
 
 export const money = (p: number | null) => (p == null ? "無料" : `¥${p.toLocaleString()}`);
 
