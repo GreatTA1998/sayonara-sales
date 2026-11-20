@@ -24,7 +24,7 @@ export async function GET(req: Request) {
     taken,
     lineInviteUrl: contact.lineInviteUrl || null,
     phone: contact.phone || null,
-    // Client may re-sort via toggle; default = cheapest first, 0/unset last.
+    // Client may re-sort via toggle; default = cheapest first, unset/null last (¥0 is real).
     items: [...s.items]
       .sort(byPrice("asc"))
       .map(({ id, name, price, note, availableFrom, availableTo, claimId, photos }) => ({
