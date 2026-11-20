@@ -48,6 +48,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [lineDraft, setLineDraft] = useState("");
   const [label, setLabel] = useState(/^\d{5}$/.test(name) ? "" : name);
   const fileRef = useRef<HTMLInputElement>(null);
+  const bioRef = useRef<HTMLTextAreaElement>(null);
   const [bio, setBio] = useState("");
   const [jimoty, setJimoty] = useState("");
   const [slots, setSlots] = useState<string[]>([...PICKUP_SLOTS]);
@@ -57,8 +58,9 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [pickupFrom, setPickupFrom] = useState(DEF_FROM);
   const [pickupTo, setPickupTo] = useState(DEF_TO);
   const [listOpen, setListOpen] = useState(false);
-  const [listRows, setListRows] = useState<string[]>([""]);
-  const listRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const [listDraft, setListDraft] = useState("");
+  const listRef = useRef<HTMLInputElement | null>(null);
+  const maskPtr = useRef(false);
   const [pub, setPub] = useState<"off" | "on" | "ok">("off");
   const { snack, show } = useSnack();
   const [addrDraft, setAddrDraft] = useState("");
@@ -114,6 +116,14 @@ export default function ShopAdminView({ shop, name }: Props) {
     if (addrTimer.current) clearTimeout(addrTimer.current);
     if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
   }, []);
+
+  function fitBio() {
+    const el = bioRef.current;
+    if (!el) return;
+    el.style.height = "0px";
+    el.style.height = `${el.scrollHeight}px`;
+  }
+  useEffect(() => { fitBio(); }, [bio]);
 
   const items = useMemo(() => [...(data?.items || [])].sort(byPriceDesc), [data?.items]);
   const open = useMemo(() => items.find((i) => i.id === openId) || null, [items, openId]);
@@ -342,11 +352,11 @@ export default function ShopAdminView({ shop, name }: Props) {
     if (ok) show(ok === 1 ? "品目を追加しました" : `${ok}件追加しました`, "ok");
   }
 
-  async function onListEnter(i: number) {
-    const v = listRows[i].trim();
+  async function onListEnter() {
+    const v = listDraft.trim();
     if (!v) {
       setListOpen(false);
-      setListRows([""]);
+      setListDraft("");
       return;
     }
     if (uploading) return;
@@ -354,10 +364,8 @@ export default function ShopAdminView({ shop, name }: Props) {
     const ok = await act({ action: "add", name: v }, "品目を追加しました");
     setUploading(null);
     if (!ok) return;
-    const drafts = listRows.map((r, j) => (j === i ? "" : r)).map((s) => s.trim()).filter(Boolean);
-    const next = [...drafts, ""];
-    setListRows(next);
-    requestAnimationFrame(() => listRefs.current[next.length - 1]?.focus());
+    setListDraft("");
+    requestAnimationFrame(() => listRef.current?.focus());
   }
 
   async function deleteItem(item: Item) {
@@ -493,8 +501,11 @@ export default function ShopAdminView({ shop, name }: Props) {
       <section className="prof-block">
         <div className="claims-h">ショップ情報</div>
         <label className="float"><span>ショップメモ</span>
-          <textarea value={bio} rows={2} onChange={(e) => setBio(e.target.value)}
-            onBlur={() => void persistProfile(bio, jimoty)} placeholder="動作確認・値引き・引越し・車・まとめ買い優先など" /></label>
+          <textarea ref={bioRef} className="grow" value={bio} rows={1}
+            onChange={(e) => setBio(e.target.value)}
+            onInput={fitBio}
+            onBlur={() => void persistProfile(bio, jimoty)}
+            placeholder="動作確認・値引き・引越し・車・まとめ買い優先など" /></label>
         <label className="float"><span>ジモティーURL（任意）</span>
           <input value={jimoty} onChange={(e) => setJimoty(e.target.value)}
             onBlur={() => void persistProfile(bio, jimoty)}
@@ -537,8 +548,6 @@ export default function ShopAdminView({ shop, name }: Props) {
             )}
           </span>
         </div>
-        <button type="button" className="text-sm text-muted" style={{ border: 0, background: "transparent", padding: 0, cursor: "pointer" }}
-          onClick={() => void saveSlots([...PICKUP_SLOTS])}>初期設定に戻す（10・14・20時）</button>
       </section>
 
       <div className="add-dual">
@@ -547,38 +556,32 @@ export default function ShopAdminView({ shop, name }: Props) {
             disabled={!data || !!uploading}
             onClick={() => {
               setListOpen((v) => {
-                if (v) { setListRows([""]); return false; }
-                setListRows([""]);
-                requestAnimationFrame(() => listRefs.current[0]?.focus());
+                if (v) { setListDraft(""); return false; }
+                setListDraft("");
+                requestAnimationFrame(() => listRef.current?.focus());
                 return true;
               });
             }}>リスト入力</button>
-          <button type="button" className="cta"
-            disabled={!data || !!uploading}
-            onClick={() => fileRef.current?.click()}>写真を追加</button>
+          <div className="add-photo">
+            <button type="button" className="cta"
+              disabled={!data || !!uploading}
+              onClick={() => fileRef.current?.click()}>
+              <Icon name="camera" size={18} />写真を追加
+            </button>
+            <p className="hint add-tip">1枚＝1出品。名前はあとで。</p>
+          </div>
         </div>
         {listOpen && (
-          <ol className="list-rows">
-            {listRows.map((row, i) => (
-              <li key={i}>
-                <span className="n" aria-hidden="true">{i + 1}.</span>
-                <input ref={(el) => { listRefs.current[i] = el; }}
-                  value={row} disabled={!!uploading} placeholder="品名"
-                  aria-label={`品名${i + 1}`}
-                  onChange={(e) => setListRows((rows) => rows.map((r, j) => (j === i ? e.target.value : r)))}
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onListEnter(i); } }} />
-              </li>
-            ))}
-            <li className="list-more">
-              <button type="button" className="text-sm" disabled={!!uploading}
-                onClick={() => {
-                  setListRows((rows) => [...rows, ""]);
-                  requestAnimationFrame(() => listRefs.current[listRows.length]?.focus());
-                }}>＋追加</button>
-            </li>
-          </ol>
+          <div className="list-row">
+            <input ref={listRef} value={listDraft} disabled={!!uploading}
+              placeholder="品名" aria-label="品名"
+              onChange={(e) => setListDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void onListEnter(); } }} />
+            <span className="list-hint" aria-hidden="true">
+              {listDraft.trim() ? "Enterで追加" : "Enterで閉じる"}
+            </span>
+          </div>
         )}
-        <p className="hint add-tip">1枚＝1出品。名前はあとで。</p>
       </div>
       <input ref={fileRef} type="file" accept={IMG_ACCEPT} multiple hidden
         disabled={!data || !!uploading}
@@ -626,7 +629,13 @@ export default function ShopAdminView({ shop, name }: Props) {
 
       {open && (
         <div className="mask" role="dialog" aria-modal="true" aria-label="品目を編集"
-          onClick={() => { if (!busyOpen) closeEdit(); }}>
+          onPointerDown={(e) => { maskPtr.current = e.target === e.currentTarget; }}
+          onPointerUp={(e) => {
+            if (!maskPtr.current || e.target !== e.currentTarget || busyOpen) return;
+            const sel = typeof window !== "undefined" ? window.getSelection()?.toString() : "";
+            if (sel) return;
+            closeEdit();
+          }}>
           <div className="sheet edit" onClick={(e) => { e.stopPropagation(); if (sheetMenu) setSheetMenu(null); }}>
             <h2>編集</h2>
             <div className="pics">
