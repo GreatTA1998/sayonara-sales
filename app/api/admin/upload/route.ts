@@ -30,7 +30,9 @@ export async function POST(req: Request) {
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "file required" }, { status: 400 });
     }
-    if (!file.type.startsWith("image/")) {
+    // Camera/OS often sends empty or octet-stream MIME — trust bytes, sharp will reject junk.
+    const mime = (file.type || "").toLowerCase();
+    if (mime && !mime.startsWith("image/") && mime !== "application/octet-stream") {
       return NextResponse.json({ error: "Image only" }, { status: 400 });
     }
     const keyId = itemId || uid("i");
