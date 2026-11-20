@@ -689,10 +689,10 @@ export default function ShopAdminView({ shop, name }: Props) {
             <input value={jimoty} onChange={(e) => setJimoty(e.target.value)}
               onBlur={() => void persistProfile(bio, jimoty, youtube)}
               placeholder="https://jmty.jp/…" inputMode="url" autoComplete="url" /></label>
-          <label className="float"><span>YouTube（アパート）</span>
+          <label className="float"><span>内見動画</span>
             <input value={youtube} onChange={(e) => setYoutube(e.target.value)}
               onBlur={() => void persistProfile(bio, jimoty, youtube)}
-              placeholder="https://youtu.be/…" inputMode="url" autoComplete="url" /></label>
+              placeholder="内見動画URL" inputMode="url" autoComplete="url" /></label>
         </div>
         <p className="hint">買い手連絡 — LINEか電話のどちらか必須</p>
         <label className="float"><span>LINE招待リンク</span>

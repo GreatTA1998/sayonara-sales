@@ -99,7 +99,7 @@ export default function AppNav({ top, onAuth }: Props) {
           onClick={() => setProfOpen(false)}>
           <div className="sheet" onClick={(e) => e.stopPropagation()}>
             <h2>{name}</h2>
-            <p className="hint">ショップメモ・Jimoty・YouTubeはマイ出品で編集</p>
+            <p className="hint">ショップメモ・Jimoty・内見動画はマイ出品で編集</p>
             <LineLoginLink />
           </div>
         </div>

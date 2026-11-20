@@ -177,7 +177,6 @@ export function withStore<T>(shop: string, fn: (s: Store) => T | Promise<T>): Pr
 function scrub(s: Store) {
   delete (s as { capacity?: unknown }).capacity;
   for (const it of s.items) delete (it as { availableAfter?: string }).availableAfter;
-  // Promote YouTube pasted into ショップメモ into the dedicated field.
   if (!(s.youtubeUrl || "").trim()) {
     const y = ytUrl(s.bio || "");
     if (y) s.youtubeUrl = y;
