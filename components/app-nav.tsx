@@ -48,7 +48,7 @@ export default function AppNav({ top, onAuth }: Props) {
   const [draft, setDraft] = useState("");
   const [bio, setBio] = useState("");
   const [jimoty, setJimoty] = useState("");
-  const [exp, setExp] = useState<N>(1);
+  const [exp, setExp] = useState<N>(2);
   const [path, setPath] = useState("");
 
   function sync() {
@@ -61,7 +61,7 @@ export default function AppNav({ top, onAuth }: Props) {
   }
   useEffect(() => {
     sync();
-    setExp(readParam(1));
+    setExp(readParam(2));
     setPath(location.pathname);
     window.addEventListener(AUTH_EVT, sync);
     return () => window.removeEventListener(AUTH_EVT, sync);
