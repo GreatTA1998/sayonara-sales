@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import AppNav from "@/components/app-nav";
 import { Listings, money } from "@/components/photo-listing";
 import { dayLbl, pickupSpan, rangeLbl } from "@/lib/days";
-import { getName, openShop } from "@/lib/shop";
+import { AUTH_EVT, applyLineSession, getName, openShop } from "@/lib/shop";
 import { SITE_URL } from "@/lib/site";
 
 type Item = {
@@ -46,6 +46,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [slot, setSlot] = useState<string | null>(null);
   const [method, setMethod] = useState<Method | null>(null);
   const [lineName, setLineName] = useState("");
+  const [knownName, setKnownName] = useState("");
   const [lineOk, setLineOk] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -56,13 +57,27 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const lineUrl = state?.lineInviteUrl || LINE_FALLBACK;
   const barDates = pickupSpan(state?.days || []);
   const shareUrl = `${SITE_URL}${shop === "elton" ? "/s/elton" : `/s/${shop}`}`;
+  const loggedIn = !!knownName;
 
   const load = useCallback(async () => {
     const data = (await fetch(api(shop, "/api/state"), { cache: "no-store" }).then((r) => r.json())) as State;
     setState(data);
     setDay((d) => d && data.days?.includes(d) ? d : (data.days?.[0] || ""));
   }, [shop]);
-  useEffect(() => { void load(); setWaited(loadWl(shop)); const n = getName(); if (n) setLineName(n); }, [load, shop]);
+  const syncName = useCallback(() => {
+    const n = getName();
+    setKnownName(n);
+    if (n) setLineName(n);
+  }, []);
+  useEffect(() => {
+    void load();
+    setWaited(loadWl(shop));
+    syncName();
+    // Soft-upgrade from optional LINE OAuth session if ss-line-name empty.
+    if (!getName()) void applyLineSession().then((s) => { if (s) syncName(); });
+    window.addEventListener(AUTH_EVT, syncName);
+    return () => window.removeEventListener(AUTH_EVT, syncName);
+  }, [load, shop, syncName]);
   useEffect(() => {
     if (!open && !checkout && !shareOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -131,8 +146,10 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "失敗しました");
+      openShop(name);
       setCheckout(false); setOpen(null); setReceipt({ ...data, contactMethod: method });
-      setPicked(new Set()); setSlot(null); setMethod(null); setLineName(""); setLineOk(false); await load();
+      setPicked(new Set()); setSlot(null); setMethod(null); setLineOk(false);
+      syncName(); await load();
     } catch (e) { setErr(e instanceof Error ? e.message : "失敗しました"); await load(); }
     finally { setBusy(false); }
   }
@@ -184,7 +201,9 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
           URLコピー
         </button>
         <button type="button" className="req"
-          onClick={() => { setOpen(null); setSlot(null); setMethod("line"); setLineOk(false); setErr(null); setCheckout(true); }}>
+          onClick={() => {
+            syncName(); setOpen(null); setSlot(null); setMethod("line"); setLineOk(false); setErr(null); setCheckout(true);
+          }}>
           {picked.size ? `引き取りを依頼 (${picked.size})` : "引き取りを依頼"}
         </button>
       </header>
@@ -273,16 +292,17 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
                   onClick={() => setMethod("phone")}>電話</button>
               </div>
               {method === "line" && <div className="linebox">
-                <p className="hint">先に招待リンクで友だち追加</p>
                 <a className="linelink" href={lineUrl} target="_blank" rel="noopener noreferrer">LINE招待リンク</a>
                 <label className="late-check"><input type="checkbox" checked={lineOk}
                   onChange={(e) => setLineOk(e.target.checked)} />LINEで友だち追加しました</label>
               </div>}
               {method === "phone" && <a className="linelink" href={PHONE_TEL}>{PHONE_DISPLAY}</a>}
             </div>
-            <label className="float"><span>LINE名</span>
-              <input value={lineName} onChange={(e) => setLineName(e.target.value)}
-                placeholder="表示名" autoComplete="nickname" enterKeyHint="done" /></label>
+            {!loggedIn && (
+              <label className="float"><span>LINE名</span>
+                <input value={lineName} onChange={(e) => setLineName(e.target.value)}
+                  placeholder="表示名" autoComplete="nickname" enterKeyHint="done" /></label>
+            )}
             {err && <div className="err">{err}</div>}
             <button type="button" className={`cta${canSend ? " go" : ""}`} disabled={busy || !canSend}
               onClick={book}>{busy ? "送信中…" : "依頼を送信"}</button>
