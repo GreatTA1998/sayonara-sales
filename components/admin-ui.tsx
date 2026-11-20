@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as
 import AppNav from "@/components/app-nav";
 import { Icon, IconBtn } from "@/components/icons";
 import { LineLoginLink, useLineOAuthReturn } from "@/components/line-oauth";
-import { byPrice, Listings, PriceSortBtn, usePriceDir, type PhotoItem } from "@/components/photo-listing";
+import { byPrice, Listings, ListingTools, usePriceDir, type PhotoItem } from "@/components/photo-listing";
 import SquareCam from "@/components/square-cam";
 import { Snack, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
@@ -752,7 +752,7 @@ export default function ShopAdminView({ shop, name }: Props) {
 
       {!empty && (
         <>
-          <PriceSortBtn dir={priceDir} onToggle={togglePriceDir} />
+          <ListingTools dir={priceDir} onToggleDir={togglePriceDir} />
           <Listings items={items} onSelect={openDetail}
             disabledFor={(it) => deleting === it.id}
             classNameFor={(it) => (deleting === it.id ? "dim" : "")} />
