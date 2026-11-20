@@ -316,7 +316,7 @@ export default function ShopAdminView({ shop, name }: Props) {
         </label>
         <span className="spacer" aria-hidden="true" />
         <button type="button" className="req"
-          onClick={logged ? publish : () => { setLineDraft(""); setLoginOpen(true); }}>
+          onClick={logged ? publish : () => { setLineDraft(getName()); setLoginOpen(true); }}>
           {logged ? (pub === "ok" ? "コピー済" : pub === "on" ? "URLコピー" : "公開する") : "ログインして保存"}
         </button>
       </header>
@@ -434,7 +434,7 @@ export default function ShopAdminView({ shop, name }: Props) {
             <label className="float"><span>LINE名</span>
               <input value={lineDraft} onChange={(e) => setLineDraft(e.target.value)}
                 placeholder="表示名" autoComplete="nickname" autoFocus /></label>
-            <button type="submit" className="cta go" disabled={!lineDraft.trim()}>保存</button>
+            <button type="submit" className="cta go" disabled={!lineDraft.trim()}>サインイン</button>
             <p className="hint" style={{ marginTop: 10 }}>より安全なLINE連携は準備中</p>
           </form>
         </div>
