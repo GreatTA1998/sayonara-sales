@@ -1,10 +1,11 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as PtrEv } from "react";
 import AppNav from "@/components/app-nav";
 import { Icon, IconBtn } from "@/components/icons";
 import { LineLoginLink, useLineOAuthReturn } from "@/components/line-oauth";
 import { Listings, type PhotoItem } from "@/components/photo-listing";
 import { Snack, useSnack } from "@/components/snack";
+import { compressImage } from "@/lib/compress";
 import { dayLbl, isLateOnly } from "@/lib/days";
 import { PICKUP_DAYS, PICKUP_SLOTS } from "@/lib/sale";
 import { AUTH_EVT, adminPath, getName, getProfile, openShop, saveProfile } from "@/lib/shop";
@@ -32,6 +33,10 @@ const methodJa = (m?: string) => (m === "phone" ? "電話" : m === "line" ? "LIN
 const kuStem = (v: string) => v.replace(/区$/, "");
 const kuFull = (v: string) => { const s = kuStem(v).trim(); return s ? `${s}区` : ""; };
 const itemLabel = (it?: Item | null) => it?.name?.trim() || "無題";
+const isRemote = (u: string) => /^https?:\/\//i.test(u);
+const tempId = () => `tmp-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+type PicStatus = "uploading" | "error";
+type PicJob = { file: File; itemId: string; kind: "append" | "create" };
 /** Claim line items by price desc (missing ids → 無題 stubs). */
 function claimItems(c: Claim, all: Item[]) {
   return c.itemIds
@@ -48,7 +53,9 @@ function claimSummary(c: Claim, all: Item[]) {
 export default function ShopAdminView({ shop, name }: Props) {
   const [data, setData] = useState<AdminState | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [uploading, setUploading] = useState<string | null>(null);
+  const [listBusy, setListBusy] = useState(false);
+  const [picBusy, setPicBusy] = useState<Record<string, PicStatus>>({});
+  const picJobs = useRef<Record<string, PicJob>>({});
   const [deleting, setDeleting] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -75,6 +82,9 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [listDraft, setListDraft] = useState("");
   const listRef = useRef<HTMLInputElement | null>(null);
   const maskPtr = useRef(false);
+  const dragRef = useRef<{ from: number; over: number; x: number; y: number; moved: boolean } | null>(null);
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
   const [pub, setPub] = useState<"off" | "on" | "ok">("off");
   const { snack, show } = useSnack();
   const [addrDraft, setAddrDraft] = useState("");
@@ -329,53 +339,110 @@ export default function ShopAdminView({ shop, name }: Props) {
     });
   }
 
-  async function uploadPhoto(itemId: string, file: File) {
-    setUploading(itemId); setErr(null); show("アップロード中…", "busy");
-    try {
-      const fd = new FormData();
-      fd.set("file", file);
-      fd.set("itemId", itemId);
-      const res = await fetch(api(shop, "/api/admin/upload"), { method: "POST", body: fd });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || "アップロードに失敗しました");
-      if (body.item) upsertItem(body.item as Item);
-      else {
-        const photos = Array.isArray(body.photos) ? body.photos.map(String) : [];
-        setData((d) => d && {
-          ...d,
-          items: d.items.map((i) => (i.id === itemId ? { ...i, photos } : i)),
-        });
+  function setPicStatus(url: string, st: PicStatus | null) {
+    setPicBusy((s) => {
+      if (!st) {
+        if (!(url in s)) return s;
+        const next = { ...s };
+        delete next[url];
+        return next;
       }
-      show("写真を追加しました", "ok");
+      return { ...s, [url]: st };
+    });
+  }
+
+  function patchPhotos(itemId: string, fn: (photos: string[]) => string[]) {
+    setData((d) => {
+      if (!d) return d;
+      return {
+        ...d,
+        items: d.items.map((i) => (i.id === itemId ? { ...i, photos: fn(i.photos || []) } : i)),
+      };
+    });
+  }
+
+  function swallowGhostClick() {
+    const stop = (ev: Event) => { ev.preventDefault(); ev.stopPropagation(); };
+    document.addEventListener("click", stop, true);
+    document.addEventListener("pointerup", stop, true);
+    window.setTimeout(() => {
+      document.removeEventListener("click", stop, true);
+      document.removeEventListener("pointerup", stop, true);
+    }, 400);
+  }
+
+  async function postUpload(file: File, itemId?: string) {
+    const compressed = await compressImage(file);
+    const fd = new FormData();
+    fd.set("file", compressed);
+    if (itemId && !itemId.startsWith("tmp-")) fd.set("itemId", itemId);
+    const res = await fetch(api(shop, "/api/admin/upload"), { method: "POST", body: fd });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || "アップロードに失敗しました");
+    return body as { item?: Item; url?: string; photos?: string[] };
+  }
+
+  async function runPicJob(local: string) {
+    const job = picJobs.current[local];
+    if (!job) return;
+    setPicStatus(local, "uploading");
+    setErr(null);
+    try {
+      if (job.kind === "create") {
+        const body = await postUpload(job.file);
+        if (!body.item) throw new Error("アップロードに失敗しました");
+        setData((d) => {
+          if (!d) return d;
+          const items = d.items.filter((i) => i.id !== job.itemId);
+          return { ...d, items: [...items, body.item as Item] };
+        });
+        if (openId === job.itemId) {
+          editIdRef.current = body.item.id;
+          setOpenId(body.item.id);
+        }
+      } else {
+        const body = await postUpload(job.file, job.itemId);
+        const remote = String(body.url || (body.item?.photos || []).slice(-1)[0] || "");
+        if (!remote) throw new Error("アップロードに失敗しました");
+        // Upload route already persisted; keep other in-flight blob previews.
+        patchPhotos(job.itemId, (photos) => photos.map((p) => (p === local ? remote : p)));
+      }
+      URL.revokeObjectURL(local);
+      delete picJobs.current[local];
+      setPicStatus(local, null);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "アップロードに失敗しました";
       setErr(msg); show(msg, "err");
-    } finally { setUploading(null); }
+      setPicStatus(local, "error");
+    }
   }
 
-  async function addFromPhotos(files: File[]) {
-    const images = files.filter((f) => f.type.startsWith("image/"));
-    if (!images.length) return;
-    setUploading("batch"); setErr(null);
-    let ok = 0;
-    show(`アップロード中 0/${images.length}…`, "busy");
-    for (let i = 0; i < images.length; i++) {
-      try {
-        const fd = new FormData();
-        fd.set("file", images[i]);
-        const res = await fetch(api(shop, "/api/admin/upload"), { method: "POST", body: fd });
-        const body = await res.json();
-        if (!res.ok) throw new Error(body.error || "アップロードに失敗しました");
-        if (body.item) upsertItem(body.item as Item);
-        ok++;
-        show(`アップロード中 ${ok}/${images.length}…`, "busy");
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : "アップロードに失敗しました";
-        setErr(msg); show(msg, "err");
-      }
+  function queueAppend(itemId: string, files: File[]) {
+    const images = files.filter((f) => f.type.startsWith("image/") || /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(f.name));
+    for (const file of images) {
+      const local = URL.createObjectURL(file);
+      picJobs.current[local] = { file, itemId, kind: "append" };
+      patchPhotos(itemId, (photos) => [...photos, local]);
+      void runPicJob(local);
     }
-    setUploading(null);
-    if (ok) show(ok === 1 ? "品目を追加しました" : `${ok}件追加しました`, "ok");
+  }
+
+  function addFromPhotos(files: File[]) {
+    const images = files.filter((f) => f.type.startsWith("image/") || /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(f.name));
+    if (!images.length) return;
+    setErr(null);
+    for (const file of images) {
+      const local = URL.createObjectURL(file);
+      const id = tempId();
+      picJobs.current[local] = { file, itemId: id, kind: "create" };
+      upsertItem({ id, name: "", price: 0, photos: [local] });
+      void runPicJob(local);
+    }
+  }
+
+  function retryPic(local: string) {
+    if (!picJobs.current[local]) return;
+    void runPicJob(local);
   }
 
   async function onListEnter() {
@@ -385,10 +452,10 @@ export default function ShopAdminView({ shop, name }: Props) {
       setListDraft("");
       return;
     }
-    if (uploading) return;
-    setUploading("list");
+    if (listBusy) return;
+    setListBusy(true);
     const ok = await act({ action: "add", name: v }, "品目を追加しました");
-    setUploading(null);
+    setListBusy(false);
     if (!ok) return;
     setListDraft("");
     requestAnimationFrame(() => listRef.current?.focus());
@@ -398,6 +465,17 @@ export default function ShopAdminView({ shop, name }: Props) {
     if (!confirm(`「${item.name || "無題"}」を削除しますか？`)) return;
     setDeleting(item.id); show("削除中…", "busy");
     try {
+      if (item.id.startsWith("tmp-")) {
+        (item.photos || []).forEach((u) => {
+          if (u.startsWith("blob:")) URL.revokeObjectURL(u);
+          delete picJobs.current[u];
+          setPicStatus(u, null);
+        });
+        setData((d) => d && { ...d, items: d.items.filter((i) => i.id !== item.id) });
+        if (openId === item.id) { editIdRef.current = null; editSavedRef.current = null; setOpenId(null); }
+        show("削除しました", "ok");
+        return;
+      }
       const ok = await act({ action: "remove", id: item.id });
       if (ok && (openId === item.id || editIdRef.current === item.id)) {
         if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
@@ -409,12 +487,38 @@ export default function ShopAdminView({ shop, name }: Props) {
     } finally { setDeleting(null); }
   }
 
+  /** Persist remote photo order without wiping local blob previews via apply(). */
+  async function saveRemotePhotos(itemId: string, photos: string[]) {
+    if (itemId.startsWith("tmp-")) return true;
+    const remotes = photos.filter(isRemote);
+    const res = await fetch(api(shop, "/api/admin"), {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "edit", id: itemId, photos: remotes }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      const msg = (body as { error?: string }).error || "失敗しました";
+      setErr(msg); show(msg, "err");
+      return false;
+    }
+    return true;
+  }
+
   async function deletePhoto(item: Item, url: string) {
     if (!confirm(`この写真を削除しますか？`)) return;
+    if (url.startsWith("blob:")) {
+      URL.revokeObjectURL(url);
+      delete picJobs.current[url];
+      setPicStatus(url, null);
+      patchPhotos(item.id, (photos) => photos.filter((p) => p !== url));
+      show("写真を削除しました", "ok");
+      return;
+    }
     const photos = (item.photos || []).filter((p) => p !== url);
+    patchPhotos(item.id, () => photos);
     setDeleting(item.id); show("削除中…", "busy");
     try {
-      const ok = await act({ action: "edit", id: item.id, photos });
+      const ok = await saveRemotePhotos(item.id, photos);
       show(ok ? "写真を削除しました" : "削除に失敗しました", ok ? "ok" : "err");
     } finally { setDeleting(null); }
   }
@@ -426,7 +530,41 @@ export default function ShopAdminView({ shop, name }: Props) {
     const [moved] = photos.splice(from, 1);
     photos.splice(to, 0, moved);
     upsertItem({ ...item, photos });
-    await act({ action: "edit", id: item.id, photos });
+    await saveRemotePhotos(item.id, photos);
+  }
+
+  function onPicPointerDown(e: PtrEv<HTMLDivElement>, i: number) {
+    if (deleting || (open?.photos || []).length < 2) return;
+    const t = e.target as HTMLElement;
+    if (t.closest("button, .pic-more, .menu-pop, .pic-retry")) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragRef.current = { from: i, over: i, x: e.clientX, y: e.clientY, moved: false };
+    setDragFrom(i);
+    setDragOver(i);
+  }
+
+  function onPicPointerMove(e: PtrEv<HTMLDivElement>) {
+    const d = dragRef.current;
+    if (!d) return;
+    if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 10) return;
+    d.moved = true;
+    const hit = document.elementsFromPoint(e.clientX, e.clientY)
+      .find((n): n is HTMLElement => n instanceof HTMLElement && n.dataset.picIdx != null);
+    if (!hit) return;
+    const over = Number(hit.dataset.picIdx);
+    if (!Number.isNaN(over) && over !== d.over) {
+      d.over = over;
+      setDragOver(over);
+    }
+  }
+
+  function onPicPointerUp() {
+    const d = dragRef.current;
+    dragRef.current = null;
+    setDragFrom(null);
+    setDragOver(null);
+    if (!d?.moved || !open || d.over === d.from) return;
+    void reorderPhotos(open, d.from, d.over);
   }
 
   function saveLogin(e: { preventDefault(): void }) {
@@ -565,7 +703,7 @@ export default function ShopAdminView({ shop, name }: Props) {
       <div className="add-dual">
         <div className="add-row">
           <button type="button" className="cta"
-            disabled={!data || !!uploading}
+            disabled={!data || listBusy}
             onClick={() => {
               setListOpen((v) => {
                 if (v) { setListDraft(""); return false; }
@@ -576,7 +714,7 @@ export default function ShopAdminView({ shop, name }: Props) {
             }}>リスト入力</button>
           <div className="add-photo">
             <button type="button" className="cta"
-              disabled={!data || !!uploading}
+              disabled={!data}
               onClick={() => fileRef.current?.click()}>
               <Icon name="camera" size={18} />写真を追加
             </button>
@@ -585,7 +723,7 @@ export default function ShopAdminView({ shop, name }: Props) {
         </div>
         {listOpen && (
           <div className="list-row">
-            <input ref={listRef} value={listDraft} disabled={!!uploading}
+            <input ref={listRef} value={listDraft} disabled={listBusy}
               placeholder="品名" aria-label="品名"
               onChange={(e) => setListDraft(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void onListEnter(); } }} />
@@ -596,8 +734,8 @@ export default function ShopAdminView({ shop, name }: Props) {
         )}
       </div>
       <input ref={fileRef} type="file" accept={IMG_ACCEPT} multiple hidden
-        disabled={!data || !!uploading}
-        onChange={(e) => { const f = e.target.files; e.target.value = ""; if (f?.length) void addFromPhotos(Array.from(f)); }} />
+        disabled={!data}
+        onChange={(e) => { const f = e.target.files; e.target.value = ""; if (f?.length) addFromPhotos(Array.from(f)); }} />
 
       {!empty && (
         <Listings items={items} onSelect={openDetail}
@@ -670,49 +808,72 @@ export default function ShopAdminView({ shop, name }: Props) {
 
       {open && (
         <div className="mask" role="dialog" aria-modal="true" aria-label="品目を編集"
-          onPointerDown={(e) => { maskPtr.current = e.target === e.currentTarget; }}
-          onPointerUp={(e) => {
-            if (!maskPtr.current || e.target !== e.currentTarget || busyOpen) return;
+          onPointerDownCapture={(e) => {
+            if (e.target !== e.currentTarget) { maskPtr.current = false; return; }
+            e.stopPropagation();
+            maskPtr.current = true;
+          }}
+          onPointerUpCapture={(e) => {
+            if (e.target !== e.currentTarget) return;
+            e.stopPropagation();
+            if (!maskPtr.current || busyOpen) return;
             const sel = typeof window !== "undefined" ? window.getSelection()?.toString() : "";
             if (sel) return;
+            swallowGhostClick();
             closeEdit();
+          }}
+          onClickCapture={(e) => {
+            if (e.target !== e.currentTarget) return;
+            e.stopPropagation();
+            e.preventDefault();
           }}>
           <div className="sheet edit" onClick={(e) => { e.stopPropagation(); if (sheetMenu) setSheetMenu(null); }}>
             <h2>編集</h2>
             <div className="pics">
-              {pics.map((src, i) => (
-                <div key={src} className="pic-wrap" draggable={!busyOpen && pics.length > 1}
-                  onClick={(e) => e.stopPropagation()}
-                  onDragStart={(e) => { e.dataTransfer.setData("text/plain", String(i)); e.dataTransfer.effectAllowed = "move"; }}
-                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    const from = Number(e.dataTransfer.getData("text/plain"));
-                    if (!Number.isNaN(from)) void reorderPhotos(open, from, i);
-                  }}>
-                  <img src={src} alt="" loading="lazy" decoding="async" draggable={false} />
-                  <div className="pic-more">
-                    <IconBtn name="more" label="写真メニュー" disabled={busyOpen} size={22} className="more"
-                      onClick={() => setSheetMenu(sheetMenu === src ? null : src)} />
-                    {sheetMenu === src && (
-                      <div className="menu-pop">
-                        <button type="button" className="danger" disabled={busyOpen}
-                          onClick={() => { setSheetMenu(null); void deletePhoto(open, src); }}>
-                          <Icon name="trash" size={16} /> 写真を削除
-                        </button>
-                      </div>
+              {pics.map((src, i) => {
+                const st = picBusy[src];
+                const cls = [
+                  "pic-wrap",
+                  pics.length > 1 ? "sortable" : "",
+                  dragFrom === i ? "dragging" : "",
+                  dragOver === i && dragFrom !== i ? "drag-over" : "",
+                  st === "uploading" ? "uploading" : "",
+                  st === "error" ? "error" : "",
+                ].filter(Boolean).join(" ");
+                return (
+                  <div key={src} className={cls} data-pic-idx={i}
+                    onPointerDown={(e) => onPicPointerDown(e, i)}
+                    onPointerMove={onPicPointerMove}
+                    onPointerUp={onPicPointerUp}
+                    onPointerCancel={onPicPointerUp}>
+                    <img src={src} alt="" loading="lazy" decoding="async" draggable={false} />
+                    {st === "uploading" && <span className="pic-status" aria-label="アップロード中">…</span>}
+                    {st === "error" && (
+                      <button type="button" className="pic-retry" onClick={() => retryPic(src)}>再試行</button>
                     )}
+                    <div className="pic-more">
+                      <IconBtn name="more" label="写真メニュー" disabled={busyOpen || !!st} size={22} className="more"
+                        onClick={() => setSheetMenu(sheetMenu === src ? null : src)} />
+                      {sheetMenu === src && (
+                        <div className="menu-pop">
+                          <button type="button" className="danger" disabled={busyOpen}
+                            onClick={() => { setSheetMenu(null); void deletePhoto(open, src); }}>
+                            <Icon name="trash" size={16} /> 写真を削除
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-              <label className={`pic-add${uploading === open.id || busyOpen ? " busy" : ""}`}
+                );
+              })}
+              <label className={`pic-add${busyOpen ? " busy" : ""}`}
                 aria-label="写真を追加" onClick={(e) => e.stopPropagation()}>
                 <Icon name="plus" size={18} />
-                <input type="file" accept={IMG_ACCEPT} hidden disabled={busyOpen || uploading === open.id}
+                <input type="file" accept={IMG_ACCEPT} multiple hidden disabled={busyOpen}
                   onChange={(e) => {
-                    const f = e.target.files?.[0];
+                    const list = e.target.files;
                     e.target.value = "";
-                    if (f) uploadPhoto(open.id, f);
+                    if (list?.length) queueAppend(open.id, Array.from(list));
                   }} />
               </label>
             </div>
