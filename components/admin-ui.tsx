@@ -48,6 +48,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [lineDraft, setLineDraft] = useState("");
   const [label, setLabel] = useState(/^\d{5}$/.test(name) ? "" : name);
   const fileRef = useRef<HTMLInputElement>(null);
+  const bioRef = useRef<HTMLTextAreaElement>(null);
   const [bio, setBio] = useState("");
   const [jimoty, setJimoty] = useState("");
   const [slots, setSlots] = useState<string[]>([...PICKUP_SLOTS]);
@@ -115,6 +116,14 @@ export default function ShopAdminView({ shop, name }: Props) {
     if (addrTimer.current) clearTimeout(addrTimer.current);
     if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
   }, []);
+
+  function fitBio() {
+    const el = bioRef.current;
+    if (!el) return;
+    el.style.height = "0px";
+    el.style.height = `${el.scrollHeight}px`;
+  }
+  useEffect(() => { fitBio(); }, [bio]);
 
   const items = useMemo(() => [...(data?.items || [])].sort(byPriceDesc), [data?.items]);
   const open = useMemo(() => items.find((i) => i.id === openId) || null, [items, openId]);
@@ -492,8 +501,11 @@ export default function ShopAdminView({ shop, name }: Props) {
       <section className="prof-block">
         <div className="claims-h">ショップ情報</div>
         <label className="float"><span>ショップメモ</span>
-          <textarea value={bio} rows={2} onChange={(e) => setBio(e.target.value)}
-            onBlur={() => void persistProfile(bio, jimoty)} placeholder="動作確認・値引き・引越し・車・まとめ買い優先など" /></label>
+          <textarea ref={bioRef} className="grow" value={bio} rows={1}
+            onChange={(e) => setBio(e.target.value)}
+            onInput={fitBio}
+            onBlur={() => void persistProfile(bio, jimoty)}
+            placeholder="動作確認・値引き・引越し・車・まとめ買い優先など" /></label>
         <label className="float"><span>ジモティーURL（任意）</span>
           <input value={jimoty} onChange={(e) => setJimoty(e.target.value)}
             onBlur={() => void persistProfile(bio, jimoty)}
