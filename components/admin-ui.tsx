@@ -8,7 +8,7 @@ import SquareCam from "@/components/square-cam";
 import { Snack, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { dayLbl, isLateOnly } from "@/lib/days";
-import { PICKUP_DAYS, PICKUP_SLOTS } from "@/lib/sale";
+import { PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
 import { AUTH_EVT, adminPath, getName, getProfile, openShop, saveProfile } from "@/lib/shop";
 import { SITE_URL } from "@/lib/site";
 
@@ -119,9 +119,10 @@ export default function ShopAdminView({ shop, name }: Props) {
       setAddrDraft(stem);
     }
     const local = getProfile();
-    setBio(body.bio || local.bio || "");
+    const bioVal = body.bio || local.bio || "";
+    setBio(bioVal);
     setJimoty(body.jimotyUrl || local.jimotyUrl || "");
-    setYoutube(body.youtubeUrl || local.youtubeUrl || "");
+    setYoutube(body.youtubeUrl || ytUrl(bioVal) || local.youtubeUrl || "");
     setLineInvite(body.lineInviteUrl || "");
     setPhone(body.phone || "");
     setSlots(body.slots?.length ? body.slots : [...PICKUP_SLOTS]);
@@ -249,11 +250,13 @@ export default function ShopAdminView({ shop, name }: Props) {
     nextBio: string, nextJimoty: string, nextYt = youtube,
     nextLine = lineInvite, nextPhone = phone,
   ) {
-    saveProfile({ bio: nextBio, jimotyUrl: nextJimoty, youtubeUrl: nextYt });
+    const yt = nextYt.trim() || ytUrl(nextBio);
+    saveProfile({ bio: nextBio, jimotyUrl: nextJimoty, youtubeUrl: yt });
     await act({
-      action: "profile", bio: nextBio, jimotyUrl: nextJimoty, youtubeUrl: nextYt,
+      action: "profile", bio: nextBio, jimotyUrl: nextJimoty, youtubeUrl: yt,
       lineInviteUrl: nextLine, phone: nextPhone,
     });
+    if (yt !== nextYt) setYoutube(yt);
   }
 
   const contactOk = !!(lineInvite.trim() || phone.trim());
@@ -679,16 +682,18 @@ export default function ShopAdminView({ shop, name }: Props) {
         <label className="float"><span>ショップメモ</span>
           <textarea className="grow" value={bio} rows={1}
             onChange={(e) => setBio(e.target.value)}
-            onBlur={() => void persistProfile(bio, jimoty)}
-            placeholder="動作確認・値引き・引越し・車・まとめ買い優先など" /></label>
-        <label className="float"><span>Jimoty profile（任意）</span>
-          <input value={jimoty} onChange={(e) => setJimoty(e.target.value)}
-            onBlur={() => void persistProfile(bio, jimoty)}
-            placeholder="https://jmty.jp/…" inputMode="url" /></label>
-        <label className="float"><span>YouTube（アパート・任意）</span>
-          <input value={youtube} onChange={(e) => setYoutube(e.target.value)}
             onBlur={() => void persistProfile(bio, jimoty, youtube)}
-            placeholder="https://youtu.be/…" inputMode="url" /></label>
+            placeholder="動作確認・値引き・引越し・車・まとめ買い優先など" /></label>
+        <div className="name-price">
+          <label className="float"><span>Jimoty profile</span>
+            <input value={jimoty} onChange={(e) => setJimoty(e.target.value)}
+              onBlur={() => void persistProfile(bio, jimoty, youtube)}
+              placeholder="https://jmty.jp/…" inputMode="url" autoComplete="url" /></label>
+          <label className="float"><span>YouTube（アパート）</span>
+            <input value={youtube} onChange={(e) => setYoutube(e.target.value)}
+              onBlur={() => void persistProfile(bio, jimoty, youtube)}
+              placeholder="https://youtu.be/…" inputMode="url" autoComplete="url" /></label>
+        </div>
         <p className="hint">買い手連絡 — LINEか電話のどちらか必須</p>
         <label className="float"><span>LINE招待リンク</span>
           <input value={lineInvite} onChange={(e) => setLineInvite(e.target.value)}

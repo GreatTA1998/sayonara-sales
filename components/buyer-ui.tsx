@@ -5,7 +5,7 @@ import { byPrice, Listings, ListingTools, money, useDense, usePriceDir } from "@
 import { Snack, useSnack } from "@/components/snack";
 import { dayLbl, pickupSpan, rangeLbl } from "@/lib/days";
 import { AUTH_EVT, applyLineSession, getName, openShop } from "@/lib/shop";
-import { telHref } from "@/lib/sale";
+import { telHref, ytUrl } from "@/lib/sale";
 import { SITE_URL } from "@/lib/site";
 
 type Item = {
@@ -210,6 +210,10 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     ? `後半のみ（${rangeLbl(open.availableFrom, state?.days?.[state.days.length - 1])}）`
     : open ? rangeLbl(open.availableFrom, open.availableTo) : "";
   const needWlName = takenOpen && !waiting && !(getName() || lineName).trim();
+  const yt = (state?.youtubeUrl || "").trim() || ytUrl(state?.bio || "");
+  const bioShow = yt && state?.bio
+    ? state.bio.replace(yt, "").replace(/[：:]\s*$/m, "").trimEnd()
+    : state?.bio;
 
   return (
     <main className={`buy${embed ? " embed" : ""}`}>
@@ -231,18 +235,18 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
           {picked.size ? `引き取りを依頼 (${picked.size})` : "引き取りを依頼"}
         </button>
       </header>
-      {state?.bio ? <p className="hint bio">{state.bio}</p> : null}
-      {(state?.jimotyUrl || state?.youtubeUrl) ? (
+      {bioShow ? <p className="hint bio">{bioShow}</p> : null}
+      {(state?.jimotyUrl || yt) ? (
         <p className="ext-links">
-          {state.jimotyUrl ? (
+          {state?.jimotyUrl ? (
             <a className="ext-link" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">
-              <img src="/jimoty.svg" alt="" width={16} height={16} />
+              <img className="ext-ico" src="/jimoty.png" alt="" width={16} height={16} />
               Jimoty profile
             </a>
           ) : null}
-          {state.youtubeUrl ? (
-            <a className="ext-link" href={state.youtubeUrl} target="_blank" rel="noopener noreferrer">
-              <img src="/youtube.svg" alt="" width={16} height={16} />
+          {yt ? (
+            <a className="ext-link" href={yt} target="_blank" rel="noopener noreferrer">
+              <img className="ext-ico" src="/youtube.svg" alt="" width={16} height={16} />
               YouTube
             </a>
           ) : null}

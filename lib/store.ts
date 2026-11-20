@@ -2,8 +2,8 @@ import { promises as fs } from "fs";
 import path from "path";
 import { put, get } from "@vercel/blob";
 import { daysBetween, isLateOnly, lateFrom, rangeLbl } from "./days";
-import { CANON_LINE, CANON_PHONE, LATE_FROM, PICKUP_DAYS, PICKUP_SLOTS } from "./sale";
-export { CANON_LINE, CANON_PHONE, telHref } from "./sale";
+import { CANON_LINE, CANON_PHONE, LATE_FROM, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "./sale";
+export { CANON_LINE, CANON_PHONE, telHref, ytUrl } from "./sale";
 
 export type Item = {
   id: string; name: string; price: number | null; note?: string; claimId?: string | null;
@@ -177,6 +177,11 @@ export function withStore<T>(shop: string, fn: (s: Store) => T | Promise<T>): Pr
 function scrub(s: Store) {
   delete (s as { capacity?: unknown }).capacity;
   for (const it of s.items) delete (it as { availableAfter?: string }).availableAfter;
+  // Promote YouTube pasted into ショップメモ into the dedicated field.
+  if (!(s.youtubeUrl || "").trim()) {
+    const y = ytUrl(s.bio || "");
+    if (y) s.youtubeUrl = y;
+  }
   return s;
 }
 
