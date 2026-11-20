@@ -1,7 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { put, get } from "@vercel/blob";
-import { isLateOnly, rangeLbl } from "./days";
+import { daysBetween, isLateOnly, lateFrom, rangeLbl } from "./days";
 import { LATE_FROM, PICKUP_DAYS, PICKUP_SLOTS } from "./sale";
 
 export type Item = {
@@ -17,13 +17,27 @@ export type Claim = {
 export type Store = {
   address: string; bio?: string; jimotyUrl?: string;
   /** Custom pickup windows; omit → PICKUP_SLOTS defaults. */
-  slots?: string[]; items: Item[]; claims: Claim[];
+  slots?: string[];
+  /** Pickup range + final move-out (YYYY-MM-DD); omit → PICKUP_DAYS defaults. */
+  pickupFrom?: string; pickupTo?: string; moveOut?: string;
+  items: Item[]; claims: Claim[];
 };
 
 export { LATE_FROM, PICKUP_DAYS, PICKUP_SLOTS, isLateOnly };
 
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
+const asYmd = (v: unknown) => { const s = String(v || "").trim(); return YMD.test(s) ? s : ""; };
+
 /** Shop's offerable slots (custom or defaults). */
 export const shopSlots = (s: Store) => (s.slots?.length ? s.slots : [...PICKUP_SLOTS]);
+
+/** Shop pickup days (custom range or defaults). */
+export const shopDays = (s: Store) => {
+  const days = daysBetween(s.pickupFrom || PICKUP_DAYS[0], s.pickupTo || PICKUP_DAYS[PICKUP_DAYS.length - 1]);
+  return days.length ? days : [...PICKUP_DAYS];
+};
+
+export const shopMoveOut = (s: Store) => s.moveOut || s.pickupTo || PICKUP_DAYS[PICKUP_DAYS.length - 1];
 
 /** Normalize admin slot labels (en dash, trim, dedupe). */
 export function normalizeSlots(raw: unknown): string[] {
@@ -35,8 +49,21 @@ export function normalizeSlots(raw: unknown): string[] {
   return out;
 }
 
-export const setLateOnly = (it: Item, on: boolean) => {
-  if (on) { it.availableFrom = LATE_FROM; delete it.availableTo; }
+/** Persist pickup range + move-out; returns normalized fields. */
+export function applyDates(s: Store, raw: { pickupFrom?: unknown; pickupTo?: unknown; moveOut?: unknown }) {
+  const from = asYmd(raw.pickupFrom) || s.pickupFrom || PICKUP_DAYS[0];
+  const to = asYmd(raw.pickupTo) || s.pickupTo || PICKUP_DAYS[PICKUP_DAYS.length - 1];
+  if (to < from) throw new Error("受取終了は開始以降にしてください");
+  if (!daysBetween(from, to).length) throw new Error("受取日が不正です");
+  s.pickupFrom = from;
+  s.pickupTo = to;
+  const mo = asYmd(raw.moveOut);
+  s.moveOut = mo || to;
+  return { pickupFrom: s.pickupFrom, pickupTo: s.pickupTo, moveOut: s.moveOut };
+}
+
+export const setLateOnly = (it: Item, on: boolean, from: string) => {
+  if (on) { it.availableFrom = from; delete it.availableTo; }
   else { delete it.availableFrom; delete it.availableTo; }
 };
 

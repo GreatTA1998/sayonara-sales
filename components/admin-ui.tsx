@@ -5,7 +5,7 @@ import { Icon, IconBtn } from "@/components/icons";
 import { Listings, type PhotoItem } from "@/components/photo-listing";
 import { Snack, useSnack } from "@/components/snack";
 import { dayLbl, isLateOnly } from "@/lib/days";
-import { PICKUP_SLOTS } from "@/lib/sale";
+import { PICKUP_DAYS, PICKUP_SLOTS } from "@/lib/sale";
 import { AUTH_EVT, adminPath, getName, getProfile, openShop, saveProfile } from "@/lib/shop";
 import { SITE_URL } from "@/lib/site";
 
@@ -14,9 +14,15 @@ type Claim = {
   id: string; code: string; day: string; slot?: string; contact?: string; contactMethod?: string;
   itemIds: string[]; status: string;
 };
-type AdminState = { address: string; bio?: string; jimotyUrl?: string; slots?: string[]; items: Item[]; claims: Claim[] };
+type AdminState = {
+  address: string; bio?: string; jimotyUrl?: string; slots?: string[];
+  pickupFrom?: string; pickupTo?: string; moveOut?: string;
+  items: Item[]; claims: Claim[];
+};
 type Props = { shop: string; name: string };
 const fmtSlot = (a: string, b: string) => `${a}–${b}`;
+const DEF_FROM = PICKUP_DAYS[0];
+const DEF_TO = PICKUP_DAYS[PICKUP_DAYS.length - 1];
 
 const IMG_ACCEPT = "image/jpeg,image/png,image/heic,image/heif,image/webp,image/gif,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif";
 const api = (shop: string, path: string) => `${path}?shop=${encodeURIComponent(shop)}`;
@@ -46,6 +52,9 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [slots, setSlots] = useState<string[]>([...PICKUP_SLOTS]);
   const [slotA, setSlotA] = useState("11:00");
   const [slotB, setSlotB] = useState("11:15");
+  const [pickupFrom, setPickupFrom] = useState(DEF_FROM);
+  const [pickupTo, setPickupTo] = useState(DEF_TO);
+  const [moveOut, setMoveOut] = useState(DEF_TO);
   const [pub, setPub] = useState<"off" | "on" | "ok">("off");
   const { snack, show } = useSnack();
   const [addrDraft, setAddrDraft] = useState("");
@@ -71,6 +80,9 @@ export default function ShopAdminView({ shop, name }: Props) {
     setBio(body.bio || local.bio || "");
     setJimoty(body.jimotyUrl || local.jimotyUrl || "");
     setSlots(body.slots?.length ? body.slots : [...PICKUP_SLOTS]);
+    setPickupFrom(body.pickupFrom || DEF_FROM);
+    setPickupTo(body.pickupTo || DEF_TO);
+    setMoveOut(body.moveOut || body.pickupTo || DEF_TO);
   }, [shop, show]);
 
   useEffect(() => { void load(); }, [load]);
@@ -298,6 +310,14 @@ export default function ShopAdminView({ shop, name }: Props) {
     if (body?.slots) setSlots(body.slots as string[]);
   }
 
+  async function saveDates(from: string, to: string, out: string) {
+    const body = await act({ action: "dates", pickupFrom: from, pickupTo: to, moveOut: out }, "保存しました");
+    if (!body) return;
+    setPickupFrom(String(body.pickupFrom || from));
+    setPickupTo(String(body.pickupTo || to));
+    setMoveOut(String(body.moveOut || out));
+  }
+
   const busyOpen = open ? deleting === open.id : false;
   const pics = open?.photos || [];
   const empty = !!data && !items.length;
@@ -366,6 +386,19 @@ export default function ShopAdminView({ shop, name }: Props) {
           <input value={jimoty} onChange={(e) => setJimoty(e.target.value)}
             onBlur={() => void persistProfile(bio, jimoty)}
             placeholder="https://jmty.jp/…" inputMode="url" /></label>
+        <div className="claims-h" style={{ marginTop: 8 }}>受取日・退去日</div>
+        <div className="slot-add">
+          <label className="float" style={{ flex: 1, margin: 0 }}><span>受取開始</span>
+            <input type="date" value={pickupFrom} aria-label="受取開始"
+              onChange={(e) => { const v = e.target.value; setPickupFrom(v); void saveDates(v, pickupTo, moveOut); }} /></label>
+          <span aria-hidden="true">〜</span>
+          <label className="float" style={{ flex: 1, margin: 0 }}><span>受取終了</span>
+            <input type="date" value={pickupTo} aria-label="受取終了"
+              onChange={(e) => { const v = e.target.value; setPickupTo(v); void saveDates(pickupFrom, v, moveOut); }} /></label>
+        </div>
+        <label className="float"><span>最終退去日</span>
+          <input type="date" value={moveOut} aria-label="最終退去日"
+            onChange={(e) => { const v = e.target.value; setMoveOut(v); void saveDates(pickupFrom, pickupTo, v); }} /></label>
         <div className="claims-h" style={{ marginTop: 8 }}>受取時間</div>
         <p className="hint">依頼中・確定済みの枠は購入者に出ません。</p>
         <div className="slot-edit" role="list">
