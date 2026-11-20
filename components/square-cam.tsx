@@ -8,6 +8,10 @@ type Props = {
   /** Each shutter (and album pick) — parent queues async create/upload. */
   onShot: (file: File) => void;
   accept: string;
+  /** Create-listing tip under header; omit for edit/append. */
+  tip?: string;
+  /** Edit/append: 0-radius viewfinder inset to match strip padding; create keeps rounded. */
+  sharp?: boolean;
 };
 
 const MAX = 1600;
@@ -92,7 +96,7 @@ async function squareFromFile(file: File): Promise<File> {
 }
 
 /** Mercari-like 1:1 camera: live preview, real square files (shutter + album), rounded viewfinder affordance. */
-export default function SquareCam({ open, onClose, onShot, accept }: Props) {
+export default function SquareCam({ open, onClose, onShot, accept, tip, sharp }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const albumRef = useRef<HTMLInputElement>(null);
@@ -241,8 +245,9 @@ export default function SquareCam({ open, onClose, onShot, accept }: Props) {
         <span className="scam-title">カメラ</span>
         <button type="button" className="scam-next" disabled={!shots.length} onClick={done}>次へ</button>
       </header>
+      {tip ? <p className="scam-tip hint">{tip}</p> : null}
 
-      <div className="scam-view">
+      <div className={`scam-view${sharp ? " sharp" : ""}`}>
         <video ref={videoRef} className="scam-video" playsInline muted autoPlay />
         {err && (
           <div className="scam-err">
