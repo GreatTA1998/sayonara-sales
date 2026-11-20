@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { getStore, isLateOnly, PICKUP_DAYS, PICKUP_SLOTS, shopFromUrl, takenSlots } from "@/lib/store";
+import { getStore, isLateOnly, PICKUP_DAYS, shopFromUrl, shopSlots, takenSlots } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const shop = shopFromUrl(req);
   const s = await getStore(shop);
+  const slots = shopSlots(s);
   const taken: Record<string, string[]> = {};
   for (const d of PICKUP_DAYS) taken[d] = takenSlots(s, d);
   return NextResponse.json({
@@ -14,7 +15,7 @@ export async function GET(req: Request) {
     bio: s.bio || "",
     jimotyUrl: s.jimotyUrl || "",
     days: PICKUP_DAYS,
-    slots: PICKUP_SLOTS,
+    slots,
     taken,
     lineInviteUrl: "https://line.me/ti/p/yBg2x2X_ut",
     items: [...s.items]
