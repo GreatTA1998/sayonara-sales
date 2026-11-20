@@ -5,7 +5,7 @@ import { Icon, IconBtn } from "@/components/icons";
 import { LineLoginLink, useLineOAuthReturn } from "@/components/line-oauth";
 import { Listings, type PhotoItem } from "@/components/photo-listing";
 import { Snack, useSnack } from "@/components/snack";
-import { compressImage } from "@/lib/compress";
+import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { dayLbl, isLateOnly } from "@/lib/days";
 import { PICKUP_DAYS, PICKUP_SLOTS } from "@/lib/sale";
 import { AUTH_EVT, adminPath, getName, getProfile, openShop, saveProfile } from "@/lib/shop";
@@ -26,7 +26,8 @@ const fmtSlot = (a: string, b: string) => `${a}–${b}`;
 const DEF_FROM = PICKUP_DAYS[0];
 const DEF_TO = PICKUP_DAYS[PICKUP_DAYS.length - 1];
 
-const IMG_ACCEPT = "image/jpeg,image/png,image/heic,image/heif,image/webp,image/gif,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif";
+// image/* + image/jpg: Android camera often sends non-standard image/jpg or empty MIME.
+const IMG_ACCEPT = "image/*,image/jpeg,image/jpg,image/png,image/heic,image/heif,image/webp,image/gif,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif";
 const api = (shop: string, path: string) => `${path}?shop=${encodeURIComponent(shop)}`;
 const byPriceDesc = (a: Item, b: Item) => (b.price ?? -1) - (a.price ?? -1);
 const methodJa = (m?: string) => (m === "phone" ? "電話" : m === "line" ? "LINE" : m || "");
@@ -149,7 +150,13 @@ export default function ShopAdminView({ shop, name }: Props) {
   }
   useEffect(() => { fitBio(); }, [bio]);
 
-  const items = useMemo(() => [...(data?.items || [])].sort(byPriceDesc), [data?.items]);
+  // Pending camera uploads float to top so create-from-photo is visible immediately.
+  const items = useMemo(() => {
+    const all = data?.items || [];
+    const pending = all.filter((i) => i.id.startsWith("tmp-"));
+    const rest = all.filter((i) => !i.id.startsWith("tmp-")).sort(byPriceDesc);
+    return pending.length ? [...pending, ...rest] : [...all].sort(byPriceDesc);
+  }, [data?.items]);
   const open = useMemo(() => items.find((i) => i.id === openId) || null, [items, openId]);
   const pending = useMemo(() => (data?.claims || []).filter((c) => c.status === "booked"), [data?.claims]);
   const done = useMemo(() => (data?.claims || []).filter((c) => c.status === "picked_up"), [data?.claims]);
@@ -372,7 +379,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   }
 
   async function postUpload(file: File, itemId?: string) {
-    const compressed = await compressImage(file);
+    const compressed = await compressImage(ensureImageFile(file));
     const fd = new FormData();
     fd.set("file", compressed);
     if (itemId && !itemId.startsWith("tmp-")) fd.set("itemId", itemId);
@@ -418,7 +425,8 @@ export default function ShopAdminView({ shop, name }: Props) {
   }
 
   function queueAppend(itemId: string, files: File[]) {
-    const images = files.filter((f) => f.type.startsWith("image/") || /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(f.name));
+    const images = files.filter(isImageFile);
+    if (!images.length) { show("画像を選択してください", "err"); return; }
     for (const file of images) {
       const local = URL.createObjectURL(file);
       picJobs.current[local] = { file, itemId, kind: "append" };
@@ -428,13 +436,14 @@ export default function ShopAdminView({ shop, name }: Props) {
   }
 
   function addFromPhotos(files: File[]) {
-    const images = files.filter((f) => f.type.startsWith("image/") || /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(f.name));
-    if (!images.length) return;
+    const images = files.filter(isImageFile);
+    if (!images.length) { show("画像を選択してください", "err"); return; }
     setErr(null);
     for (const file of images) {
       const local = URL.createObjectURL(file);
       const id = tempId();
       picJobs.current[local] = { file, itemId: id, kind: "create" };
+      // Optimistic card first — never wait on compress/upload.
       upsertItem({ id, name: "", price: 0, photos: [local] });
       void runPicJob(local);
     }
@@ -735,7 +744,12 @@ export default function ShopAdminView({ shop, name }: Props) {
       </div>
       <input ref={fileRef} type="file" accept={IMG_ACCEPT} multiple hidden
         disabled={!data}
-        onChange={(e) => { const f = e.target.files; e.target.value = ""; if (f?.length) addFromPhotos(Array.from(f)); }} />
+        onChange={(e) => {
+          // FileList is live — snapshot BEFORE clearing value or the array is empty.
+          const files = Array.from(e.target.files || []);
+          e.target.value = "";
+          if (files.length) addFromPhotos(files);
+        }} />
 
       {!empty && (
         <Listings items={items} onSelect={openDetail}
@@ -871,9 +885,9 @@ export default function ShopAdminView({ shop, name }: Props) {
                 <Icon name="plus" size={18} />
                 <input type="file" accept={IMG_ACCEPT} multiple hidden disabled={busyOpen}
                   onChange={(e) => {
-                    const list = e.target.files;
+                    const files = Array.from(e.target.files || []);
                     e.target.value = "";
-                    if (list?.length) queueAppend(open.id, Array.from(list));
+                    if (files.length) queueAppend(open.id, files);
                   }} />
               </label>
             </div>
