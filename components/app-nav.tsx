@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LineLoginLink, useLineOAuthReturn } from "@/components/line-oauth";
 import {
-  AUTH_EVT, adminPath, ensureShopId, getId, getName, getProfile, openShop, saveProfile,
+  AUTH_EVT, adminPath, ensureShopId, getId, getName, openShop,
 } from "@/lib/shop";
 
 type Props = {
@@ -13,7 +13,7 @@ type Props = {
   onAuth?: () => void;
 };
 
-/** State-aware app chrome: logo+サヨナラ | 出品/マイ出品 | login/LINE名 (+ profile popover). */
+/** State-aware app chrome: logo+サヨナラ | 出品/マイ出品 | login/LINE名 (+ LINE popover). */
 export default function AppNav({ top, onAuth }: Props) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -21,19 +21,11 @@ export default function AppNav({ top, onAuth }: Props) {
   const [loginOpen, setLoginOpen] = useState(false);
   const [profOpen, setProfOpen] = useState(false);
   const [draft, setDraft] = useState("");
-  const [bio, setBio] = useState("");
-  const [jimoty, setJimoty] = useState("");
-  const [youtube, setYoutube] = useState("");
   const [path, setPath] = useState("");
 
   function sync() {
-    const n = getName();
-    setName(n);
+    setName(getName());
     setShopId(getId());
-    const p = getProfile();
-    setBio(p.bio);
-    setJimoty(p.jimotyUrl);
-    setYoutube(p.youtubeUrl);
   }
   useEffect(() => {
     sync();
@@ -52,12 +44,6 @@ export default function AppNav({ top, onAuth }: Props) {
     if (!openShop(draft)) return;
     setLoginOpen(false);
     onAuth?.();
-  }
-
-  function saveProf(e: { preventDefault(): void }) {
-    e.preventDefault();
-    saveProfile({ bio, jimotyUrl: jimoty, youtubeUrl: youtube });
-    setProfOpen(false);
   }
 
   const sellHref = shopId ? adminPath(shopId) : "/admin";
@@ -111,22 +97,11 @@ export default function AppNav({ top, onAuth }: Props) {
       {profOpen && (
         <div className="mask" role="dialog" aria-modal="true" aria-label="プロフィール"
           onClick={() => setProfOpen(false)}>
-          <form className="sheet" onClick={(e) => e.stopPropagation()} onSubmit={saveProf}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()}>
             <h2>{name}</h2>
-            <label className="float"><span>ショップメモ</span>
-              <textarea className="grow" value={bio} rows={1}
-                onChange={(e) => setBio(e.target.value)}
-                placeholder="動作確認・値引き・引越し・車・まとめ買い優先など" /></label>
-            <label className="float"><span>Jimoty profile（任意）</span>
-              <input value={jimoty} onChange={(e) => setJimoty(e.target.value)}
-                placeholder="https://jmty.jp/…" inputMode="url" autoComplete="url" /></label>
-            <label className="float"><span>YouTube（アパート・任意）</span>
-              <input value={youtube} onChange={(e) => setYoutube(e.target.value)}
-                placeholder="https://youtu.be/…" inputMode="url" autoComplete="url" /></label>
-            <button type="submit" className="cta go">保存</button>
-            <p className="hint" style={{ marginTop: 10 }}>より安全に使う場合はLINE連携</p>
+            <p className="hint">ショップメモ・Jimoty・YouTubeはマイ出品で編集</p>
             <LineLoginLink />
-          </form>
+          </div>
         </div>
       )}
     </>

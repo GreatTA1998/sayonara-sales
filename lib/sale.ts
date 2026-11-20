@@ -22,6 +22,14 @@ export const telHref = (phone: string) => {
   return `tel:${d}`;
 };
 
+/** First YouTube URL in text (field empty → promote from ショップメモ). */
+export const ytUrl = (s: string) => {
+  const m = s.match(
+    /https?:\/\/(?:www\.)?(?:youtu\.be\/[\w-]+(?:\?[^\s]*)?|youtube\.com\/(?:watch\?[^\s]*|shorts\/[\w-]+))/i,
+  );
+  return m ? m[0].replace(/[)\].,;]+$/, "") : "";
+};
+
 /** Listing grid price order — default cheapest first; unset/null last (¥0 is real). */
 export type PriceDir = "asc" | "desc";
 const priced = (p: number | null | undefined) => p != null;
