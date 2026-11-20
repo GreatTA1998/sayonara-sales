@@ -107,7 +107,7 @@ export function PhotoCard({
   );
 }
 
-/** Shared photoless tile — price (when set) + name. Dense = name-only one-liner. */
+/** Shared photoless tile — price + name; dense = name only (CSS columns). */
 export function TextTile({
   item, onClick, className = "", disabled, dense,
 }: {
