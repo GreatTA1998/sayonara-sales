@@ -8,12 +8,12 @@ import { byPrice, Listings, ListingTools, usePriceDir, type PhotoItem } from "@/
 import SquareCam from "@/components/square-cam";
 import { Snack, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
-import { dayLbl, isLateOnly } from "@/lib/days";
+import { dayLbl } from "@/lib/days";
 import { PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
 import { AUTH_EVT, adminPath, getName, getProfile, openShop, saveProfile } from "@/lib/shop";
 import { SITE_URL } from "@/lib/site";
 
-type Item = PhotoItem & { claimId?: string | null; note?: string; availableFrom?: string; availableTo?: string };
+type Item = PhotoItem & { claimId?: string | null; note?: string; paused?: boolean };
 type Claim = {
   id: string; code: string; day: string; slot?: string; contact?: string; contactMethod?: string;
   itemIds: string[]; status: string;
@@ -66,7 +66,6 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState("0");
   const [editNote, setEditNote] = useState("");
-  const [editLate, setEditLate] = useState(false);
   const [sheetMenu, setSheetMenu] = useState<string | null>(null);
   const [claimId, setClaimId] = useState<string | null>(null);
   const [logged, setLogged] = useState(false);
@@ -104,8 +103,8 @@ export default function ShopAdminView({ shop, name }: Props) {
   const addrReq = useRef(0);
   const editTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editIdRef = useRef<string | null>(null);
-  const editDraftRef = useRef({ name: "", price: "0", note: "", late: false });
-  const editSavedRef = useRef<{ id: string; name: string; price: number; note: string; late: boolean } | null>(null);
+  const editDraftRef = useRef({ name: "", price: "0", note: "" });
+  const editSavedRef = useRef<{ id: string; name: string; price: number; note: string } | null>(null);
   const editReq = useRef(0);
   const [priceDir, setPriceDir] = usePriceDir();
 
@@ -185,7 +184,10 @@ export default function ShopAdminView({ shop, name }: Props) {
       if (action === "add") return { ...d, items: [...d.items, body as unknown as Item] };
       if (action === "edit") {
         const next = body as unknown as Item;
-        return { ...d, items: d.items.map((i) => (i.id === next.id ? { ...i, ...next } : i)) };
+        return {
+          ...d,
+          items: d.items.map((i) => (i.id === next.id ? { ...i, ...next, paused: !!next.paused } : i)),
+        };
       }
       if (action === "remove") return { ...d, items: d.items.filter((i) => i.id !== payload.id) };
       if (action === "cancel" || action === "picked_up") {
@@ -268,15 +270,14 @@ export default function ShopAdminView({ shop, name }: Props) {
     setSheetMenu(null);
     if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
     if (editIdRef.current && editIdRef.current !== item.id) void flushEdit();
-    const snap = { id: item.id, name: item.name, price: item.price ?? 0, note: item.note || "", late: isLateOnly(item) };
+    const snap = { id: item.id, name: item.name, price: item.price ?? 0, note: item.note || "" };
     editIdRef.current = item.id;
     editSavedRef.current = snap;
-    editDraftRef.current = { name: snap.name, price: String(snap.price), note: snap.note, late: snap.late };
+    editDraftRef.current = { name: snap.name, price: String(snap.price), note: snap.note };
     setOpenId(item.id);
     setEditName(snap.name);
     setEditPrice(String(snap.price));
     setEditNote(snap.note);
-    setEditLate(snap.late);
   }
 
   function scheduleEdit() {
@@ -288,8 +289,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     editDraftRef.current = { ...editDraftRef.current, [key]: value };
     if (key === "name") setEditName(value as string);
     else if (key === "price") setEditPrice(value as string);
-    else if (key === "note") setEditNote(value as string);
-    else setEditLate(value as boolean);
+    else setEditNote(value as string);
     scheduleEdit();
   }
 
@@ -306,32 +306,36 @@ export default function ShopAdminView({ shop, name }: Props) {
     if (draft.name !== saved.name) { payload.name = draft.name; changed = true; }
     if (price !== saved.price) { payload.price = price; changed = true; }
     if (note !== saved.note) { payload.note = note; changed = true; }
-    if (draft.late !== saved.late) { payload.lateOnly = draft.late; changed = true; }
     if (!changed) return;
     const prev = saved;
     const req = ++editReq.current;
     const ok = await act(payload);
     if (!ok || req !== editReq.current) return;
-    editSavedRef.current = { id, name: draft.name, price, note, late: draft.late };
+    editSavedRef.current = { id, name: draft.name, price, note };
     show("保存しました", "ok", { label: "元に戻す", onClick: () => { void undoEdit(prev); } });
   }
 
-  async function undoEdit(prev: { id: string; name: string; price: number; note: string; late: boolean }) {
+  async function undoEdit(prev: { id: string; name: string; price: number; note: string }) {
     if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
     editReq.current++;
     const ok = await act({
-      action: "edit", id: prev.id, name: prev.name, price: prev.price, note: prev.note, lateOnly: prev.late,
+      action: "edit", id: prev.id, name: prev.name, price: prev.price, note: prev.note,
     });
     if (!ok) return;
     editSavedRef.current = prev;
     if (editIdRef.current === prev.id) {
-      editDraftRef.current = { name: prev.name, price: String(prev.price), note: prev.note, late: prev.late };
+      editDraftRef.current = { name: prev.name, price: String(prev.price), note: prev.note };
       setEditName(prev.name);
       setEditPrice(String(prev.price));
       setEditNote(prev.note);
-      setEditLate(prev.late);
     }
     show("元に戻しました", "ok");
+  }
+
+  async function togglePause(item: Item) {
+    const next = !item.paused;
+    const ok = await act({ action: "edit", id: item.id, paused: next });
+    if (ok) show(next ? "一時停止しました" : "再開しました", "ok");
   }
 
   function closeEdit() {
@@ -782,7 +786,7 @@ export default function ShopAdminView({ shop, name }: Props) {
           <ListingTools dir={priceDir} onDir={setPriceDir} />
           <Listings items={items} onSelect={openDetail}
             disabledFor={(it) => deleting === it.id}
-            classNameFor={(it) => (deleting === it.id ? "dim" : "")} />
+            classNameFor={(it) => (deleting === it.id || it.paused ? "dim" : "")} />
         </>
       )}
 
@@ -933,11 +937,10 @@ export default function ShopAdminView({ shop, name }: Props) {
               <textarea className="grow" value={editNote} disabled={busyOpen} rows={1}
                 onChange={(e) => patchEdit("note", e.target.value)} />
             </label>
-            <label className="late-check">
-              <input type="checkbox" checked={editLate} disabled={busyOpen}
-                onChange={(e) => patchEdit("late", e.target.checked)} />
-              <span>後半のみ（最後の4日）</span>
-            </label>
+            <button type="button" className="cta soft" disabled={busyOpen}
+              onClick={() => void togglePause(open)}>
+              {open.paused ? "再開" : "一時停止"}
+            </button>
             <div className="save-row" onClick={(e) => e.stopPropagation()}>
               <div className="save-more">
                 <IconBtn name="more" label="品目メニュー" disabled={busyOpen} size={24} className="more"
