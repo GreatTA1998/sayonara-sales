@@ -103,11 +103,6 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
       setTimeout(() => setShared(false), 1600);
     } catch { /* ignore */ }
   }
-  async function systemShare() {
-    try {
-      if (navigator.share) await navigator.share({ title: `${name} — サヨナラ`, url: shareUrl });
-    } catch { /* user cancel */ }
-  }
 
   async function book() {
     const name = lineName.trim();
@@ -174,7 +169,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         </span>
         <span className="span">{span}</span>
         <button type="button" className="share" onClick={() => { setShared(false); setShareOpen(true); }}>
-          シェア
+          URLコピー
         </button>
         <button type="button" className="req"
           onClick={() => { setOpen(null); setSlot(null); setMethod("line"); setLineOk(false); setErr(null); setCheckout(true); }}>
@@ -220,16 +215,13 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         </div>
       )}
       {shareOpen && (
-        <div className="mask" role="dialog" aria-modal="true" aria-label="シェア"
+        <div className="mask" role="dialog" aria-modal="true" aria-label="URLコピー"
           onClick={() => setShareOpen(false)}>
           <div className="sheet" onClick={(e) => e.stopPropagation()}>
-            <h2>シェア</h2>
+            <h2>URLコピー</h2>
             <p className="share-url">{shareUrl}</p>
             <button type="button" className="cta go" onClick={() => void copyShare()}>
               {shared ? "コピー済" : "コピー"}
-            </button>
-            <button type="button" className="cta soft" onClick={() => void systemShare()}>
-              他のアプリで共有
             </button>
           </div>
         </div>
