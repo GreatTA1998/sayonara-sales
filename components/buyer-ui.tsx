@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import AppNav from "@/components/app-nav";
 import { Listings, money } from "@/components/photo-listing";
-import { dayLbl, dayShort, pickupSpan, rangeLbl } from "@/lib/days";
+import { dayLbl, pickupSpan, rangeLbl } from "@/lib/days";
 import { getName, openShop } from "@/lib/shop";
 import { SITE_URL } from "@/lib/site";
 
@@ -11,7 +11,7 @@ type Item = {
   photos?: string[]; availableFrom?: string; availableTo?: string; lateOnly?: boolean;
 };
 type State = {
-  address: string; bio?: string; jimotyUrl?: string; moveOut?: string;
+  address: string; bio?: string; jimotyUrl?: string;
   days: string[]; slots: string[]; taken: Record<string, string[]>;
   lineInviteUrl?: string | null; items: Item[];
 };
@@ -54,8 +54,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [shared, setShared] = useState(false);
   const [waited, setWaited] = useState<Set<string>>(new Set());
   const lineUrl = state?.lineInviteUrl || LINE_FALLBACK;
-  const span = pickupSpan(state?.days || []);
-  const barDates = state?.moveOut ? `${span} · 退去${dayShort(state.moveOut)}` : span;
+  const barDates = pickupSpan(state?.days || []);
   const shareUrl = `${SITE_URL}${shop === "elton" ? "/s/elton" : `/s/${shop}`}`;
 
   const load = useCallback(async () => {
