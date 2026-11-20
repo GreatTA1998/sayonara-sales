@@ -20,10 +20,10 @@ export function useSnack() {
 
 export function Snack({ snack }: { snack: SnackState }) {
   if (!snack) return null;
-  const bg = snack.kind === "err" ? "#b00020" : snack.kind === "busy" ? "#333" : "#111";
+  const [title, sub] = snack.msg.split("\n");
   return (
-    <div role="status" className="snack text-base" style={{ background: bg }}>
-      <span>{snack.msg}</span>
+    <div role="status" className="snack text-base" data-k={snack.kind}>
+      <span className="snack-body">{title}{sub ? <span className="snack-sub">{sub}</span> : null}</span>
       {snack.action && <button type="button" className="snack-act" onClick={snack.action.onClick}>{snack.action.label}</button>}
     </div>
   );
