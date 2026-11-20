@@ -1,4 +1,6 @@
 "use client";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LineLoginLink, useLineOAuthReturn } from "@/components/line-oauth";
 import {
@@ -38,6 +40,7 @@ function writeParam(n: N) {
 
 /** State-aware app chrome: logo+サヨナラ | 出品/マイ出品 | login/LINE名 (+ profile popover). */
 export default function AppNav({ top, onAuth }: Props) {
+  const router = useRouter();
   const [name, setName] = useState("");
   const [shopId, setShopId] = useState("");
   const [loginOpen, setLoginOpen] = useState(false);
@@ -63,6 +66,10 @@ export default function AppNav({ top, onAuth }: Props) {
     window.addEventListener(AUTH_EVT, sync);
     return () => window.removeEventListener(AUTH_EVT, sync);
   }, []);
+  // Prefetch マイ出品 so nav feels instant (cheap win vs full remount wait).
+  useEffect(() => {
+    router.prefetch(shopId ? adminPath(shopId) : "/admin");
+  }, [shopId, router]);
   useLineOAuthReturn(sync);
 
   function saveLogin(e: { preventDefault(): void }) {
@@ -78,28 +85,28 @@ export default function AppNav({ top, onAuth }: Props) {
     setProfOpen(false);
   }
 
-  const sellHref = shopId ? adminPath(shopId) : "#";
+  const sellHref = shopId ? adminPath(shopId) : "/admin";
   const sellLabel = name ? "マイ出品" : "出品";
   const logged = !!name;
   const sellOn = path === "/admin" || /\/admin\/?$/.test(path);
-  const homeOn = path === "/";
 
   return (
     <>
       <nav className={`app-nav${top ? " top" : " bot"} nav-exp-${exp}`} aria-label="アプリ">
-        <a href="/" className={`brand${homeOn ? " on" : ""}`} aria-label="サヨナラ ホーム" aria-current={homeOn ? "page" : undefined}>
-          <img className="logo" src="/sun-logo.png" alt="" width={52} height={27} />
+        {/* Brand is identity, not a tab — never show active orange dot on home. */}
+        <Link href="/" className="brand" prefetch aria-label="サヨナラ ホーム">
+          <img className="logo" src="/sun-logo.png" alt="" width={52} height={27} decoding="async" />
           <span>サヨナラ</span>
-        </a>
-        <a className={`nav-a${sellOn ? " on" : ""}`} href={sellHref}
+        </Link>
+        <Link className={`nav-a${sellOn ? " on" : ""}`} href={sellHref} prefetch
           aria-current={sellOn ? "page" : undefined}
           onClick={(e) => {
             if (shopId) return;
             e.preventDefault();
             const id = ensureShopId();
             setShopId(id);
-            window.location.href = adminPath(id);
-          }}>{sellLabel}</a>
+            router.push(adminPath(id));
+          }}>{sellLabel}</Link>
         {logged ? (
           <button type="button" className="nav-a" onClick={() => setProfOpen(true)}>{name}</button>
         ) : (
