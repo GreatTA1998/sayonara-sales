@@ -662,7 +662,6 @@ export default function ShopAdminView({ shop, name }: Props) {
       )}
 
       <section className="prof-block">
-        <div className="claims-h">ショップ情報</div>
         <label className="float"><span>ショップメモ</span>
           <textarea ref={bioRef} className="grow" value={bio} rows={1}
             onChange={(e) => setBio(e.target.value)}
@@ -673,7 +672,6 @@ export default function ShopAdminView({ shop, name }: Props) {
           <input value={jimoty} onChange={(e) => setJimoty(e.target.value)}
             onBlur={() => void persistProfile(bio, jimoty)}
             placeholder="https://jmty.jp/…" inputMode="url" /></label>
-        <div className="claims-h" style={{ marginTop: 8 }}>受取日・退去日</div>
         <div className="slot-add">
           <label className="float" style={{ flex: 1, margin: 0 }}><span>受取開始</span>
             <input type="date" value={pickupFrom} aria-label="受取開始"
@@ -683,8 +681,7 @@ export default function ShopAdminView({ shop, name }: Props) {
             <input type="date" value={pickupTo} aria-label="退去日"
               onChange={(e) => { const v = e.target.value; setPickupTo(v); void saveDates(pickupFrom, v); }} /></label>
         </div>
-        <div className="claims-h" style={{ marginTop: 8 }}>受取時間</div>
-        <div className="slot-edit" role="list">
+        <div className="slot-edit" role="list" aria-label="受取時間">
           {slots.map((s) => (
             <button key={s} type="button" className="slot" role="listitem"
               aria-label={`${s}を削除`}
