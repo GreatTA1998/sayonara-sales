@@ -4,6 +4,7 @@ import AppNav from "@/components/app-nav";
 import { Icon, IconBtn } from "@/components/icons";
 import { LineLoginLink, useLineOAuthReturn } from "@/components/line-oauth";
 import { Listings, type PhotoItem } from "@/components/photo-listing";
+import SquareCam from "@/components/square-cam";
 import { Snack, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { dayLbl, isLateOnly } from "@/lib/days";
@@ -69,7 +70,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [loginOpen, setLoginOpen] = useState(false);
   const [lineDraft, setLineDraft] = useState("");
   const [label, setLabel] = useState(/^\d{5}$/.test(name) ? "" : name);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [camOpen, setCamOpen] = useState(false);
   const bioRef = useRef<HTMLTextAreaElement>(null);
   const [bio, setBio] = useState("");
   const [jimoty, setJimoty] = useState("");
@@ -724,7 +725,7 @@ export default function ShopAdminView({ shop, name }: Props) {
           <div className="add-photo">
             <button type="button" className="cta"
               disabled={!data}
-              onClick={() => fileRef.current?.click()}>
+              onClick={() => setCamOpen(true)}>
               <Icon name="camera" size={18} />写真を追加
             </button>
             <p className="hint add-tip">1枚＝1出品。名前はあとで。</p>
@@ -742,14 +743,9 @@ export default function ShopAdminView({ shop, name }: Props) {
           </div>
         )}
       </div>
-      <input ref={fileRef} type="file" accept={IMG_ACCEPT} multiple hidden
-        disabled={!data}
-        onChange={(e) => {
-          // FileList is live — snapshot BEFORE clearing value or the array is empty.
-          const files = Array.from(e.target.files || []);
-          e.target.value = "";
-          if (files.length) addFromPhotos(files);
-        }} />
+      <SquareCam open={camOpen} accept={IMG_ACCEPT}
+        onClose={() => setCamOpen(false)}
+        onShot={(file) => addFromPhotos([file])} />
 
       {!empty && (
         <Listings items={items} onSelect={openDetail}
