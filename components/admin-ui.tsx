@@ -7,6 +7,7 @@ import { Snack, useSnack } from "@/components/snack";
 import { dayLbl, isLateOnly } from "@/lib/days";
 import { PICKUP_SLOTS } from "@/lib/sale";
 import { AUTH_EVT, adminPath, getName, getProfile, openShop, saveProfile } from "@/lib/shop";
+import { SITE_URL } from "@/lib/site";
 
 type Item = PhotoItem & { claimId?: string | null; note?: string; availableFrom?: string; availableTo?: string };
 type Claim = {
@@ -45,7 +46,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [slots, setSlots] = useState<string[]>([...PICKUP_SLOTS]);
   const [slotA, setSlotA] = useState("11:00");
   const [slotB, setSlotB] = useState("11:15");
-  const [pubOk, setPubOk] = useState(false);
+  const [pub, setPub] = useState<"off" | "on" | "ok">("off");
   const { snack, show } = useSnack();
   const [addrDraft, setAddrDraft] = useState("");
   const addrDraftRef = useRef("");
@@ -285,13 +286,11 @@ export default function ShopAdminView({ shop, name }: Props) {
 
   function publish() {
     const href = shop === "elton" ? "/s/elton" : `/s/${shop}`;
-    setPubOk(true);
-    show("公開しました", "ok");
-    setTimeout(() => setPubOk(false), 1800);
-    if (typeof window !== "undefined") {
-      const url = `${window.location.origin}${href}`;
-      void navigator.clipboard?.writeText(url).catch(() => undefined);
-    }
+    const first = pub === "off";
+    setPub("ok");
+    show(first ? "公開しました" : "コピーしました", "ok");
+    setTimeout(() => setPub("on"), 1600);
+    void navigator.clipboard?.writeText(`${SITE_URL}${href}`).catch(() => undefined);
   }
 
   async function saveSlots(next: string[]) {
@@ -318,7 +317,7 @@ export default function ShopAdminView({ shop, name }: Props) {
         <span className="spacer" aria-hidden="true" />
         <button type="button" className="req"
           onClick={logged ? publish : () => { setLineDraft(""); setLoginOpen(true); }}>
-          {logged ? (pubOk ? "リンクコピー済" : "公開する") : "ログインして保存"}
+          {logged ? (pub === "ok" ? "コピー済" : pub === "on" ? "URLコピー" : "公開する") : "ログインして保存"}
         </button>
       </header>
 
