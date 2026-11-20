@@ -16,6 +16,7 @@ export async function GET(req: Request) {
     address: s.address,
     bio: s.bio || "",
     jimotyUrl: s.jimotyUrl || "",
+    youtubeUrl: s.youtubeUrl || "",
     days,
     moveOut: shopMoveOut(s),
     slots,

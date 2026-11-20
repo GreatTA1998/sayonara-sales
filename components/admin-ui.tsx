@@ -18,7 +18,7 @@ type Claim = {
   itemIds: string[]; status: string;
 };
 type AdminState = {
-  address: string; bio?: string; jimotyUrl?: string; slots?: string[];
+  address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string; slots?: string[];
   pickupFrom?: string; pickupTo?: string; moveOut?: string; published?: boolean;
   items: Item[]; claims: Claim[];
 };
@@ -75,6 +75,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const bioRef = useRef<HTMLTextAreaElement>(null);
   const [bio, setBio] = useState("");
   const [jimoty, setJimoty] = useState("");
+  const [youtube, setYoutube] = useState("");
   const [slots, setSlots] = useState<string[]>([...PICKUP_SLOTS]);
   const [slotA, setSlotA] = useState("11:00");
   const [slotB, setSlotB] = useState("11:15");
@@ -118,6 +119,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     const local = getProfile();
     setBio(body.bio || local.bio || "");
     setJimoty(body.jimotyUrl || local.jimotyUrl || "");
+    setYoutube(body.youtubeUrl || local.youtubeUrl || "");
     setSlots(body.slots?.length ? body.slots : [...PICKUP_SLOTS]);
     setPickupFrom(body.pickupFrom || DEF_FROM);
     setPickupTo(body.pickupTo || body.moveOut || DEF_TO);
@@ -247,9 +249,9 @@ export default function ShopAdminView({ shop, name }: Props) {
     addrTimer.current = setTimeout(() => { void saveAddress(stem); }, 450);
   }
 
-  async function persistProfile(nextBio: string, nextJimoty: string) {
-    saveProfile({ bio: nextBio, jimotyUrl: nextJimoty });
-    await act({ action: "profile", bio: nextBio, jimotyUrl: nextJimoty });
+  async function persistProfile(nextBio: string, nextJimoty: string, nextYt: string) {
+    saveProfile({ bio: nextBio, jimotyUrl: nextJimoty, youtubeUrl: nextYt });
+    await act({ action: "profile", bio: nextBio, jimotyUrl: nextJimoty, youtubeUrl: nextYt });
   }
 
   function openDetail(item: Item) {
@@ -667,12 +669,16 @@ export default function ShopAdminView({ shop, name }: Props) {
           <textarea ref={bioRef} className="grow" value={bio} rows={1}
             onChange={(e) => setBio(e.target.value)}
             onInput={fitBio}
-            onBlur={() => void persistProfile(bio, jimoty)}
+            onBlur={() => void persistProfile(bio, jimoty, youtube)}
             placeholder="動作確認・値引き・引越し・車・まとめ買い優先など" /></label>
-        <label className="float"><span>ジモティーURL（任意）</span>
+        <label className="float"><span>Jimoty profile（任意）</span>
           <input value={jimoty} onChange={(e) => setJimoty(e.target.value)}
-            onBlur={() => void persistProfile(bio, jimoty)}
+            onBlur={() => void persistProfile(bio, jimoty, youtube)}
             placeholder="https://jmty.jp/…" inputMode="url" /></label>
+        <label className="float"><span>YouTube（アパート・任意）</span>
+          <input value={youtube} onChange={(e) => setYoutube(e.target.value)}
+            onBlur={() => void persistProfile(bio, jimoty, youtube)}
+            placeholder="https://youtu.be/…" inputMode="url" /></label>
         <div className="slot-add">
           <label className="float" style={{ flex: 1, margin: 0 }}><span>受取開始</span>
             <input type="date" value={pickupFrom} aria-label="受取開始"

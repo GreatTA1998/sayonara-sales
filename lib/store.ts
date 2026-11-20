@@ -15,7 +15,7 @@ export type Claim = {
   status: "booked" | "picked_up" | "cancelled"; createdAt: string;
 };
 export type Store = {
-  address: string; bio?: string; jimotyUrl?: string;
+  address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
   /** Custom pickup windows; omit → PICKUP_SLOTS defaults. */
   slots?: string[];
   /** Pickup range + final move-out (YYYY-MM-DD); omit → PICKUP_DAYS defaults. */

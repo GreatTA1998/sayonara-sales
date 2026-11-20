@@ -40,18 +40,21 @@ const readMap = (): Record<string, string> => {
   catch { return {}; }
 };
 
-export type Profile = { bio: string; jimotyUrl: string };
+export type Profile = { bio: string; jimotyUrl: string; youtubeUrl: string };
 export const getProfile = (): Profile => {
-  if (typeof window === "undefined") return { bio: "", jimotyUrl: "" };
+  if (typeof window === "undefined") return { bio: "", jimotyUrl: "", youtubeUrl: "" };
   try {
     const p = JSON.parse(localStorage.getItem(PROF_KEY) || "{}") as Partial<Profile>;
-    return { bio: String(p.bio || ""), jimotyUrl: String(p.jimotyUrl || "") };
-  } catch { return { bio: "", jimotyUrl: "" }; }
+    return {
+      bio: String(p.bio || ""), jimotyUrl: String(p.jimotyUrl || ""),
+      youtubeUrl: String(p.youtubeUrl || ""),
+    };
+  } catch { return { bio: "", jimotyUrl: "", youtubeUrl: "" }; }
 };
 export const saveProfile = (p: Profile) => {
   if (typeof window === "undefined") return;
   localStorage.setItem(PROF_KEY, JSON.stringify({
-    bio: p.bio.trim(), jimotyUrl: p.jimotyUrl.trim(),
+    bio: p.bio.trim(), jimotyUrl: p.jimotyUrl.trim(), youtubeUrl: p.youtubeUrl.trim(),
   }));
 };
 

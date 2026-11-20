@@ -13,7 +13,7 @@ export async function GET(req: Request) {
   const s = await getStore(shop);
   const days = shopDays(s);
   return NextResponse.json({
-    address: s.address, bio: s.bio || "", jimotyUrl: s.jimotyUrl || "",
+    address: s.address, bio: s.bio || "", jimotyUrl: s.jimotyUrl || "", youtubeUrl: s.youtubeUrl || "",
     pickupFrom: days[0], pickupTo: days[days.length - 1], moveOut: shopMoveOut(s),
     slots: shopSlots(s), published: shopPublished(shop, s),
     items: s.items, claims: s.claims, shop,
@@ -55,7 +55,8 @@ export async function POST(req: Request) {
         case "profile":
           if ("bio" in body) s.bio = String(body.bio || "").trim();
           if ("jimotyUrl" in body) s.jimotyUrl = String(body.jimotyUrl || "").trim();
-          return { bio: s.bio || "", jimotyUrl: s.jimotyUrl || "" };
+          if ("youtubeUrl" in body) s.youtubeUrl = String(body.youtubeUrl || "").trim();
+          return { bio: s.bio || "", jimotyUrl: s.jimotyUrl || "", youtubeUrl: s.youtubeUrl || "" };
         case "dates":
           return applyDates(s, body);
         case "slots": {
