@@ -52,7 +52,9 @@ function claimSummary(c: Claim, all: Item[]) {
   const top = itemLabel(list[0]);
   return n <= 1 ? `1点 · ${top}` : `${n}点 · ${top}…`;
 }
-const claimWhen = (c: Claim) => `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}`;
+const claimWhen = (c: Claim) =>
+  [c.contact && c.contact !== "LINE" ? c.contact : "", `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}`]
+    .filter(Boolean).join(" · ");
 
 export default function ShopAdminView({ shop, name }: Props) {
   const router = useRouter();
@@ -173,11 +175,6 @@ export default function ShopAdminView({ shop, name }: Props) {
     () => (claimOpen && data ? claimItems(claimOpen, data.items) : []),
     [claimOpen, data],
   );
-  const claimContact = claimOpen
-    ? [methodJa(claimOpen.contactMethod), claimOpen.contact && claimOpen.contact !== "LINE" ? claimOpen.contact : ""]
-      .filter(Boolean).join(" · ")
-    : "";
-
   function apply(action: string, payload: Record<string, unknown>, body: Record<string, unknown>) {
     setData((d) => {
       if (!d) return d;
@@ -797,7 +794,7 @@ export default function ShopAdminView({ shop, name }: Props) {
           <ul>
             {done.map((c) => (
               <li key={c.id} className="claim">
-                <div className="text-sm text-muted">{dayLbl(c.day)}{c.slot ? ` · ${c.slot}` : ""} · 受取済</div>
+                <div className="text-sm text-muted">{claimWhen(c)} · 受取済</div>
               </li>
             ))}
           </ul>
@@ -813,7 +810,7 @@ export default function ShopAdminView({ shop, name }: Props) {
           onClick={() => setClaimId(null)}>
           <div className="sheet claim-sheet" onClick={(e) => e.stopPropagation()}>
             <b className="tl-when">{claimWhen(claimOpen)}</b>
-            {claimContact ? <div className="text-sm text-muted" style={{ marginBottom: 8 }}>{claimContact}</div> : null}
+            {claimOpen.contactMethod ? <div className="text-sm text-muted" style={{ marginBottom: 8 }}>{methodJa(claimOpen.contactMethod)}</div> : null}
             <ul className="claim-items">
               {claimList.map((it) => (
                 <li key={it.id}>
