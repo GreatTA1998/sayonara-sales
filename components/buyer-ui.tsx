@@ -3,14 +3,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AppNav from "@/components/app-nav";
 import { byPrice, Listings, ListingTools, money, useDense, usePriceDir } from "@/components/photo-listing";
 import { Snack, useSnack } from "@/components/snack";
-import { dayLbl, pickupSpan, rangeLbl } from "@/lib/days";
+import { dayLbl, pickupSpan } from "@/lib/days";
 import { AUTH_EVT, applyLineSession, getName, openShop } from "@/lib/shop";
 import { telHref, ytUrl } from "@/lib/sale";
 import { SITE_URL } from "@/lib/site";
 
 type Item = {
   id: string; name: string; price: number | null; note?: string; taken: boolean;
-  photos?: string[]; availableFrom?: string; availableTo?: string; lateOnly?: boolean;
+  photos?: string[];
 };
 type State = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
@@ -30,11 +30,6 @@ const loadWl = (shop: string) => {
   try { return new Set(JSON.parse(localStorage.getItem(wlKey(shop)) || "[]") as string[]); }
   catch { return new Set<string>(); }
 };
-
-const dayOk = (i: Item, day: string) =>
-  !(i.availableFrom && day < i.availableFrom) && !(i.availableTo && day > i.availableTo);
-const why = (i: Item, day: string) =>
-  !dayOk(i, day) ? `受け取り可能：${rangeLbl(i.availableFrom, i.availableTo)}` : "受け取り不可";
 
 export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [state, setState] = useState<State | null>(null);
@@ -108,8 +103,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     () => (state?.items || []).filter((i) => picked.has(i.id)),
     [state, picked],
   );
-  const blocked = useMemo(() => pickedItems.filter((i) => !dayOk(i, day)), [pickedItems, day]);
-  const canSend = !!slot && !!method && !!lineName.trim() && picked.size > 0 && !blocked.length
+  const canSend = !!slot && !!method && !!lineName.trim() && picked.size > 0
     && ((method === "line" && canLine && lineOk) || (method === "phone" && canPhone));
 
   function toggle(id: string) {
@@ -153,8 +147,6 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   async function book() {
     const name = lineName.trim();
     if (!picked.size || !slot || !method || !name || busy || (method === "line" && !lineOk)) return;
-    const bad = pickedItems.find((i) => !dayOk(i, day));
-    if (bad) { setErr(`${bad.name}: ${why(bad, day)}`); return; }
     setBusy(true); setErr(null);
     try {
       const res = await fetch(api(shop, "/api/book"), {
@@ -206,9 +198,6 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const onOpen = open ? picked.has(open.id) : false;
   const waiting = open ? waited.has(open.id) : false;
   const openPics = open?.photos || [];
-  const openAvail = open?.lateOnly
-    ? `後半のみ（${rangeLbl(open.availableFrom, state?.days?.[state.days.length - 1])}）`
-    : open ? rangeLbl(open.availableFrom, open.availableTo) : "";
   const needWlName = takenOpen && !waiting && !(getName() || lineName).trim();
   const yt = (state?.youtubeUrl || "").trim() || ytUrl(state?.bio || "");
   const bioShow = yt && state?.bio
@@ -283,7 +272,6 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             <div className="sp">{money(open.price)}</div>
             <h2>{open.name}</h2>
             {open.note ? <p className="sn">{open.note}</p> : null}
-            {openAvail ? <p className="sm">{openAvail}</p> : null}
             {takenOpen ? (
               <>
                 <p className="sw sold">予約済 — 他の方が引き取り予定</p>
@@ -312,11 +300,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             <h2>引き取り日程</h2>
             <div className="when">
               <select value={day} aria-label="日付" onChange={(e) => {
-                const nd = e.target.value; setDay(nd); setSlot(null);
-                setPicked((p) => new Set([...p].filter((id) => {
-                  const it = state?.items.find((i) => i.id === id);
-                  return it && !it.taken && dayOk(it, nd);
-                })));
+                setDay(e.target.value); setSlot(null);
               }}>
                 {(state?.days || []).map((d) => <option key={d} value={d}>{dayLbl(d)}</option>)}
               </select>
@@ -328,9 +312,6 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
                 ))}
               </div>
             </div>
-            {blocked.length > 0 && (
-              <p className="sw">後半のみの品目があります。日付を{rangeLbl(blocked[0].availableFrom, state?.days?.[state.days.length - 1])}以降にしてください。</p>
-            )}
             {!freeSlots.length && <p className="sw">この日は空きがありません。</p>}
             <p className="total">合計 {money(pickedItems.reduce((n, i) => n + (i.price ?? 0), 0))} <span className="hint">現金・WiseどちらでもOK</span></p>
             <div className="field"><span>連絡方法</span>

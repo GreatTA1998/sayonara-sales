@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { byPrice } from "@/lib/sale";
-import { getStore, isLateOnly, shopContact, shopDays, shopFromUrl, shopMoveOut, shopSlots, takenSlots } from "@/lib/store";
+import { getStore, shopContact, shopDays, shopFromUrl, shopMoveOut, shopSlots, takenSlots } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
@@ -24,13 +24,12 @@ export async function GET(req: Request) {
     taken,
     lineInviteUrl: contact.lineInviteUrl || null,
     phone: contact.phone || null,
-    // Client may re-sort via toggle; default = cheapest first, unset/null last (¥0 is real).
+    // Active listings only — paused hidden from buyer shop.
     items: [...s.items]
+      .filter((i) => !i.paused)
       .sort(byPrice("asc"))
-      .map(({ id, name, price, note, availableFrom, availableTo, claimId, photos }) => ({
-        id, name, price, note, availableFrom, availableTo, taken: !!claimId,
-        lateOnly: isLateOnly({ availableFrom, availableTo }),
-        photos: photos || [],
+      .map(({ id, name, price, note, claimId, photos }) => ({
+        id, name, price, note, taken: !!claimId, photos: photos || [],
       })),
   });
 }

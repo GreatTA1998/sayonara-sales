@@ -1,13 +1,14 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { put, get } from "@vercel/blob";
-import { daysBetween, isLateOnly, lateFrom, rangeLbl } from "./days";
-import { CANON_LINE, CANON_PHONE, LATE_FROM, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "./sale";
+import { daysBetween } from "./days";
+import { CANON_LINE, CANON_PHONE, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "./sale";
 export { CANON_LINE, CANON_PHONE, telHref, ytUrl } from "./sale";
 
 export type Item = {
   id: string; name: string; price: number | null; note?: string; claimId?: string | null;
-  photos?: string[]; availableFrom?: string; availableTo?: string;
+  photos?: string[]; /** Seller pause — hidden from buyer shop, not claimable. */
+  paused?: boolean;
 };
 export type Claim = {
   id: string; code: string; day: string; slot: string; itemIds: string[];
@@ -45,7 +46,7 @@ export const hasBuyerContact = (shop: string, s: Store) => {
   return !!(c.lineInviteUrl || c.phone);
 };
 
-export { LATE_FROM, PICKUP_DAYS, PICKUP_SLOTS, isLateOnly };
+export { PICKUP_DAYS, PICKUP_SLOTS };
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 const asYmd = (v: unknown) => { const s = String(v || "").trim(); return YMD.test(s) ? s : ""; };
@@ -84,11 +85,6 @@ export function applyDates(s: Store, raw: { pickupFrom?: unknown; pickupTo?: unk
   return { pickupFrom: s.pickupFrom, pickupTo: s.pickupTo, moveOut: s.moveOut };
 }
 
-export const setLateOnly = (it: Item, on: boolean, from: string) => {
-  if (on) { it.availableFrom = from; delete it.availableTo; }
-  else { delete it.availableFrom; delete it.availableTo; }
-};
-
 /** Elton keeps legacy blob key; others use sayonara-store-{id}.json */
 export const ELTON_SHOP = "elton";
 export const parseShop = (raw: string | null | undefined) => {
@@ -119,11 +115,8 @@ const eltonSeed = (): Store => ({
     { id: "i5", name: "Floor lamp", price: 800 },
     { id: "i6", name: "Bookshelf", price: 1000, photos: ["https://picsum.photos/seed/shelf1/400/400", "https://picsum.photos/seed/shelf2/400/400"] },
     { id: "i7", name: "Hangers (set)", price: null },
-    {
-      id: "i8", name: "Small fridge", price: 5000, note: "needs cleaning",
-      availableFrom: LATE_FROM,
-      photos: ["https://picsum.photos/seed/fridge/600/400"],
-    },
+    { id: "i8", name: "Small fridge", price: 5000, note: "needs cleaning",
+      photos: ["https://picsum.photos/seed/fridge/600/400"] },
   ],
   claims: [],
 });
@@ -176,7 +169,14 @@ export function withStore<T>(shop: string, fn: (s: Store) => T | Promise<T>): Pr
 
 function scrub(s: Store) {
   delete (s as { capacity?: unknown }).capacity;
-  for (const it of s.items) delete (it as { availableAfter?: string }).availableAfter;
+  for (const it of s.items) {
+    const raw = it as Item & { availableAfter?: string; availableFrom?: string; availableTo?: string; lateOnly?: boolean };
+    delete raw.availableAfter;
+    delete raw.availableFrom;
+    delete raw.availableTo;
+    delete raw.lateOnly;
+    if (!it.paused) delete it.paused;
+  }
   if (!(s.youtubeUrl || "").trim()) {
     const y = ytUrl(s.bio || "");
     if (y) s.youtubeUrl = y;
@@ -200,12 +200,8 @@ export function takenSlots(s: Store, day: string): string[] {
 export const uid = (p: string) => `${p}${Math.random().toString(36).slice(2, 8)}`;
 export const shortCode = () => Math.random().toString(36).slice(2, 6).toUpperCase();
 
-export function itemStatus(item: Item, day: string) {
+export function itemStatus(item: Item) {
+  if (item.paused) return { ok: false as const, reason: "一時停止中" };
   if (item.claimId) return { ok: false as const, reason: "予約済みです" };
-  const bad = (item.availableFrom && day < item.availableFrom) || (item.availableTo && day > item.availableTo);
-  if (bad) {
-    const r = rangeLbl(item.availableFrom, item.availableTo);
-    return { ok: false as const, reason: r ? `受け取りは${r}のみ` : "この日は受け取り不可" };
-  }
   return { ok: true as const };
 }

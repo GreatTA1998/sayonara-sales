@@ -21,7 +21,7 @@ export async function POST(req: Request) {
       for (const id of itemIds) {
         const item = s.items.find((i) => i.id === id);
         if (!item) throw new Error("品目が見つかりません");
-        const st = itemStatus(item, day);
+        const st = itemStatus(item);
         if (!st.ok) throw new Error(`${item.name}: ${st.reason}`);
       }
       const claim = {
