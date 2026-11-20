@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import AppNav from "@/components/app-nav";
 import { Listings, money } from "@/components/photo-listing";
 import { dayLbl, pickupSpan, rangeLbl } from "@/lib/days";
+import { getName, openShop } from "@/lib/shop";
 import { SITE_URL } from "@/lib/site";
 
 type Item = {
@@ -25,13 +26,16 @@ const LINE_FALLBACK = "https://line.me/ti/p/yBg2x2X_ut";
 const PHONE_DISPLAY = "080-4919-2027";
 const PHONE_TEL = "tel:+818049192027";
 const api = (shop: string, path: string) => `${path}?shop=${encodeURIComponent(shop)}`;
+const wlKey = (shop: string) => `ss-wl-${shop}`;
+const loadWl = (shop: string) => {
+  try { return new Set(JSON.parse(localStorage.getItem(wlKey(shop)) || "[]") as string[]); }
+  catch { return new Set<string>(); }
+};
 
 const dayOk = (i: Item, day: string) =>
   !(i.availableFrom && day < i.availableFrom) && !(i.availableTo && day > i.availableTo);
 const why = (i: Item, day: string) =>
-  i.taken ? "予約済み — キャンセル待ち"
-    : !dayOk(i, day) ? `受け取り可能：${rangeLbl(i.availableFrom, i.availableTo)}`
-    : "受け取り不可";
+  !dayOk(i, day) ? `受け取り可能：${rangeLbl(i.availableFrom, i.availableTo)}` : "受け取り不可";
 
 export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [state, setState] = useState<State | null>(null);
@@ -48,6 +52,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [shared, setShared] = useState(false);
+  const [waited, setWaited] = useState<Set<string>>(new Set());
   const lineUrl = state?.lineInviteUrl || LINE_FALLBACK;
   const span = pickupSpan(state?.days || []);
   const shareUrl = `${SITE_URL}${shop === "elton" ? "/s/elton" : `/s/${shop}`}`;
@@ -57,7 +62,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     setState(data);
     setDay((d) => d && data.days?.includes(d) ? d : (data.days?.[0] || ""));
   }, [shop]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); setWaited(loadWl(shop)); const n = getName(); if (n) setLineName(n); }, [load, shop]);
 
   const freeSlots = useMemo(() => {
     const taken = new Set(state?.taken?.[day] || []);
@@ -77,6 +82,18 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     const it = state?.items.find((i) => i.id === id);
     if (!it || it.taken) return;
     setPicked((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
+
+  function joinWait(id: string) {
+    const n = (getName() || lineName).trim();
+    if (!n) { setErr("LINE名を入力してください"); return; }
+    openShop(n); setLineName(n); setErr(null);
+    setWaited((prev) => {
+      const next = new Set(prev); next.add(id);
+      localStorage.setItem(wlKey(shop), JSON.stringify([...next]));
+      return next;
+    });
+    setOpen(null);
   }
 
   async function copyShare() {
@@ -139,12 +156,14 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     );
   }
 
-  const okOpen = open ? !open.taken : false;
+  const takenOpen = !!open?.taken;
   const onOpen = open ? picked.has(open.id) : false;
+  const waiting = open ? waited.has(open.id) : false;
   const openPics = open?.photos || [];
   const openAvail = open?.lateOnly
     ? `後半のみ（${rangeLbl(open.availableFrom, state?.days?.[state.days.length - 1])}）`
     : open ? rangeLbl(open.availableFrom, open.availableTo) : "";
+  const needWlName = takenOpen && !waiting && !(getName() || lineName).trim();
 
   return (
     <main className={`buy${embed ? " embed" : ""}`}>
@@ -167,9 +186,9 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
       {state?.jimotyUrl ? (
         <p className="hint bio"><a className="linelink" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">ジモティー</a></p>
       ) : null}
-      {err && !checkout && <div className="err">{err}</div>}
-      <Listings items={state?.items || []} onSelect={setOpen}
-        classNameFor={(item) => `${picked.has(item.id) ? "on" : ""}${item.taken ? " dim" : ""}`.trim()} />
+      {err && !checkout && !open && <div className="err">{err}</div>}
+      <Listings items={state?.items || []} onSelect={(it) => { setErr(null); setOpen(it); }}
+        classNameFor={(item) => `${picked.has(item.id) ? "on" : ""}${item.taken ? " sold" : ""}`.trim()} />
       {!state && <p className="text-sm text-muted pad">読み込み中…</p>}
       {open && !checkout && (
         <div className="mask" role="dialog" aria-modal="true" aria-label={open.name} onClick={() => setOpen(null)}>
@@ -179,9 +198,24 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             <h2>{open.name}</h2>
             {open.note ? <p className="sn">{open.note}</p> : null}
             {openAvail ? <p className="sm">{openAvail}</p> : null}
-            {!okOpen && <p className="sw">{why(open, day || (state?.days?.[0] || ""))}</p>}
-            <button type="button" className={`cta${okOpen ? (onOpen ? " soft" : " go") : ""}`} disabled={!okOpen}
-              onClick={() => { toggle(open.id); setOpen(null); }}>{onOpen ? "外す" : "追加"}</button>
+            {takenOpen ? (
+              <>
+                <p className="sw sold">確定済み — 他の方が引き取り予定</p>
+                {needWlName && (
+                  <label className="float"><span>LINE名</span>
+                    <input value={lineName} onChange={(e) => setLineName(e.target.value)}
+                      placeholder="表示名" autoComplete="nickname" enterKeyHint="done" /></label>
+                )}
+                {err && <div className="err">{err}</div>}
+                <button type="button" className={`cta${waiting ? " soft" : " go"}`} disabled={waiting}
+                  onClick={() => joinWait(open.id)}>
+                  {waiting ? "キャンセル待ち中" : "キャンセル待ち"}
+                </button>
+              </>
+            ) : (
+              <button type="button" className={`cta${onOpen ? " soft" : " go"}`}
+                onClick={() => { toggle(open.id); setOpen(null); }}>{onOpen ? "外す" : "追加"}</button>
+            )}
           </div>
         </div>
       )}
