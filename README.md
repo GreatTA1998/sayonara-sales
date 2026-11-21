@@ -4,17 +4,43 @@ Phone-first move-out sale. Hub `/`; seller UI `/s/{id}/admin` (Elton `/s/elton/a
 
 **Production:** https://sayonara.tokyo
 
+Shop state: **Firebase Firestore** via the **client SDK** + security rules + snapshot listeners (optimistic writes). Photos stay on Vercel Blob. Soft Jimoty identity UX; Anonymous Firebase Auth under the hood (UID owns shops).
+
+## Data model
+
+```
+shops/{shopId}                    # ownerUid, address, bio, contact, slots, dates, published
+shops/{shopId}/items/{itemId}     # name, price, note, photos, paused, claimId, pos
+shops/{shopId}/claims/{claimId}   # code, day, slot, itemIds, contact, buyerUid, status, waiters, createdAt
+```
+
 ## Env (Vercel)
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `BLOB_READ_WRITE_TOKEN` | prod | Vercel Blob |
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | prod | Web API key |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | prod | `sayonara-sales.firebaseapp.com` |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | prod | `sayonara-sales` |
+| `NEXT_PUBLIC_FIREBASE_APP_ID` | prod | Web app id |
+| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | prod | Sender id |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | prod | Storage bucket |
+| `BLOB_READ_WRITE_TOKEN` | prod | Photo uploads only |
 | `LINE_CHANNEL_ID` / `LINE_CHANNEL_SECRET` | optional | LINE Login |
 | `LINE_CALLBACK_URL` | optional | default `{origin}/api/auth/line/callback` |
 | `NEXT_PUBLIC_SITE_URL` | optional | default `https://sayonara.tokyo` |
-| `REPORT_WEBHOOK_URL` | optional | POST JSON on each bug report (auto-fix) |
+| `REPORT_WEBHOOK_URL` | optional | POST JSON on each bug report |
 
-Soft identity via `getName()` (Jimoty-first once SS-171 lands). Pickup lead default 2 days (`leadDays`, 0 ok). Blob: `sayonara-store.json` / `sayonara-store-{id}.json` / `sayonara-reports.json`.
+**Do not set** `FIREBASE_CLIENT_EMAIL` / `FIREBASE_PRIVATE_KEY` — no server SA path.
+
+Soft identity = Jimoty名. Pickup lead default 2 days (`leadDays`, 0 ok). Reports Blob: `sayonara-reports.json`.
+
+## Firebase setup (once)
+
+1. Console → Authentication → Sign-in method → **Anonymous** → Enable
+2. Deploy rules: `firebase deploy --only firestore:rules --project sayonara-sales`
+3. Existing Elton data stays. First soft-login as エルトン on shop admin claims `ownerUid`.
+
+## Dev
 
 ```bash
 npm i && npm run build

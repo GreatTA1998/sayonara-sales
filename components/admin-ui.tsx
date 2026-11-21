@@ -8,7 +8,9 @@ import { Snack, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { dayLbl } from "@/lib/days";
 import { DEF_LEAD, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
+import { adminAct, listenShop } from "@/lib/live";
 import { getName, getProfile, saveProfile, subscribeAuth } from "@/lib/shop";
+import { shopPublished, type Store } from "@/lib/store";
 import { SITE_URL } from "@/lib/site";
 
 type Item = PhotoItem & { claimId?: string | null; note?: string; paused?: boolean };
@@ -104,12 +106,9 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [priceDir, setPriceDir] = usePriceDir();
   const [dense, setDense] = useDense();
 
-  const load = useCallback(async () => {
-    const res = await fetch(api(shop, "/api/admin"), { cache: "no-store" });
-    if (!res.ok) { setErr("読み込みに失敗しました"); show("読み込みに失敗しました", "err"); return; }
+  const applySnap = useCallback((body: Store) => {
     setErr(null);
-    const body = await res.json() as AdminState;
-    setData(body);
+    setData(body as AdminState);
     addrSaved.current = body.address || "";
     if (!addrDirty.current) {
       const stem = kuStem(body.address || "");
@@ -128,10 +127,16 @@ export default function ShopAdminView({ shop, name }: Props) {
     setPickupFrom(body.pickupFrom || DEF_FROM);
     setPickupTo(body.pickupTo || body.moveOut || DEF_TO);
     setLeadDays(body.leadDays ?? DEF_LEAD);
-    if (body.published) setPub("on");
-  }, [shop, show]);
+    if (shopPublished(shop, body)) setPub("on");
+  }, [shop]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const unsub = listenShop(shop, applySnap, (e) => {
+      setErr(e.message || "読み込みに失敗しました");
+      show(e.message || "読み込みに失敗しました", "err");
+    }, { claimOwner: true });
+    return unsub;
+  }, [shop, applySnap, show]);
   useEffect(() => () => {
     if (addrTimer.current) clearTimeout(addrTimer.current);
     if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
@@ -181,19 +186,16 @@ export default function ShopAdminView({ shop, name }: Props) {
 
   async function act(payload: Record<string, unknown>, okMsg?: string) {
     setErr(null);
-    const res = await fetch(api(shop, "/api/admin"), {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const body = await res.json();
-    if (!res.ok) {
-      const msg = body.error || "失敗しました";
+    try {
+      const body = await adminAct(shop, payload) as Record<string, unknown>;
+      apply(String(payload.action), payload, body);
+      if (okMsg) show(okMsg, "ok");
+      return body;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "失敗しました";
       setErr(msg); show(msg, "err");
       return null;
     }
-    apply(String(payload.action), payload, body);
-    if (okMsg) show(okMsg, "ok");
-    return body;
   }
 
   async function saveAddress(raw: string) {
@@ -201,23 +203,19 @@ export default function ShopAdminView({ shop, name }: Props) {
     if (next === addrSaved.current) return;
     const req = ++addrReq.current;
     setErr(null);
-    const res = await fetch(api(shop, "/api/admin"), {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "address", address: next }),
-    });
-    const body = await res.json();
-    if (!res.ok) {
+    try {
+      const body = await adminAct(shop, { action: "address", address: next }) as { address?: string };
       if (req !== addrReq.current) return;
-      const msg = body.error || "失敗しました";
+      const saved = String(body.address ?? next);
+      addrSaved.current = saved;
+      setData((d) => d && { ...d, address: saved });
+      if (kuFull(addrDraftRef.current) === saved) addrDirty.current = false;
+      show("保存しました", "ok");
+    } catch (e) {
+      if (req !== addrReq.current) return;
+      const msg = e instanceof Error ? e.message : "失敗しました";
       setErr(msg); show(msg, "err");
-      return;
     }
-    if (req !== addrReq.current) return;
-    const saved = String(body.address ?? next);
-    addrSaved.current = saved;
-    setData((d) => d && { ...d, address: saved });
-    if (kuFull(addrDraftRef.current) === saved) addrDirty.current = false;
-    show("保存しました", "ok");
   }
 
   function onAddressChange(value: string) {
@@ -385,7 +383,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     const res = await fetch(api(shop, "/api/admin/upload"), { method: "POST", body: fd });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || "アップロードに失敗しました");
-    return body as { item?: Item; url?: string; photos?: string[] };
+    return body as { url?: string; itemId?: string };
   }
 
   async function runPicJob(local: string) {
@@ -395,22 +393,37 @@ export default function ShopAdminView({ shop, name }: Props) {
     setErr(null);
     try {
       if (job.kind === "create") {
-        const body = await postUpload(job.file);
-        if (!body.item) throw new Error("アップロードに失敗しました");
+        const up = await postUpload(job.file);
+        const remote = String(up.url || "");
+        if (!remote) throw new Error("アップロードに失敗しました");
+        const created = await adminAct(shop, { action: "add", name: "" }) as Item;
+        await adminAct(shop, { action: "edit", id: created.id, photos: [remote] });
+        const item = { ...created, photos: [remote] };
         setData((d) => {
           if (!d) return d;
-          const items = d.items.filter((i) => i.id !== job.itemId);
-          return { ...d, items: [...items, body.item as Item] };
+          return { ...d, items: [...d.items.filter((i) => i.id !== job.itemId), item] };
         });
         if (openId === job.itemId) {
-          editIdRef.current = body.item.id;
-          setOpenId(body.item.id);
+          editIdRef.current = item.id;
+          setOpenId(item.id);
         }
       } else {
-        const body = await postUpload(job.file, job.itemId);
-        const remote = String(body.url || (body.item?.photos || []).slice(-1)[0] || "");
+        const up = await postUpload(job.file, job.itemId);
+        const remote = String(up.url || "");
         if (!remote) throw new Error("アップロードに失敗しました");
-        patchPhotos(job.itemId, (photos) => photos.map((p) => (p === local ? remote : p)));
+        let nextPhotos: string[] = [];
+        setData((d) => {
+          if (!d) return d;
+          return {
+            ...d,
+            items: d.items.map((i) => {
+              if (i.id !== job.itemId) return i;
+              nextPhotos = (i.photos || []).map((p) => (p === local ? remote : p)).filter(isRemote);
+              return { ...i, photos: (i.photos || []).map((p) => (p === local ? remote : p)) };
+            }),
+          };
+        });
+        await adminAct(shop, { action: "edit", id: job.itemId, photos: nextPhotos });
       }
       URL.revokeObjectURL(local);
       delete picJobs.current[local];
@@ -496,17 +509,14 @@ export default function ShopAdminView({ shop, name }: Props) {
   async function saveRemotePhotos(itemId: string, photos: string[]) {
     if (itemId.startsWith("tmp-")) return true;
     const remotes = photos.filter(isRemote);
-    const res = await fetch(api(shop, "/api/admin"), {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "edit", id: itemId, photos: remotes }),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      const msg = (body as { error?: string }).error || "失敗しました";
+    try {
+      await adminAct(shop, { action: "edit", id: itemId, photos: remotes });
+      return true;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "失敗しました";
       setErr(msg); show(msg, "err");
       return false;
     }
-    return true;
   }
 
   async function deletePhoto(item: Item, url: string) {
