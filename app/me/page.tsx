@@ -53,7 +53,7 @@ export default function MePage() {
       <p className="hint" style={{ marginBottom: 12 }}>ショップメモ・Jimoty・内見動画は投稿一覧で編集</p>
       <p style={{ display: "flex", flexDirection: "column", gap: 8, margin: "0 0 16px" }}>
         {shopId ? <Link className="cta soft" href={`/s/${shopId}`} prefetch>ショップを見る</Link> : null}
-        <Link className="cta soft" href={shopId ? adminPath(shopId) : "/admin"} prefetch>投稿一覧</Link>
+        <Link className="cta soft" href={shopId ? adminPath(shopId) : "/"} prefetch>投稿一覧</Link>
       </p>
       <section className="claims">
         <div className="claims-h">買う · 引き取り履歴</div>
