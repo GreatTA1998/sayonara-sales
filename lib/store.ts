@@ -150,20 +150,6 @@ export function itemStatus(item: Item) {
   return { ok: true as const };
 }
 
-/** Account-FIFO waitlist on the item's claim; idempotent per account. */
-export function joinWait(s: Store, itemId: string, account: string) {
-  const a = account.trim();
-  if (!a) throw new Error("アカウントが必要です");
-  const item = s.items.find((i) => i.id === itemId);
-  const claim = item && claimOf(s, item);
-  if (!claim || (claim.status !== "requested" && claim.status !== "booked")) {
-    throw new Error(item ? "待機できません" : "品目が見つかりません");
-  }
-  const list = claim.waiters || (claim.waiters = []);
-  if (!list.some((w) => w.account === a)) list.push({ account: a, at: new Date().toISOString() });
-  return { ok: true as const };
-}
-
 export function shopFields(s: Store): Record<string, unknown> {
   return {
     address: s.address || "",

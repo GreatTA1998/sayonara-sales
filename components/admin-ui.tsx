@@ -393,8 +393,7 @@ export default function ShopAdminView({ shop, name }: Props) {
         const up = await postUpload(job.file);
         const remote = String(up.url || "");
         if (!remote) throw new Error("アップロードに失敗しました");
-        const created = await adminAct(shop, { action: "add", name: "" }) as Item;
-        await adminAct(shop, { action: "edit", id: created.id, photos: [remote] });
+        const created = await adminAct(shop, { action: "add", name: "", photos: [remote] }) as Item;
         const item = { ...created, photos: [remote] };
         setData((d) => {
           if (!d) return d;
@@ -519,11 +518,16 @@ export default function ShopAdminView({ shop, name }: Props) {
       return;
     }
     const prev = item.photos || [];
-    const photos = prev.filter((p) => p !== url);
-    patchPhotos(item.id, () => photos);
+    patchPhotos(item.id, (photos) => photos.filter((p) => p !== url));
     setViewPic((v) => (v === url ? null : v));
     show("写真を削除しました", "ok");
-    if (!(await saveRemotePhotos(item.id, photos))) patchPhotos(item.id, () => prev);
+    try {
+      await adminAct(shop, { action: "edit", id: item.id, removePhoto: url });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "失敗しました";
+      setErr(msg); show(msg, "err");
+      patchPhotos(item.id, () => prev);
+    }
   }
 
   async function reorderPhotos(item: Item, from: number, to: number) {
