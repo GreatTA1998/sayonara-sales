@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { byPrice, Listings, ListingTools, money, useDense, usePriceDir } from "@/components/photo-listing";
+import { byPrice, Listings, ListingTools, money, Seg, useDense, usePriceDir } from "@/components/photo-listing";
 import { Snack, useMaskDismiss, useSnack } from "@/components/snack";
 import { dayLbl, pickupSpan } from "@/lib/days";
 import { bookShop, joinWaitLive, listenShop } from "@/lib/live";
@@ -278,13 +278,9 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             ))}</ul>
             <div className="field"><span>連絡方法</span>
               {(canJimoty || canLine || canPhone) ? (
-                <div className="slots trio">
-                  {([["jimoty", canJimoty], ["line", canLine], ["phone", canPhone]] as const)
-                    .filter(([, ok]) => ok).map(([id]) => (
-                    <button key={id} type="button" className={method === id ? "slot on" : "slot"}
-                      onClick={() => { setMethod(id); setChanOk(false); }}>{CH[id][0]}</button>
-                  ))}
-                </div>
+                <Seg label="連絡方法" value={method || ""} onPick={(v) => { setMethod(v as Method); setChanOk(false); }}
+                  opts={([["jimoty", canJimoty], ["line", canLine], ["phone", canPhone]] as const)
+                    .filter(([, ok]) => ok).map(([id]) => [id, CH[id][0]])} />
               ) : <p className="sw">出品者の連絡先が未設定です。しばらくしてから再度お試しください。</p>}
               {method && <>
                 <div className="linebox">
