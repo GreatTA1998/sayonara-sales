@@ -32,7 +32,7 @@ export type SaleRow = {
 export const getName = () => typeof window === "undefined" ? ""
   : (localStorage.getItem(NAME_KEY) || localStorage.getItem(LEGACY_NAME_KEY) || "").trim();
 export const getId = () => typeof window === "undefined" ? "" : (localStorage.getItem(ID_KEY) || "").trim();
-export const adminPath = (id: string) => id === ELTON_ID ? "/admin" : `/s/${id}/admin`;
+export const adminPath = (id: string) => `/s/${id}/admin`;
 export const notifyAuth = () => { if (typeof window !== "undefined") window.dispatchEvent(new Event(AUTH_EVT)); };
 /** For useSyncExternalStore — identity known on first client paint (no useEffect flash). */
 export const subscribeAuth = (cb: () => void) => {
