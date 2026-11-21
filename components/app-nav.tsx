@@ -12,7 +12,6 @@ type Props = {
   top?: boolean;
 };
 
-/** State-aware app chrome: logo+サヨナラ | 出品/マイ出品 | login/LINE名 (+ LINE popover). */
 export default function AppNav({ top }: Props) {
   const router = useRouter();
   const path = usePathname() || "";
@@ -34,7 +33,6 @@ export default function AppNav({ top }: Props) {
   }
 
   const sellHref = shopId ? adminPath(shopId) : "/admin";
-  const sellLabel = name ? "マイ出品" : "出品";
   const logged = !!name;
   const sellOn = path === "/admin" || /\/admin\/?$/.test(path);
 
@@ -53,7 +51,7 @@ export default function AppNav({ top }: Props) {
               e.preventDefault();
               const id = ensureShopId();
               router.push(adminPath(id));
-            }}>{sellLabel}</Link>
+            }}>{name ? "投稿一覧" : "投稿"}</Link>
           {logged ? (
             <button type="button" className="nav-a" onClick={() => setProfOpen(true)}>{name}</button>
           ) : (
@@ -83,7 +81,7 @@ export default function AppNav({ top }: Props) {
           onClick={() => setProfOpen(false)}>
           <div className="sheet" onClick={(e) => e.stopPropagation()}>
             <h2>{name}</h2>
-            <p className="hint">ショップメモ・Jimoty・内見動画はマイ出品で編集</p>
+            <p className="hint">ショップメモ・Jimoty・内見動画は投稿一覧で編集</p>
             <LineLoginLink />
           </div>
         </div>
