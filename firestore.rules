@@ -20,7 +20,10 @@ service cloud.firestore {
 
     match /shops/{shopId} {
       // Browse: published / elton / unclaimed — no auth. Owner draft needs auth.
-      allow read: if resource.data.published == true
+      // `resource == null` first: a missing shop has no resource.data, and that
+      // denial is what blocked first-time create (existence check before set).
+      allow read: if resource == null
+        || resource.data.published == true
         || shopId == 'elton'
         || (signedIn() && resource.data.ownerUid == request.auth.uid)
         || !('ownerUid' in resource.data);

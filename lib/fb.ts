@@ -46,8 +46,9 @@ export function ensureAuth(): Promise<User> {
       const unsub = onAuthStateChanged(auth, async (u) => {
         unsub();
         try {
-          if (u) { resolve(u); return; }
-          resolve((await signInAnonymously(auth)).user);
+          const user = u ?? (await signInAnonymously(auth)).user;
+          await user.getIdToken();
+          resolve(user);
         } catch (e) { authReady = null; reject(e); }
       }, (e) => { authReady = null; reject(e); });
     });

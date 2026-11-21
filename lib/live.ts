@@ -37,23 +37,34 @@ const emptySeed = (id: string): Store =>
     ? { address: "目黒区", lineInviteUrl: "", phone: "", items: [], claims: [], published: true }
     : { address: "目黒区", items: [], claims: [] };
 
+const denied = (e: unknown) => String((e as { code?: string })?.code || "").endsWith("permission-denied");
+const NO_EDIT = "このショップの編集権限がありません";
+
 /** Claim ownerUid for non-elton shops. Elton: soft Jimoty era — no UID gate (rules). */
 async function claimShopOwner(shop: string, uid: string) {
   if (shop === ELTON_SHOP) return;
   const ref = doc(getDb(), "shops", shop);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) {
+  const now = new Date().toISOString();
+  const seedDoc = () => {
     const seed = emptySeed(shop);
     seed.ownerUid = uid;
-    await setDoc(ref, { ...shopFields(seed), ownerUid: uid, updatedAt: new Date().toISOString() });
-    return;
+    return { ...shopFields(seed), ownerUid: uid, updatedAt: now };
+  };
+  // Deployed rules reject get() of a missing shop (`resource.data` on null).
+  // Same error as a private shop — merge ownerUid only, never a full overwrite.
+  let snap;
+  try { snap = await getDoc(ref); }
+  catch (e) {
+    if (!denied(e)) throw e;
+    try { await setDoc(ref, { ownerUid: uid, updatedAt: now }, { merge: true }); }
+    catch (err) { if (denied(err)) throw new Error(NO_EDIT); throw err; }
+    snap = await getDoc(ref);
   }
-  const cur = snap.data()?.ownerUid;
-  if (!cur) {
-    await updateDoc(ref, { ownerUid: uid, updatedAt: new Date().toISOString() });
-    return;
-  }
-  if (cur !== uid) throw new Error("このショップの編集権限がありません");
+  if (!snap.exists()) { await setDoc(ref, seedDoc()); return; }
+  const data = snap.data() || {};
+  if (data.ownerUid && data.ownerUid !== uid) throw new Error(NO_EDIT);
+  if (!data.ownerUid) await updateDoc(ref, { ownerUid: uid, updatedAt: now });
+  if (!("address" in data)) await setDoc(ref, seedDoc(), { merge: true });
 }
 
 /** Live shop: public onSnapshot (no auth). Owner claim only when opts.claimOwner. */
@@ -68,37 +79,47 @@ export function listenShop(
   const state: ShopSnap = { meta: null, items: new Map(), claims: new Map() };
   // Paint on items alone (shop meta fills in; claims soft-lock via item.claimId).
   let itemsReady = false;
-  const emit = () => { if (itemsReady) onData(assemble(state)); };
-  const fail = (e: unknown) => onErr?.(e instanceof Error ? e : new Error(String(e)));
-
-  if (opts?.claimOwner && shop !== ELTON_SHOP) {
-    void ensureAuth().then((u) => claimShopOwner(shop, u.uid)).catch(fail);
-  }
+  let dead = false;
+  const emit = () => { if (itemsReady && !dead) onData(assemble(state)); };
+  const fail = (e: unknown) => {
+    if (dead) return;
+    onErr?.(e instanceof Error ? e : new Error(String(e)));
+  };
 
   let stopClaims: Unsubscribe | null = null;
+  let stopShop: Unsubscribe | null = null;
+  let stopItems: Unsubscribe | null = null;
   const watchClaims = () => {
-    if (stopClaims) return;
+    if (stopClaims || dead) return;
     stopClaims = onSnapshot(collection(db, "shops", shop, "claims"), (snap) => {
       state.claims = new Map(snap.docs.map((d) => [d.id, d.data() as Record<string, unknown>]));
       emit();
     }, (e) => {
-      if ((e as { code?: string }).code === "permission-denied") { emit(); return; }
+      if (denied(e)) { emit(); return; }
       fail(e);
     });
   };
 
-  const u1 = onSnapshot(doc(db, "shops", shop), (snap) => {
-    state.meta = snap.exists() ? (snap.data() as Record<string, unknown>) : { address: "目黒区" };
-    emit();
-  }, fail);
-  const u2 = onSnapshot(collection(db, "shops", shop, "items"), (snap) => {
-    state.items = new Map(snap.docs.map((d) => [d.id, d.data() as Record<string, unknown>]));
-    itemsReady = true;
-    emit();
-    watchClaims(); // after first items paint — avoid cold 3-way contention
-  }, fail);
+  const start = () => {
+    if (dead) return;
+    stopShop = onSnapshot(doc(db, "shops", shop), (snap) => {
+      state.meta = snap.exists() ? (snap.data() as Record<string, unknown>) : { address: "目黒区" };
+      emit();
+    }, fail);
+    stopItems = onSnapshot(collection(db, "shops", shop, "items"), (snap) => {
+      state.items = new Map(snap.docs.map((d) => [d.id, d.data() as Record<string, unknown>]));
+      itemsReady = true;
+      emit();
+      watchClaims(); // after first items paint — avoid cold 3-way contention
+    }, fail);
+  };
 
-  return () => { u1(); u2(); stopClaims?.(); };
+  // New shops 404 the listener until the doc exists — claim (create) first.
+  if (opts?.claimOwner && shop !== ELTON_SHOP) {
+    void ensureAuth().then((u) => claimShopOwner(shop, u.uid)).then(start).catch(fail);
+  } else start();
+
+  return () => { dead = true; stopShop?.(); stopItems?.(); stopClaims?.(); };
 }
 
 /** Home tabs — public shop+items. */
