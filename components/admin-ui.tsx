@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { DateField, Icon, IconBtn } from "@/components/icons";
 import { byPrice, Listings, ListingTools, Seg, useDense, usePriceDir, type PhotoItem } from "@/components/photo-listing";
 import SquareCam from "@/components/square-cam";
-import { Snack, useSnack } from "@/components/snack";
+import { Snack, useMaskDismiss, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { dayLbl } from "@/lib/days";
 import { DEF_LEAD, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
@@ -86,7 +86,6 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [listOpen, setListOpen] = useState(false);
   const [listDraft, setListDraft] = useState("");
   const listRef = useRef<HTMLInputElement | null>(null);
-  const maskPtr = useRef(false);
   const dragRef = useRef<{ from: number; over: number; x: number; y: number; moved: boolean } | null>(null);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
@@ -365,16 +364,6 @@ export default function ShopAdminView({ shop, name }: Props) {
     });
   }
 
-  function swallowGhostClick() {
-    const stop = (ev: Event) => { ev.preventDefault(); ev.stopPropagation(); };
-    document.addEventListener("click", stop, true);
-    document.addEventListener("pointerup", stop, true);
-    window.setTimeout(() => {
-      document.removeEventListener("click", stop, true);
-      document.removeEventListener("pointerup", stop, true);
-    }, 400);
-  }
-
   async function postUpload(file: File, itemId?: string) {
     const compressed = await compressImage(ensureImageFile(file));
     const fd = new FormData();
@@ -612,6 +601,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   }
 
   const busyOpen = open ? deleting === open.id : false;
+  const editMask = useMaskDismiss(closeEdit, busyOpen);
   const pics = open?.photos || [];
   const empty = !!data && !items.length;
   const areaN = Math.max(2, Array.from(addrDraft || "目黒").length);
@@ -808,26 +798,7 @@ export default function ShopAdminView({ shop, name }: Props) {
       )}
 
       {open && (
-        <div className="mask" role="dialog" aria-modal="true" aria-label="品目を編集"
-          onPointerDownCapture={(e) => {
-            if (e.target !== e.currentTarget) { maskPtr.current = false; return; }
-            e.stopPropagation();
-            maskPtr.current = true;
-          }}
-          onPointerUpCapture={(e) => {
-            if (e.target !== e.currentTarget) return;
-            e.stopPropagation();
-            if (!maskPtr.current || busyOpen) return;
-            const sel = typeof window !== "undefined" ? window.getSelection()?.toString() : "";
-            if (sel) return;
-            swallowGhostClick();
-            closeEdit();
-          }}
-          onClickCapture={(e) => {
-            if (e.target !== e.currentTarget) return;
-            e.stopPropagation();
-            e.preventDefault();
-          }}>
+        <div className="mask" role="dialog" aria-modal="true" aria-label="品目を編集" {...editMask}>
           <div className="sheet edit" onClick={(e) => { e.stopPropagation(); if (itemMenu) setItemMenu(false); }}>
             <div className="pics">
               {pics.map((src, i) => {
