@@ -27,7 +27,7 @@ export function useDense(): [boolean, (on: boolean) => void] {
 
 function DensIco({ list }: { list?: boolean }) {
   return list ? (
-    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+    <svg width="18" height="18" viewBox="0 0 14 14" aria-hidden="true">
       <circle cx="2.25" cy="3.25" r="1.1" fill="currentColor" />
       <rect x="5" y="2.5" width="7.5" height="1.5" rx=".6" fill="currentColor" />
       <circle cx="2.25" cy="7" r="1.1" fill="currentColor" />
@@ -36,7 +36,7 @@ function DensIco({ list }: { list?: boolean }) {
       <rect x="5" y="10" width="7.5" height="1.5" rx=".6" fill="currentColor" />
     </svg>
   ) : (
-    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+    <svg width="18" height="18" viewBox="0 0 14 14" aria-hidden="true">
       <rect x="1.5" y="1.5" width="4.5" height="4.5" rx="1" fill="currentColor" />
       <rect x="8" y="1.5" width="4.5" height="4.5" rx="1" fill="currentColor" />
       <rect x="1.5" y="8" width="4.5" height="4.5" rx="1" fill="currentColor" />
