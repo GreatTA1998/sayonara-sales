@@ -11,4 +11,8 @@ export type Report = {
   createdAt: string;
   /** Legacy; new reports omit. */
   type?: "bug" | "message";
+  /** Webhook kick outcome (cost guards). */
+  autofix?: "kicked" | "capped" | "off" | "error";
+  autofixAt?: string;
+  autofixAgent?: string;
 };

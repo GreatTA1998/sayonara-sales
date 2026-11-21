@@ -42,6 +42,7 @@ export default function ReportInbox() {
               {r.name ? ` · ${r.name}` : ""}
               {r.shopId ? ` · shop ${r.shopId}` : ""}
               {r.path ? ` · ${r.path}` : ""}
+              {r.autofix ? ` · autofix:${r.autofix}` : ""}
             </span>
           </article>
         </li>
