@@ -2,14 +2,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as PtrEv } from "react";
 import { useRouter } from "next/navigation";
 import { DateField, Icon, IconBtn } from "@/components/icons";
-import { LineLoginLink, useLineOAuthReturn } from "@/components/line-oauth";
 import { byPrice, Listings, ListingTools, Seg, useDense, usePriceDir, type PhotoItem } from "@/components/photo-listing";
 import SquareCam from "@/components/square-cam";
 import { Snack, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { dayLbl } from "@/lib/days";
 import { DEF_LEAD, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
-import { adminPath, getName, getProfile, openShop, saveProfile, subscribeAuth } from "@/lib/shop";
+import { getName, getProfile, saveProfile, subscribeAuth } from "@/lib/shop";
 import { SITE_URL } from "@/lib/site";
 
 type Item = PhotoItem & { claimId?: string | null; note?: string; paused?: boolean };
@@ -29,7 +28,7 @@ const DEF_FROM = PICKUP_DAYS[0];
 const DEF_TO = PICKUP_DAYS[PICKUP_DAYS.length - 1];
 const IMG_ACCEPT = "image/*,image/jpeg,image/jpg,image/png,image/heic,image/heif,image/webp,image/gif,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif";
 const api = (shop: string, path: string) => `${path}?shop=${encodeURIComponent(shop)}`;
-const methodJa = (m?: string) => (m === "phone" ? "電話" : m === "line" ? "LINE" : m || "");
+const methodJa = (m?: string) => (m === "jimoty" ? "Jimoty" : m === "phone" ? "電話" : m === "line" ? "LINE" : m || "");
 const kuStem = (v: string) => v.replace(/区$/, "");
 const kuFull = (v: string) => { const s = kuStem(v).trim(); return s ? `${s}区` : ""; };
 const itemLabel = (it?: Item | null) => it?.name?.trim() || "無題";
@@ -42,15 +41,11 @@ function claimItems(c: Claim, all: Item[]) {
     .map((id) => all.find((i) => i.id === id) || { id, name: "無題", price: null as number | null })
     .sort(byPrice("desc"));
 }
-function claimSummary(c: Claim, all: Item[]) {
+const claimSummary = (c: Claim, all: Item[]) => {
   const list = claimItems(c, all);
-  const n = list.length;
-  const top = itemLabel(list[0]);
-  return n <= 1 ? `1点 · ${top}` : `${n}点 · ${top}…`;
-}
-const claimWhen = (c: Claim) =>
-  [c.contact && c.contact !== "LINE" ? c.contact : "", `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}`]
-    .filter(Boolean).join(" · ");
+  return list.length <= 1 ? `1点 · ${itemLabel(list[0])}` : `${list.length}点 · ${itemLabel(list[0])}…`;
+};
+const claimWhen = (c: Claim) => [c.contact && c.contact !== "LINE" && c.contact !== "Jimoty" ? c.contact : "", `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}`].filter(Boolean).join(" · ");
 
 export default function ShopAdminView({ shop, name }: Props) {
   const router = useRouter();
@@ -70,8 +65,6 @@ export default function ShopAdminView({ shop, name }: Props) {
   const softName = useSyncExternalStore(subscribeAuth, getName, () => "");
   const logged = !!softName;
   const label = softName || (/^\d{5}$/.test(name) ? "" : name);
-  const [loginOpen, setLoginOpen] = useState(false);
-  const [lineDraft, setLineDraft] = useState("");
   const [camOpen, setCamOpen] = useState(false);
   const [camItemId, setCamItemId] = useState<string | null>(null);
   const [bio, setBio] = useState("");
@@ -138,7 +131,6 @@ export default function ShopAdminView({ shop, name }: Props) {
   }, [shop, show]);
 
   useEffect(() => { void load(); }, [load]);
-  useLineOAuthReturn();
   useEffect(() => () => {
     if (addrTimer.current) clearTimeout(addrTimer.current);
     if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
@@ -153,7 +145,6 @@ export default function ShopAdminView({ shop, name }: Props) {
   }, [data?.items, priceDir]);
   const open = useMemo(() => items.find((i) => i.id === openId) || null, [items, openId]);
   const pending = useMemo(() => (data?.claims || []).filter((c) => c.status === "booked"), [data?.claims]);
-  const done = useMemo(() => (data?.claims || []).filter((c) => c.status === "picked_up"), [data?.claims]);
   const claimOpen = useMemo(
     () => pending.find((c) => c.id === claimId) || null,
     [pending, claimId],
@@ -580,15 +571,6 @@ export default function ShopAdminView({ shop, name }: Props) {
     if (d.over !== d.from) void reorderPhotos(open, d.from, d.over);
   }
 
-  function saveLogin(e: { preventDefault(): void }) {
-    e.preventDefault();
-    const id = openShop(lineDraft);
-    if (!id) return;
-    setLoginOpen(false);
-    if (id !== shop) { router.push(adminPath(id)); return; }
-    show("保存しました", "ok");
-  }
-
   function publish() {
     const href = `/s/${shop}`;
     if (pub === "see") { router.push(href); return; }
@@ -635,7 +617,7 @@ export default function ShopAdminView({ shop, name }: Props) {
         </label>
         <span className="spacer" aria-hidden="true" />
         <button type="button" className="req"
-          onClick={logged ? publish : () => { setLineDraft(getName()); setLoginOpen(true); }}>
+          onClick={logged ? publish : () => router.push("/me")}>
           {logged ? (pub === "see" ? "見る" : pub === "on" ? "URLコピー" : "公開する") : "ログインして保存"}
         </button>
       </header>
@@ -772,22 +754,9 @@ export default function ShopAdminView({ shop, name }: Props) {
         </>
       )}
 
-      {done.length > 0 && (
-        <section className="claims done">
-          <div className="claims-h">完了</div>
-          <p className="hint thanks">ありがとう。スムーズな受け渡しでした。</p>
-          <ul>
-            {done.map((c) => (
-              <li key={c.id} className="claim">
-                <div className="text-sm text-muted">{claimWhen(c)} · 受取済</div>
-              </li>
-            ))}
-          </ul>
-          <p className="soft-promo hint">
-            ほかの小さなアプリも →{" "}
-            <a className="linelink" href="https://linelton.dev" target="_blank" rel="noopener noreferrer">linelton.dev</a>
-          </p>
-        </section>
+      {(data?.claims || []).some((c) => c.status === "picked_up") && (
+        <p className="hint thanks pad">ありがとう。履歴はマイページ。ほかの小さなアプリも →{" "}
+          <a className="linelink" href="https://linelton.dev" target="_blank" rel="noopener noreferrer">linelton.dev</a></p>
       )}
 
       {claimOpen && (
@@ -813,22 +782,6 @@ export default function ShopAdminView({ shop, name }: Props) {
               }}>受取済み</button>
             </div>
           </div>
-        </div>
-      )}
-
-      {loginOpen && (
-        <div className="mask" role="dialog" aria-modal="true" aria-label="ログインして保存"
-          onClick={() => setLoginOpen(false)}>
-          <form className="sheet" onClick={(e) => e.stopPropagation()} onSubmit={saveLogin}>
-            <h2>ログインして保存</h2>
-            <p className="hint">LINE名だけでOK。ゲスト出品はこの名前に紐づきます。</p>
-            <label className="float"><span>LINE名</span>
-              <input value={lineDraft} onChange={(e) => setLineDraft(e.target.value)}
-                placeholder="表示名" autoComplete="nickname" autoFocus /></label>
-            <button type="submit" className="cta go" disabled={!lineDraft.trim()}>サインイン</button>
-            <p className="hint" style={{ marginTop: 10 }}>より安全に使う場合はLINE連携</p>
-            <LineLoginLink />
-          </form>
         </div>
       )}
 
