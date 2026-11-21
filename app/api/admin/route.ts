@@ -74,15 +74,22 @@ export async function POST(req: Request) {
           }
           s.published = true;
           return { published: true };
+        case "confirm": {
+          const claim = s.claims.find((c) => c.id === body.id);
+          if (!claim || claim.status !== "requested") throw new Error("No claim");
+          claim.status = "booked"; return claim;
+        }
         case "cancel":
         case "release": {
+          const open = (st: string) => st === "booked" || st === "requested";
           const keep = body.action === "release" ? String(body.keepId || "") : "";
-          const ids = body.action === "cancel" ? [String(body.id)] : s.claims.filter((c) => c.status === "booked" && c.id !== keep).map((c) => c.id);
+          const ids = body.action === "cancel" ? [String(body.id)] : s.claims.filter((c) => open(c.status) && c.id !== keep).map((c) => c.id);
           let n = 0;
           for (const id of ids) {
             const c = s.claims.find((x) => x.id === id);
-            if (!c || c.status !== "booked") { if (body.action === "cancel") throw new Error("No claim"); continue; }
+            if (!c || !open(c.status)) { if (body.action === "cancel") throw new Error("No claim"); continue; }
             c.status = "cancelled"; n++;
+            delete c.waiters;
             for (const iid of c.itemIds) { const it = s.items.find((i) => i.id === iid); if (it?.claimId === c.id) it.claimId = null; }
           }
           return body.action === "cancel" ? s.claims.find((c) => c.id === body.id) : { released: n };

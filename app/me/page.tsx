@@ -28,7 +28,7 @@ export default function MePage() {
     if (!res.ok) return;
     const b = await res.json() as { claims?: Claim[]; items?: Item[] };
     setItems(b.items || []);
-    setSelling((b.claims || []).filter((c) => c.status === "booked" || c.status === "picked_up"));
+    setSelling((b.claims || []).filter((c) => c.status !== "cancelled"));
   }, []);
   useEffect(() => { void loadSell(); }, [loadSell, shopId, name]);
 

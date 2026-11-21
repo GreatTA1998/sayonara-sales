@@ -1,19 +1,29 @@
 import { NextResponse } from "next/server";
-import { bookableDays, itemStatus, shortCode, shopFromUrl, shopSlots, takenSlots, uid, withStore } from "@/lib/store";
+import { bookableDays, itemStatus, joinWait, shortCode, shopFromUrl, shopSlots, takenSlots, uid, withStore } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   const shop = shopFromUrl(req);
   const body = await req.json();
-  const day = String(body.day || "");
-  const slot = String(body.slot || "");
-  const contactMethod = (["jimoty", "line", "phone"] as const).find((x) => x === body.contactMethod);
-  const contact = String(body.contact || "").trim();
-  const itemIds: string[] = Array.isArray(body.itemIds) ? body.itemIds.map(String) : [];
-  if (!day || !slot || !itemIds.length || !contactMethod || !contact)
-    return NextResponse.json({ error: "日付・時間・連絡先・連絡方法・品目を確認してください" }, { status: 400 });
   try {
+    if (body.action === "wait") {
+      const itemId = String(body.itemId || "");
+      const account = String(body.account || body.contact || "").trim();
+      if (!itemId || !account) {
+        return NextResponse.json({ error: "ジモティ名を入力してください" }, { status: 400 });
+      }
+      return NextResponse.json(await withStore(shop, (s) => joinWait(s, itemId, account)));
+    }
+
+    const day = String(body.day || "");
+    const slot = String(body.slot || "");
+    const contactMethod = (["jimoty", "line", "phone"] as const).find((x) => x === body.contactMethod);
+    const contact = String(body.contact || "").trim();
+    const itemIds: string[] = Array.isArray(body.itemIds) ? body.itemIds.map(String) : [];
+    if (!day || !slot || !itemIds.length || !contactMethod || !contact) {
+      return NextResponse.json({ error: "日付・時間・連絡先・連絡方法・品目を確認してください" }, { status: 400 });
+    }
     const result = await withStore(shop, (s) => {
       if (!bookableDays(s).includes(day)) throw new Error("その日は選べません");
       if (!shopSlots(s).includes(slot)) throw new Error("その時間帯は選べません");
@@ -27,7 +37,7 @@ export async function POST(req: Request) {
       const claim = {
         id: uid("c"), code: shortCode(), day, slot, itemIds: [...itemIds],
         contactMethod, contact,
-        status: "booked" as const, createdAt: new Date().toISOString(),
+        status: "requested" as const, createdAt: new Date().toISOString(),
       };
       for (const id of itemIds) s.items.find((i) => i.id === id)!.claimId = claim.id;
       s.claims.unshift(claim);

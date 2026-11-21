@@ -144,11 +144,13 @@ export default function ShopAdminView({ shop, name }: Props) {
     return pending.length ? [...pending, ...rest] : [...all].sort(cmp);
   }, [data?.items, priceDir]);
   const open = useMemo(() => items.find((i) => i.id === openId) || null, [items, openId]);
-  const pending = useMemo(() => (data?.claims || []).filter((c) => c.status === "booked"), [data?.claims]);
-  const claimOpen = useMemo(
-    () => pending.find((c) => c.id === claimId) || null,
-    [pending, claimId],
+  const active = useMemo(
+    () => (data?.claims || []).filter((c) => c.status === "requested" || c.status === "booked"),
+    [data?.claims],
   );
+  const claimOpen = useMemo(() => active.find((c) => c.id === claimId) || null, [active, claimId]);
+  const requests = active.filter((c) => c.status === "requested");
+  const pending = active.filter((c) => c.status === "booked");
   const claimList = useMemo(
     () => (claimOpen && data ? claimItems(claimOpen, data.items) : []),
     [claimOpen, data],
@@ -165,7 +167,7 @@ export default function ShopAdminView({ shop, name }: Props) {
         };
       }
       if (action === "remove") return { ...d, items: d.items.filter((i) => i.id !== payload.id) };
-      if (action === "cancel" || action === "picked_up") {
+      if (action === "confirm" || action === "cancel" || action === "picked_up") {
         const next = body as unknown as Claim;
         const items = action === "cancel"
           ? d.items.map((i) => (i.claimId === next.id ? { ...i, claimId: null } : i))
@@ -625,11 +627,11 @@ export default function ShopAdminView({ shop, name }: Props) {
       {err && <div className="err">{err}</div>}
       {!data && !err && <p className="text-sm text-muted pad">読み込み中…</p>}
 
-      {pending.length > 0 && (
-        <section className="claims pending">
-          <div className="claims-h">引き取り予定</div>
+      {([["依頼", requests], ["引き取り予定", pending]] as const).map(([title, list]) => list.length > 0 && (
+        <section key={title} className="claims pending">
+          <div className="claims-h">{title}</div>
           <ol className="timeline">
-            {pending.map((c) => (
+            {list.map((c) => (
               <li key={c.id}>
                 <button type="button" className="tl-card" onClick={() => setClaimId(c.id)}>
                   <b className="tl-when">{claimWhen(c)}</b>
@@ -639,7 +641,7 @@ export default function ShopAdminView({ shop, name }: Props) {
             ))}
           </ol>
         </section>
-      )}
+      ))}
 
       <section className="prof-block">
         <label className="float"><span>ショップメモ</span>
@@ -777,9 +779,15 @@ export default function ShopAdminView({ shop, name }: Props) {
               <button type="button" onClick={() => {
                 void act({ action: "cancel", id: claimOpen.id }, "保存しました").then((ok) => { if (ok) setClaimId(null); });
               }}>キャンセル</button>
-              <button type="button" onClick={() => {
-                void act({ action: "picked_up", id: claimOpen.id }, "受取済み").then((ok) => { if (ok) setClaimId(null); });
-              }}>受取済み</button>
+              {claimOpen.status === "requested" ? (
+                <button type="button" onClick={() => {
+                  void act({ action: "confirm", id: claimOpen.id }, "確認しました").then((ok) => { if (ok) setClaimId(null); });
+                }}>確認する</button>
+              ) : (
+                <button type="button" onClick={() => {
+                  void act({ action: "picked_up", id: claimOpen.id }, "受取済み").then((ok) => { if (ok) setClaimId(null); });
+                }}>受取済み</button>
+              )}
             </div>
           </div>
         </div>

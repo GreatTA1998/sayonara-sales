@@ -12,7 +12,10 @@ export type Item = {
 export type Claim = {
   id: string; code: string; day: string; slot: string; itemIds: string[];
   contact?: string; contactMethod?: "jimoty" | "line" | "phone";
-  status: "booked" | "picked_up" | "cancelled"; createdAt: string;
+  /** requested = pending; booked = confirmed 予約済. */
+  status: "requested" | "booked" | "picked_up" | "cancelled"; createdAt: string;
+  /** Account-FIFO waiters (soft Jimoty / shop account id). */
+  waiters?: { account: string; at: string }[];
 };
 export type Store = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
@@ -197,8 +200,32 @@ export function takenSlots(s: Store, day: string): string[] {
 export const uid = (p: string) => `${p}${Math.random().toString(36).slice(2, 8)}`;
 export const shortCode = () => Math.random().toString(36).slice(2, 6).toUpperCase();
 
+export function claimOf(s: Store, item: Item) {
+  return item.claimId ? s.claims.find((c) => c.id === item.claimId) : undefined;
+}
+
+/** taken = confirmed 予約済; requested = pending soft notice. */
+export function itemFlags(s: Store, item: Item) {
+  const st = claimOf(s, item)?.status;
+  return { taken: st === "booked" || st === "picked_up", requested: st === "requested" };
+}
+
 export function itemStatus(item: Item) {
   if (item.paused) return { ok: false as const, reason: "一時停止中" };
   if (item.claimId) return { ok: false as const, reason: "予約済みです" };
+  return { ok: true as const };
+}
+
+/** Account-FIFO waitlist on the item's claim; idempotent per account. */
+export function joinWait(s: Store, itemId: string, account: string) {
+  const a = account.trim();
+  if (!a) throw new Error("アカウントが必要です");
+  const item = s.items.find((i) => i.id === itemId);
+  const claim = item && claimOf(s, item);
+  if (!claim || (claim.status !== "requested" && claim.status !== "booked")) {
+    throw new Error(item ? "待機できません" : "品目が見つかりません");
+  }
+  const list = claim.waiters || (claim.waiters = []);
+  if (!list.some((w) => w.account === a)) list.push({ account: a, at: new Date().toISOString() });
   return { ok: true as const };
 }

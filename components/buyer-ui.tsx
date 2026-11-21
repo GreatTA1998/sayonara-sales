@@ -3,17 +3,18 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { byPrice, Listings, ListingTools, money, useDense, usePriceDir } from "@/components/photo-listing";
 import { Snack, useSnack } from "@/components/snack";
 import { dayLbl, pickupSpan } from "@/lib/days";
-import { applyLineSession, getName, openShop, pushBuy, subscribeAuth } from "@/lib/shop";
+import { applyLineSession, getId, getName, openShop, pushBuy, subscribeAuth } from "@/lib/shop";
 import { telHref, ytUrl } from "@/lib/sale";
 import { SITE_URL } from "@/lib/site";
 
 type Item = {
-  id: string; name: string; price: number | null; note?: string; taken: boolean;
-  photos?: string[];
+  id: string; name: string; price: number | null; note?: string;
+  taken: boolean; requested?: boolean; photos?: string[];
 };
 type State = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
   days: string[]; slots: string[]; taken: Record<string, string[]>;
+  waiting?: string[];
   lineInviteUrl?: string | null; phone?: string | null; items: Item[];
 };
 type Receipt = { code: string; day: string; slot: string; total?: number };
@@ -22,11 +23,15 @@ type Props = { shop: string; name: string; /** Flatten padding when embedded on 
 const CH = { jimoty: ["Jimoty", "ジモティでメッセージしました", "ジモティ名"], line: ["LINE", "LINEで友だち追加しました", "LINE名"], phone: ["電話", "電話しました", "電話番号"] } as const;
 
 const api = (shop: string, path: string) => `${path}?shop=${encodeURIComponent(shop)}`;
-const wlKey = (shop: string) => `ss-wl-${shop}`;
-const loadWl = (shop: string) => {
-  try { return new Set(JSON.parse(localStorage.getItem(wlKey(shop)) || "[]") as string[]); }
-  catch { return new Set<string>(); }
-};
+const locked = (i: Item) => i.taken || !!i.requested;
+async function postBook(shop: string, body: object) {
+  const res = await fetch(api(shop, "/api/book"), {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "失敗しました");
+  return data;
+}
 
 export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [state, setState] = useState<State | null>(null);
@@ -57,13 +62,15 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const contactVal = (method === "jimoty" && loggedIn ? knownName : lineName).trim();
 
   const load = useCallback(async () => {
-    const data = (await fetch(api(shop, "/api/state"), { cache: "no-store" }).then((r) => r.json())) as State;
+    const acc = getId();
+    const url = `${api(shop, "/api/state")}${acc ? `&account=${encodeURIComponent(acc)}` : ""}`;
+    const data = (await fetch(url, { cache: "no-store" }).then((r) => r.json())) as State;
     setState(data);
+    setWaited(new Set(data.waiting || []));
     setDay((d) => d && data.days?.includes(d) ? d : (data.days?.[0] || ""));
   }, [shop]);
   useEffect(() => {
     void load();
-    setWaited(loadWl(shop));
     const n = getName();
     if (n) setLineName(n);
     else void applyLineSession().then((s) => { if (s?.name) setLineName(s.name); });
@@ -85,26 +92,27 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     if (slot && (!(state?.slots || []).includes(slot) || (state?.taken?.[day] || []).includes(slot))) setSlot(null);
   }, [state, day, slot]);
   const gridItems = [...(state?.items || [])].sort(byPrice(priceDir));
-  const pickedItems = (state?.items || []).filter((i) => picked.has(i.id) && !i.taken);
+  const pickedItems = (state?.items || []).filter((i) => picked.has(i.id) && !locked(i));
   const canSend = !!slot && !!method && !!contactVal && chanOk && pickedItems.length > 0
     && (method === "jimoty" ? canJimoty : method === "line" ? canLine : canPhone);
 
   function toggle(id: string) {
     const it = state?.items.find((i) => i.id === id);
-    if (!it || it.taken) return;
+    if (!it || locked(it)) return;
     setPicked((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
 
-  function joinWait(id: string) {
+  async function joinWait(id: string) {
     const n = (getName() || lineName).trim();
     if (!n) { setErr("ジモティ名を入力してください"); return; }
-    openShop(n); setLineName(n); setErr(null);
-    setWaited((prev) => {
-      const next = new Set(prev); next.add(id);
-      localStorage.setItem(wlKey(shop), JSON.stringify([...next]));
-      return next;
-    });
-    setOpen(null);
+    const account = openShop(n) || n;
+    setLineName(n); setErr(null); setBusy(true);
+    try {
+      await postBook(shop, { action: "wait", itemId: id, account, contact: n });
+      setWaited((prev) => new Set(prev).add(id));
+      setOpen(null);
+    } catch (e) { setErr(e instanceof Error ? e.message : "失敗しました"); }
+    finally { setBusy(false); }
   }
 
   function swallowGhostClick() {
@@ -132,14 +140,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     if (!itemIds.length || !slot || !method || !contactVal || busy || !canSend) return;
     setBusy(true); setErr(null);
     try {
-      const res = await fetch(api(shop, "/api/book"), {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          day, slot, itemIds, contactMethod: method, contact: contactVal,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "失敗しました");
+      const data = await postBook(shop, { day, slot, itemIds, contactMethod: method, contact: contactVal });
       if (method === "jimoty" || (method === "line" && !loggedIn)) openShop(contactVal);
       pushBuy({
         code: String(data.code || ""), shop, day, slot,
@@ -164,11 +165,12 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     );
   }
 
+  const lockOpen = open ? locked(open) : false;
   const takenOpen = !!open?.taken;
   const onOpen = open ? picked.has(open.id) : false;
   const waiting = open ? waited.has(open.id) : false;
   const openPics = open?.photos || [];
-  const needWlName = takenOpen && !waiting && !(getName() || lineName).trim();
+  const needWlName = lockOpen && !waiting && !(getName() || lineName).trim();
   const yt = (state?.youtubeUrl || "").trim() || ytUrl(state?.bio || "");
   const bioShow = yt && state?.bio
     ? state.bio.replace(yt, "").replace(/[：:]\s*$/m, "").trimEnd()
@@ -240,17 +242,19 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             <div className="sp">{money(open.price)}</div>
             <h2>{open.name}</h2>
             {open.note ? <p className="sn">{open.note}</p> : null}
-            {takenOpen ? (
+            {lockOpen ? (
               <>
-                <p className="sw sold">予約済 — 他の方が引き取り予定</p>
+                <p className={takenOpen ? "sw sold" : "sw"}>
+                  {takenOpen ? "予約済 — 他の方が引き取り予定" : "他の方が先に依頼中です（まだ確定していません）"}
+                </p>
                 {needWlName && (
                   <label className="float"><span>ジモティ名</span>
                     <input value={lineName} onChange={(e) => setLineName(e.target.value)}
                       placeholder="表示名" autoComplete="nickname" enterKeyHint="done" /></label>
                 )}
                 {err && <div className="err">{err}</div>}
-                <button type="button" className={`cta${waiting ? " soft" : " go"}`} disabled={waiting}
-                  onClick={() => joinWait(open.id)}>
+                <button type="button" className={`cta${waiting ? " soft" : " go"}`} disabled={waiting || busy}
+                  onClick={() => void joinWait(open.id)}>
                   {waiting ? "キャンセル待ち中" : "キャンセル待ち"}
                 </button>
               </>
