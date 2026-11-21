@@ -3,25 +3,26 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useLineOAuthReturn } from "@/components/line-oauth";
-import { adminPath, ensureShopId, getId, getName, logout, subscribeAuth } from "@/lib/shop";
+import { adminPath, ensureShopId, getId, getName, logout, openShop, subscribeAuth } from "@/lib/shop";
 
 type Props = { top?: boolean };
 
-/** brand+投稿一覧 · ヘルプ/name menu-pop · ログイン→/me */
+/** brand+投稿一覧 · ヘルプ/ログイン|name menu-pop */
 export default function AppNav({ top }: Props) {
   const router = useRouter();
   const path = usePathname() || "";
   const name = useSyncExternalStore(subscribeAuth, getName, () => "");
   const shopId = useSyncExternalStore(subscribeAuth, getId, () => "");
-  const [open, setOpen] = useState<"help" | "prof" | "">("");
+  const [open, setOpen] = useState<"help" | "me" | "">("");
+  const [draft, setDraft] = useState("");
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(""); // "" | ok | "!err"
 
   useEffect(() => {
     if (shopId) router.prefetch(adminPath(shopId));
-    router.prefetch("/me");
-  }, [shopId, router]);
+    if (name) router.prefetch("/me");
+  }, [shopId, name, router]);
   useLineOAuthReturn();
   useEffect(() => {
     if (!open) return;
@@ -60,6 +61,7 @@ export default function AppNav({ top }: Props) {
   const sellOn = /\/s\/[^/]+\/admin\/?$/.test(path);
   const meOn = path === "/me" || path.startsWith("/me/");
   const pop = `menu-pop${top ? "" : " up"}`;
+  const toggleMe = () => setOpen(open === "me" ? "" : "me");
 
   return (
     <nav className={`app-nav${top ? " top" : " bot"}`} aria-label="アプリ">
@@ -83,7 +85,7 @@ export default function AppNav({ top }: Props) {
               aria-expanded={open === "help"} aria-haspopup="dialog"
               onClick={() => { setOpen(open === "help" ? "" : "help"); setMsg(""); }}>ヘルプ</button>
             {open === "help" && (
-              <form className={`${pop} help`} role="dialog" aria-label="ヘルプ" onSubmit={sendHelp}>
+              <form className={`${pop} pane`} role="dialog" aria-label="ヘルプ" onSubmit={sendHelp}>
                 <textarea rows={3} value={body} onChange={(e) => setBody(e.target.value)}
                   placeholder="バグ・要望・質問" autoFocus />
                 {msg && <p className={msg.startsWith("!") ? "sw" : "hint"}>{msg.replace(/^!/, "")}</p>}
@@ -91,23 +93,30 @@ export default function AppNav({ top }: Props) {
               </form>
             )}
           </div>
-          {name ? (
-            <div className="nav-me">
-              <button type="button" className={`nav-a${meOn || open === "prof" ? " on" : ""}`}
-                aria-expanded={open === "prof"} aria-haspopup="menu"
-                onClick={() => setOpen(open === "prof" ? "" : "prof")}>{name}</button>
-              {open === "prof" && (
-                <div className={pop} role="menu">
-                  <button type="button" role="menuitem"
-                    onClick={() => { setOpen(""); router.push("/me"); }}>履歴</button>
-                  <button type="button" className="danger" role="menuitem"
-                    onClick={() => { setOpen(""); void logout(); }}>ログアウト</button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <Link className="nav-a" href="/me" prefetch>ログイン</Link>
-          )}
+          <div className="nav-me">
+            <button type="button" className={`nav-a${(name && meOn) || open === "me" ? " on" : ""}`}
+              aria-expanded={open === "me"} aria-haspopup={name ? "menu" : "dialog"}
+              onClick={toggleMe}>{name || "ログイン"}</button>
+            {open === "me" && (name ? (
+              <div className={pop} role="menu">
+                <button type="button" role="menuitem"
+                  onClick={() => { setOpen(""); router.push("/me"); }}>履歴</button>
+                <button type="button" className="danger" role="menuitem"
+                  onClick={() => { setOpen(""); void logout(); }}>ログアウト</button>
+              </div>
+            ) : (
+              <form className={`${pop} pane`} role="dialog" aria-label="ログイン"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!draft.trim()) return;
+                  openShop(draft); setDraft(""); setOpen("");
+                }}>
+                <input value={draft} onChange={(e) => setDraft(e.target.value)}
+                  placeholder="ジモティ名" autoComplete="nickname" autoFocus />
+                <button type="submit" disabled={!draft.trim()}>サインイン</button>
+              </form>
+            ))}
+          </div>
         </div>
       </div>
     </nav>
