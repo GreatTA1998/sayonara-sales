@@ -29,20 +29,49 @@ export type SaleRow = {
   count?: number;
 };
 
-export const getName = () => typeof window === "undefined" ? ""
-  : (localStorage.getItem(NAME_KEY) || localStorage.getItem(LEGACY_NAME_KEY) || "").trim();
-export const getId = () => typeof window === "undefined" ? "" : (localStorage.getItem(ID_KEY) || "").trim();
+const readMap = (): Record<string, string> => {
+  try { return JSON.parse(localStorage.getItem(MAP_KEY) || "{}") as Record<string, string>; }
+  catch { return {}; }
+};
+
+const clearNames = () => {
+  localStorage.removeItem(NAME_KEY); localStorage.removeItem(LEGACY_NAME_KEY);
+};
+const writeName = (v: string) => {
+  localStorage.setItem(NAME_KEY, v); localStorage.removeItem(LEGACY_NAME_KEY);
+};
+
+/** Once: ss-line-name→jimoty; reclaim id↔name so shops aren’t orphaned after key move. */
+let ready = false;
+const hydrate = () => {
+  if (ready || typeof window === "undefined") return;
+  ready = true;
+  let name = (localStorage.getItem(NAME_KEY) || localStorage.getItem(LEGACY_NAME_KEY) || "").trim();
+  let id = (localStorage.getItem(ID_KEY) || "").trim();
+  const map = readMap();
+  if (!name && isShop(id)) {
+    name = id === ELTON_ID ? ELTON_LABEL
+      : (Object.entries(map).find(([, v]) => v === id)?.[0] || "");
+  }
+  if (name && !isShop(id)) id = knownId(name) || map[norm(name)] || "";
+  if (!name) return;
+  writeName(name);
+  if (!isShop(id)) return;
+  map[norm(name)] = id;
+  localStorage.setItem(MAP_KEY, JSON.stringify(map));
+  localStorage.setItem(ID_KEY, id);
+};
+
+export const getName = () =>
+  typeof window === "undefined" ? "" : (hydrate(), (localStorage.getItem(NAME_KEY) || "").trim());
+export const getId = () =>
+  typeof window === "undefined" ? "" : (hydrate(), (localStorage.getItem(ID_KEY) || "").trim());
 export const adminPath = (id: string) => `/s/${id}/admin`;
 export const notifyAuth = () => { if (typeof window !== "undefined") window.dispatchEvent(new Event(AUTH_EVT)); };
 /** For useSyncExternalStore — identity known on first client paint (no useEffect flash). */
 export const subscribeAuth = (cb: () => void) => {
   window.addEventListener(AUTH_EVT, cb);
   return () => window.removeEventListener(AUTH_EVT, cb);
-};
-
-const readMap = (): Record<string, string> => {
-  try { return JSON.parse(localStorage.getItem(MAP_KEY) || "{}") as Record<string, string>; }
-  catch { return {}; }
 };
 
 export type Profile = { bio: string; jimotyUrl: string; youtubeUrl: string };
@@ -79,14 +108,7 @@ const readUidMap = (): Record<string, string> => {
   catch { return {}; }
 };
 
-const clearNames = () => {
-  localStorage.removeItem(NAME_KEY); localStorage.removeItem(LEGACY_NAME_KEY);
-};
-const writeName = (v: string) => {
-  localStorage.setItem(NAME_KEY, v); localStorage.removeItem(LEGACY_NAME_KEY);
-};
-
-/** Soft Jimoty name. Bind shop only when reclaiming known/map or an existing guest dig5 — never invent. */
+/** Soft Jimoty name. Bind shop only when reclaiming known/map or an existing guest shop — never invent. */
 export const openShop = (n: string) => {
   if (typeof window === "undefined") return "";
   const v = n.trim();
@@ -95,7 +117,7 @@ export const openShop = (n: string) => {
   const key = norm(v);
   const cur = getId();
   let id = knownId(v) || map[key] || "";
-  if (!isShop(id) && dig5(cur)) id = cur;
+  if (!isShop(id) && isShop(cur)) id = cur;
   writeName(v);
   if (isShop(id)) {
     map[key] = id;
@@ -139,10 +161,10 @@ export const applyLineSession = async () => {
   return body;
 };
 
-/** Clear soft name + optional LINE OAuth session (keep guest shop id). */
+/** Clear soft name + shop pointer + optional LINE session (map/known reclaim on next sign-in). */
 export async function logout() {
   if (typeof window === "undefined") return;
-  clearNames(); localStorage.removeItem(UID_KEY); notifyAuth();
+  clearNames(); localStorage.removeItem(UID_KEY); localStorage.removeItem(ID_KEY); notifyAuth();
   try { await fetch("/api/auth/session", { method: "DELETE" }); } catch { /* offline */ }
 }
 export type BuyRow = { code: string; shop: string; day: string; slot: string; items: string[]; at: string };
