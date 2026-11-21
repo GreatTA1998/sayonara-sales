@@ -69,7 +69,7 @@ export function ListingTools({
       <Seg label="表示" value={dense ? "1" : "0"} onPick={(v) => onDense(v === "1")}
         opts={[["0", <DensIco />, "通常"], ["1", <DensIco list />, "密集"]]} />
       <Seg label="価格順" value={dir} onPick={(v) => onDir(v as PriceDir)}
-        opts={[["asc", "安→高"], ["desc", "高→安"]]} />
+        opts={[["asc", "安い順"], ["desc", "高い順"]]} />
     </div>
   );
 }

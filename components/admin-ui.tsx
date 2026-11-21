@@ -662,16 +662,6 @@ export default function ShopAdminView({ shop, name }: Props) {
             onChange={(e) => setBio(e.target.value)}
             onBlur={() => void persistProfile(bio, jimoty, youtube)}
             placeholder="動作確認・値引き・引越し・車・まとめ買い優先など" /></label>
-        <div className="name-price">
-          <label className="float"><span>Jimoty profile</span>
-            <input value={jimoty} onChange={(e) => setJimoty(e.target.value)}
-              onBlur={() => void persistProfile(bio, jimoty, youtube)}
-              placeholder="https://jmty.jp/…" inputMode="url" autoComplete="url" /></label>
-          <label className="float"><span>内見動画</span>
-            <input value={youtube} onChange={(e) => setYoutube(e.target.value)}
-              onBlur={() => void persistProfile(bio, jimoty, youtube)}
-              placeholder="内見動画URL" inputMode="url" autoComplete="url" /></label>
-        </div>
         <Seg label="買い手連絡" value={contactMode} onPick={(v) => setContactMode(v as ContactMode)}
           opts={[["jimoty", "Jimoty"], ["line", "LINE"], ["phone", "電話"]]} />
         {contactMode !== "jimoty" && (
@@ -683,67 +673,6 @@ export default function ShopAdminView({ shop, name }: Props) {
               inputMode={contactMode === "line" ? "url" : "tel"}
               autoComplete={contactMode === "line" ? "off" : "tel"} /></label>
         )}
-        <div className="slot-add">
-          <DateField label="受取開始" value={pickupFrom} onChange={(v) => { setPickupFrom(v); void saveDates(v, pickupTo); }} />
-          <span aria-hidden="true">〜</span>
-          <DateField label="退去日" value={pickupTo} onChange={(v) => { setPickupTo(v); void saveDates(pickupFrom, v); }} />
-        </div>
-        <div className="name-price">
-          <label className="float lead"><span>最短予約</span>
-            <span className="lead-row">
-              <input type="number" min={0} inputMode="numeric" aria-label="最短予約（日前）"
-                value={leadDays}
-                onChange={(e) => setLeadDays(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-                onBlur={() => void saveDates(pickupFrom, pickupTo, leadDays)} />
-              <span aria-hidden="true">日前</span>
-            </span>
-          </label>
-          <label className="float lead"><span>最低点数</span>
-            <span className="lead-row">
-              <input type="number" min={0} inputMode="numeric" aria-label="最低点数（0でなし）"
-                value={minItems}
-                onChange={(e) => setMinItems(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-                onBlur={() => void saveMins()} />
-              <span aria-hidden="true">点</span>
-            </span>
-          </label>
-          <label className="float lead"><span>最低合計</span>
-            <span className="lead-row">
-              <input type="number" min={0} inputMode="numeric" aria-label="最低合計円（0でなし）"
-                value={minTotal}
-                onChange={(e) => setMinTotal(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-                onBlur={() => void saveMins()} />
-              <span aria-hidden="true">円</span>
-            </span>
-          </label>
-        </div>
-        <div className="slot-edit" role="list" aria-label="受取時間">
-          {slots.map((s) => (
-            <button key={s} type="button" className="slot" role="listitem"
-              aria-label={`${s}を削除`}
-              onClick={() => {
-                if (slots.length <= 1) { show("時間帯は1つ以上必要です", "err"); return; }
-                void saveSlots(slots.filter((x) => x !== s));
-              }}>{s} ×</button>
-          ))}
-          <span className="slot-add-wrap">
-            <button type="button" className="slot" onClick={() => setSlotOpen((v) => !v)}>時間を追加</button>
-            {slotOpen && (
-              <div className="slot-pop" role="dialog" aria-label="時間を追加">
-                <input type="time" aria-label="開始" value={slotA} onChange={(e) => setSlotA(e.target.value)} />
-                <span aria-hidden="true">〜</span>
-                <input type="time" aria-label="終了" value={slotB} onChange={(e) => setSlotB(e.target.value)} />
-                <button type="button" className="slot" disabled={!slotA || !slotB || slotB <= slotA}
-                  onClick={() => {
-                    const label = fmtSlot(slotA, slotB);
-                    if (slots.includes(label)) { show("すでにあります", "err"); return; }
-                    void saveSlots([...slots, label].sort());
-                    setSlotOpen(false);
-                  }}>追加</button>
-              </div>
-            )}
-          </span>
-        </div>
       </section>
 
       <div className="add-dual">
@@ -791,6 +720,83 @@ export default function ShopAdminView({ shop, name }: Props) {
             classNameFor={(it) => (deleting === it.id || it.paused ? "dim" : "")} />
         </>
       )}
+
+      <section className="prof-block">
+        <div className="slot-add">
+          <DateField label="受取開始" value={pickupFrom} onChange={(v) => { setPickupFrom(v); void saveDates(v, pickupTo); }} />
+          <span aria-hidden="true">〜</span>
+          <DateField label="退去日" value={pickupTo} onChange={(v) => { setPickupTo(v); void saveDates(pickupFrom, v); }} />
+        </div>
+        <label className="float lead"><span>最短予約</span>
+          <span className="lead-row">
+            <input type="number" min={0} inputMode="numeric" aria-label="最短予約（日前）"
+              value={leadDays}
+              onChange={(e) => setLeadDays(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+              onBlur={() => void saveDates(pickupFrom, pickupTo, leadDays)} />
+            <span aria-hidden="true">日前</span>
+          </span>
+        </label>
+        <div className="slot-edit" role="list" aria-label="受取時間">
+          {slots.map((s) => (
+            <button key={s} type="button" className="slot" role="listitem"
+              aria-label={`${s}を削除`}
+              onClick={() => {
+                if (slots.length <= 1) { show("時間帯は1つ以上必要です", "err"); return; }
+                void saveSlots(slots.filter((x) => x !== s));
+              }}>{s} ×</button>
+          ))}
+          <span className="slot-add-wrap">
+            <button type="button" className="slot" onClick={() => setSlotOpen((v) => !v)}>時間を追加</button>
+            {slotOpen && (
+              <div className="slot-pop" role="dialog" aria-label="時間を追加">
+                <input type="time" aria-label="開始" value={slotA} onChange={(e) => setSlotA(e.target.value)} />
+                <span aria-hidden="true">〜</span>
+                <input type="time" aria-label="終了" value={slotB} onChange={(e) => setSlotB(e.target.value)} />
+                <button type="button" className="slot" disabled={!slotA || !slotB || slotB <= slotA}
+                  onClick={() => {
+                    const label = fmtSlot(slotA, slotB);
+                    if (slots.includes(label)) { show("すでにあります", "err"); return; }
+                    void saveSlots([...slots, label].sort());
+                    setSlotOpen(false);
+                  }}>追加</button>
+              </div>
+            )}
+          </span>
+        </div>
+        <details className="opt">
+          <summary>任意</summary>
+          <div className="name-price">
+            <label className="float"><span>Jimoty profile</span>
+              <input value={jimoty} onChange={(e) => setJimoty(e.target.value)}
+                onBlur={() => void persistProfile(bio, jimoty, youtube)}
+                placeholder="https://jmty.jp/…" inputMode="url" autoComplete="url" /></label>
+            <label className="float"><span>内見動画</span>
+              <input value={youtube} onChange={(e) => setYoutube(e.target.value)}
+                onBlur={() => void persistProfile(bio, jimoty, youtube)}
+                placeholder="内見動画URL" inputMode="url" autoComplete="url" /></label>
+          </div>
+          <div className="name-price">
+            <label className="float lead"><span>最低点数</span>
+              <span className="lead-row">
+                <input type="number" min={0} inputMode="numeric" aria-label="最低点数（0でなし）"
+                  value={minItems}
+                  onChange={(e) => setMinItems(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+                  onBlur={() => void saveMins()} />
+                <span aria-hidden="true">点</span>
+              </span>
+            </label>
+            <label className="float lead"><span>最低合計</span>
+              <span className="lead-row">
+                <input type="number" min={0} inputMode="numeric" aria-label="最低合計円（0でなし）"
+                  value={minTotal}
+                  onChange={(e) => setMinTotal(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+                  onBlur={() => void saveMins()} />
+                <span aria-hidden="true">円</span>
+              </span>
+            </label>
+          </div>
+        </details>
+      </section>
 
       {(data?.claims || []).some((c) => c.status === "picked_up") && (
         <p className="hint thanks pad">ありがとう。ほかの小さなアプリも →{" "}
