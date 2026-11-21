@@ -1,7 +1,7 @@
 "use client";
 /**
- * Firestore snapshot listeners = source of truth (actions.life style).
- * Optimistic local writes reconcile when onSnapshot fires.
+ * Firestore onSnapshot = sole SOT (actions.life / blackboards.io).
+ * Writes hit Firestore; UI follows snap (SDK local cache is already optimistic).
  */
 import {
   arrayRemove, arrayUnion, collection, doc, getDoc, getDocs, onSnapshot, runTransaction, setDoc, updateDoc, deleteDoc,

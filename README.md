@@ -4,7 +4,7 @@ Phone-first move-out sale. Hub `/`; seller UI `/s/{id}/admin` (Elton `/s/elton/a
 
 **Production:** https://sayonara.tokyo
 
-Shop state: **Firebase Firestore** via the **client SDK** + security rules + snapshot listeners (optimistic writes). Photos stay on Vercel Blob. Soft Jimoty identity UX; Anonymous Firebase Auth for writes. Soft-auth era: `/s/elton` admin writes need signed-in only (not `ownerUid` match); other shops still claim `ownerUid`.
+Shop state: **Firebase Firestore** via the **client SDK** + security rules + `onSnapshot` sole SOT (no client optimistic listing ids). Photos stay on Vercel Blob. Soft Jimoty identity UX; Anonymous Firebase Auth for writes. Soft-auth era: `/s/elton` admin writes need signed-in only (not `ownerUid` match); other shops still claim `ownerUid`.
 
 ## Data model
 
