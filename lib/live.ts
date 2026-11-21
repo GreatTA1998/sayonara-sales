@@ -37,6 +37,25 @@ const emptySeed = (id: string): Store =>
     ? { address: "目黒区", lineInviteUrl: "", phone: "", items: [], claims: [], published: true }
     : { address: "目黒区", items: [], claims: [] };
 
+/** Claim shops/{id}.ownerUid when missing. Throws if another uid already owns. */
+async function claimShopOwner(shop: string, uid: string) {
+  const ref = doc(getDb(), "shops", shop);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    const seed = emptySeed(shop);
+    seed.ownerUid = uid;
+    if (shop === ELTON_SHOP) seed.published = true;
+    await setDoc(ref, { ...shopFields(seed), ownerUid: uid, updatedAt: new Date().toISOString() });
+    return;
+  }
+  const cur = snap.data()?.ownerUid;
+  if (!cur) {
+    await updateDoc(ref, { ownerUid: uid, updatedAt: new Date().toISOString() });
+    return;
+  }
+  if (cur !== uid) throw new Error("このショップの編集権限がありません");
+}
+
 /** Live shop: public onSnapshot (no auth). Owner claim only when opts.claimOwner. */
 export function listenShop(
   shopRaw: string,
@@ -55,18 +74,7 @@ export function listenShop(
   const fail = (e: unknown) => onErr?.(e instanceof Error ? e : new Error(String(e)));
 
   if (opts?.claimOwner) {
-    void ensureAuth().then(async (user) => {
-      const ref = doc(db, "shops", shop);
-      const snap = await getDoc(ref);
-      if (!snap.exists()) {
-        const seed = emptySeed(shop);
-        seed.ownerUid = user.uid;
-        if (shop === ELTON_SHOP) seed.published = true;
-        await setDoc(ref, { ...shopFields(seed), ownerUid: user.uid, updatedAt: new Date().toISOString() });
-      } else if (!snap.data()?.ownerUid) {
-        await updateDoc(ref, { ownerUid: user.uid, updatedAt: new Date().toISOString() });
-      }
-    }).catch(fail);
+    void ensureAuth().then((u) => claimShopOwner(shop, u.uid)).catch(fail);
   }
 
   const u1 = onSnapshot(doc(db, "shops", shop), (snap) => {
@@ -120,7 +128,9 @@ async function setClaimStatus(shop: string, id: string, from: string, to: string
 /** Admin mutations — same action surface as old /api/admin. */
 export async function adminAct(shopRaw: string, body: Record<string, unknown>): Promise<unknown> {
   const shop = parseShop(shopRaw);
-  await ensureAuth();
+  const user = await ensureAuth();
+  // Await ownership before writes — listenShop claimOwner is fire-and-forget.
+  await claimShopOwner(shop, user.uid);
   const db = getDb();
   const shopRef = doc(db, "shops", shop);
   const action = String(body.action || "");

@@ -489,14 +489,13 @@ export default function ShopAdminView({ shop, name }: Props) {
         show("削除しました", "ok");
         return;
       }
-      const ok = await act({ action: "remove", id: item.id });
+      const ok = await act({ action: "remove", id: item.id }, "削除しました");
       if (ok && (openId === item.id || editIdRef.current === item.id)) {
         if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
         editIdRef.current = null;
         editSavedRef.current = null;
         setOpenId(null);
       }
-      show(ok ? "削除しました" : "削除に失敗しました", ok ? "ok" : "err");
     } finally { setDeleting(null); }
   }
 
