@@ -20,7 +20,7 @@
 .xgrid.text{gap:6px}.xgrid.text.dense{display:block;column-width:144px;column-gap:10px}
 .xgrid.dense:not(.text){gap:3px;grid-template-columns:repeat(auto-fill,minmax(min(100%,72px),1fr))}
 .xtxt{position:relative;display:flex;flex-direction:column;gap:2px;padding:8px 10px;border:1px solid #e5e5e5;border-radius:16px;background:#fff;text-align:left;cursor:pointer;font:inherit;color:inherit;min-height:44px;box-sizing:border-box}
-.xtxt.dense{display:block;width:100%;margin:0;padding:2px 0;border:0;border-radius:0;background:0;min-height:0;font-size:var(--t-sm);break-inside:avoid}
+.xtxt.dense{display:block;width:100%;margin:0;padding:2px 0;border:0;border-radius:0;background:0;min-height:0;font-size:var(--t-xs);break-inside:avoid}
 .xtxt.on{border-color:#ff9900;background:#fff8ee}
 .xtxt.sold:not(.dense){background:#f3f3f3}.xtxt.dense.sold{opacity:.55}
 .xtxt.sold:not(.dense)::after{content:"予約済";position:absolute;right:8px;top:8px;padding:1px 6px;border-radius:4px;background:rgba(17,17,17,.72);color:#fff;font-size:var(--t-sm);font-weight:var(--fw-bold);line-height:1.3;pointer-events:none}
