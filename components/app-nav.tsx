@@ -87,7 +87,7 @@ export default function AppNav({ top }: Props) {
             {open === "help" && (
               <form className={`${pop} pane`} role="dialog" aria-label="ヘルプ" onSubmit={sendHelp}>
                 <textarea rows={3} value={body} onChange={(e) => setBody(e.target.value)}
-                  placeholder="バグ・要望・質問" autoFocus />
+                  placeholder="バグ・要望・質問" />
                 {msg && <p className={msg.startsWith("!") ? "sw" : "hint"}>{msg.replace(/^!/, "")}</p>}
                 <button type="submit" disabled={!body.trim() || busy}>{busy ? "送信中…" : "送信"}</button>
               </form>
