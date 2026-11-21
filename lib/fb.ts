@@ -1,6 +1,8 @@
 "use client";
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
-import { getFirestore, type Firestore } from "firebase/firestore";
+import {
+  getFirestore, initializeFirestore, persistentLocalCache, type Firestore,
+} from "firebase/firestore";
 import type { User } from "firebase/auth";
 
 const cfg = {
@@ -22,8 +24,15 @@ function appOrThrow(): FirebaseApp {
   return app;
 }
 
+/** IndexedDB cache when possible — warm revisits paint from disk; memory fallback. */
 export function getDb(): Firestore {
-  if (!db) db = getFirestore(appOrThrow());
+  if (db) return db;
+  const a = appOrThrow();
+  try {
+    db = initializeFirestore(a, { localCache: persistentLocalCache() });
+  } catch {
+    db = getFirestore(a);
+  }
   return db;
 }
 

@@ -66,36 +66,39 @@ export function listenShop(
   const shop = parseShop(shopRaw);
   const db = getDb();
   const state: ShopSnap = { meta: null, items: new Map(), claims: new Map() };
-  let ready = { shop: false, items: false };
-  const emit = () => {
-    if (!ready.shop || !ready.items) return;
-    onData(assemble(state));
-  };
+  // Paint on items alone (shop meta fills in; claims soft-lock via item.claimId).
+  let itemsReady = false;
+  const emit = () => { if (itemsReady) onData(assemble(state)); };
   const fail = (e: unknown) => onErr?.(e instanceof Error ? e : new Error(String(e)));
 
   if (opts?.claimOwner) {
     void ensureAuth().then((u) => claimShopOwner(shop, u.uid)).catch(fail);
   }
 
+  let stopClaims: Unsubscribe | null = null;
+  const watchClaims = () => {
+    if (stopClaims) return;
+    stopClaims = onSnapshot(collection(db, "shops", shop, "claims"), (snap) => {
+      state.claims = new Map(snap.docs.map((d) => [d.id, d.data() as Record<string, unknown>]));
+      emit();
+    }, (e) => {
+      if ((e as { code?: string }).code === "permission-denied") { emit(); return; }
+      fail(e);
+    });
+  };
+
   const u1 = onSnapshot(doc(db, "shops", shop), (snap) => {
     state.meta = snap.exists() ? (snap.data() as Record<string, unknown>) : { address: "目黒区" };
-    ready.shop = true;
     emit();
   }, fail);
   const u2 = onSnapshot(collection(db, "shops", shop, "items"), (snap) => {
     state.items = new Map(snap.docs.map((d) => [d.id, d.data() as Record<string, unknown>]));
-    ready.items = true;
+    itemsReady = true;
     emit();
+    watchClaims(); // after first items paint — avoid cold 3-way contention
   }, fail);
-  const u3 = onSnapshot(collection(db, "shops", shop, "claims"), (snap) => {
-    state.claims = new Map(snap.docs.map((d) => [d.id, d.data() as Record<string, unknown>]));
-    emit();
-  }, (e) => {
-    if ((e as { code?: string }).code === "permission-denied") { emit(); return; }
-    fail(e);
-  });
 
-  return () => { u1(); u2(); u3(); };
+  return () => { u1(); u2(); stopClaims?.(); };
 }
 
 /** Home tabs — public shop+items. */

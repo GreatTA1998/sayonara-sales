@@ -29,7 +29,13 @@ export default function HomePage() {
     setCards(enriched);
   }, []);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  // Defer tab peeks so embedded listenShop wins the cold Firebase connection.
+  useEffect(() => {
+    let gone = false;
+    const run = () => { if (!gone) void refresh(); };
+    const t = window.setTimeout(run, 250);
+    return () => { gone = true; clearTimeout(t); };
+  }, [refresh]);
   useEffect(() => {
     const onAuth = () => { void refresh(); };
     window.addEventListener(AUTH_EVT, onAuth);
