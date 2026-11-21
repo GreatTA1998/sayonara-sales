@@ -5,7 +5,7 @@
  */
 import {
   arrayRemove, arrayUnion, collection, doc, getDoc, getDocs, onSnapshot, runTransaction, setDoc, updateDoc, deleteDoc,
-  type Unsubscribe,
+  writeBatch, type Unsubscribe,
 } from "firebase/firestore";
 import { ensureAuth, getDb } from "./fb";
 import {
@@ -125,12 +125,15 @@ async function setClaimStatus(shop: string, id: string, from: string, to: string
   const cref = doc(db, "shops", shop, "claims", id);
   const csnap = await getDoc(cref);
   if (!csnap.exists() || csnap.data().status !== from) throw new Error("No claim");
-  await updateDoc(cref, { status: to });
-  // Confirm binds items to this claim so parallel pending 依頼 yield to 予約済.
+  const batch = writeBatch(db);
+  batch.update(cref, { status: to });
+  // Confirm binds items so parallel pending 依頼 yield to 予約済 — one commit RTT.
   if (to === "booked") {
-    const ids = Array.isArray(csnap.data().itemIds) ? csnap.data().itemIds.map(String) : [];
-    await Promise.all(ids.map((iid: string) => updateDoc(doc(db, "shops", shop, "items", iid), { claimId: id })));
+    for (const iid of (Array.isArray(csnap.data().itemIds) ? csnap.data().itemIds.map(String) : [])) {
+      batch.update(doc(db, "shops", shop, "items", iid), { claimId: id });
+    }
   }
+  await batch.commit();
   return asClaim(csnap.id, { ...csnap.data(), status: to });
 }
 
@@ -248,11 +251,11 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       const patch: Record<string, unknown> = { status: "cancelled", waiters: [] };
       if (reason) patch.declineReason = reason;
       await updateDoc(cref, patch);
-      for (const iid of (Array.isArray(c.itemIds) ? c.itemIds.map(String) : [])) {
+      await Promise.all((Array.isArray(c.itemIds) ? c.itemIds.map(String) : []).map(async (iid) => {
         const iref = doc(db, "shops", shop, "items", iid);
         const isnap = await getDoc(iref);
         if (isnap.exists() && isnap.data().claimId === id) await updateDoc(iref, { claimId: null });
-      }
+      }));
       return asClaim(id, { ...c, ...patch });
     }
     default:
