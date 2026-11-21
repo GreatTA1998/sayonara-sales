@@ -576,6 +576,18 @@ export default function ShopAdminView({ shop, name }: Props) {
   }
   function openClaim(id: string) { setDecline(false); setClaimId(id); }
   function closeClaim() { setDecline(false); setClaimId(null); }
+  /** Like publish / photo-delete: dismiss + snack first; local status then snap. */
+  function claimAct(payload: Record<string, unknown>, okMsg: string) {
+    const id = String(payload.id || "");
+    const st = payload.action === "confirm" ? "booked" : payload.action === "picked_up" ? "picked_up" : "cancelled";
+    const prev = data;
+    setData((d) => d && { ...d, claims: d.claims.map((c) => (c.id === id ? { ...c, status: st } : c)) });
+    closeClaim(); show(okMsg, "ok");
+    void adminAct(shop, payload).catch((e) => {
+      const msg = e instanceof Error ? e.message : "失敗しました";
+      setErr(msg); show(msg, "err"); if (prev) setData(prev);
+    });
+  }
 
   const busyOpen = open ? deleting === open.id : false;
   useBodyScrollLock(!!openId || !!claimId);
@@ -786,10 +798,8 @@ export default function ShopAdminView({ shop, name }: Props) {
               <div className="decline-list" role="group" aria-label="お断り理由">
                 <p className="hint">丁寧なお断り文を選んでください</p>
                 {DECLINE_PRESETS.map((t) => (
-                  <button key={t} type="button" className="decline-opt" onClick={() => {
-                    void act({ action: "cancel", id: claimOpen.id, reason: t }, "お断りしました")
-                      .then((ok) => { if (ok) closeClaim(); });
-                  }}>{t}</button>
+                  <button key={t} type="button" className="decline-opt"
+                    onClick={() => claimAct({ action: "cancel", id: claimOpen.id, reason: t }, "お断りしました")}>{t}</button>
                 ))}
                 <button type="button" className="decline-back" onClick={() => setDecline(false)}>戻る</button>
               </div>
@@ -798,18 +808,15 @@ export default function ShopAdminView({ shop, name }: Props) {
                 {claimOpen.status === "requested" ? (
                   <>
                     <button type="button" onClick={() => setDecline(true)}>お断り</button>
-                    <button type="button" onClick={() => {
-                      void act({ action: "confirm", id: claimOpen.id }, "確認しました").then((ok) => { if (ok) closeClaim(); });
-                    }}>確認する</button>
+                    <button type="button"
+                      onClick={() => claimAct({ action: "confirm", id: claimOpen.id }, "確認しました")}>確認する</button>
                   </>
                 ) : (
                   <>
-                    <button type="button" onClick={() => {
-                      void act({ action: "cancel", id: claimOpen.id }, "キャンセルしました").then((ok) => { if (ok) closeClaim(); });
-                    }}>キャンセル</button>
-                    <button type="button" onClick={() => {
-                      void act({ action: "picked_up", id: claimOpen.id }, "受取済み").then((ok) => { if (ok) closeClaim(); });
-                    }}>受取済み</button>
+                    <button type="button"
+                      onClick={() => claimAct({ action: "cancel", id: claimOpen.id }, "キャンセルしました")}>キャンセル</button>
+                    <button type="button"
+                      onClick={() => claimAct({ action: "picked_up", id: claimOpen.id }, "受取済み")}>受取済み</button>
                   </>
                 )}
               </div>
