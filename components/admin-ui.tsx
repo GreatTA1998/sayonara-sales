@@ -405,19 +405,11 @@ export default function ShopAdminView({ shop, name }: Props) {
         const up = await postUpload(job.file, job.itemId);
         const remote = String(up.url || "");
         if (!remote) throw new Error("アップロードに失敗しました");
-        let nextPhotos: string[] = [];
-        setData((d) => {
-          if (!d) return d;
-          return {
-            ...d,
-            items: d.items.map((i) => {
-              if (i.id !== job.itemId) return i;
-              nextPhotos = (i.photos || []).map((p) => (p === local ? remote : p)).filter(isRemote);
-              return { ...i, photos: (i.photos || []).map((p) => (p === local ? remote : p)) };
-            }),
-          };
-        });
-        await adminAct(shop, { action: "edit", id: job.itemId, photos: nextPhotos });
+        patchPhotos(job.itemId, (photos) =>
+          photos.some((p) => p === local)
+            ? photos.map((p) => (p === local ? remote : p))
+            : [...photos, remote]);
+        await adminAct(shop, { action: "edit", id: job.itemId, appendPhoto: remote });
       }
       URL.revokeObjectURL(local);
       delete picJobs.current[local];

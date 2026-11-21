@@ -4,7 +4,7 @@
  * Optimistic local writes reconcile when onSnapshot fires.
  */
 import {
-  collection, doc, getDoc, getDocs, onSnapshot, runTransaction, setDoc, updateDoc, deleteDoc,
+  arrayUnion, collection, doc, getDoc, getDocs, onSnapshot, runTransaction, setDoc, updateDoc, deleteDoc,
   type Unsubscribe,
 } from "firebase/firestore";
 import { ensureAuth, getDb } from "./fb";
@@ -153,6 +153,11 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       const snap = await getDoc(ref);
       if (!snap.exists()) throw new Error("Not found");
       const cur = snap.data();
+      // Atomic append — parallel multi-add must not replace the full photos array.
+      if (typeof body.appendPhoto === "string" && body.appendPhoto) {
+        await updateDoc(ref, { photos: arrayUnion(body.appendPhoto) });
+        return { id, appendPhoto: body.appendPhoto };
+      }
       const next: Item = {
         id,
         name: body.name != null ? String(body.name).trim() : String(cur.name || ""),
