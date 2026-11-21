@@ -4,7 +4,7 @@ Phone-first move-out sale. Hub `/`; seller UI `/s/{id}/admin` (Elton `/s/elton/a
 
 **Production:** https://sayonara.tokyo
 
-Shop state: **Firebase Firestore** via the **client SDK** + security rules + snapshot listeners (optimistic writes). Photos stay on Vercel Blob. Soft Jimoty identity UX; Anonymous Firebase Auth under the hood (UID owns shops).
+Shop state: **Firebase Firestore** via the **client SDK** + security rules + snapshot listeners (optimistic writes). Photos stay on Vercel Blob. Soft Jimoty identity UX; Anonymous Firebase Auth for writes. Soft-auth era: `/s/elton` admin writes need signed-in only (not `ownerUid` match); other shops still claim `ownerUid`.
 
 ## Data model
 
@@ -38,7 +38,7 @@ Soft identity = Jimoty名. Pickup lead default 2 days (`leadDays`, 0 ok). Report
 
 1. Console → Authentication → Sign-in method → **Anonymous** → Enable
 2. Deploy rules: `firebase deploy --only firestore:rules --project sayonara-sales`
-3. Existing Elton data stays. First soft-login as エルトン on shop admin claims `ownerUid`.
+3. Existing Elton data stays. Soft Jimoty name is enough for `/s/elton` admin until LINE OAuth; no `ownerUid` reclaim needed.
 
 ## Dev
 

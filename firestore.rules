@@ -8,6 +8,10 @@ service cloud.firestore {
     function isOwner(shopId) {
       return signedIn() && shopDoc(shopId).ownerUid == request.auth.uid;
     }
+    // Soft Jimoty era: elton writable by any signed-in anon (no hard account yet).
+    function canAdmin(shopId) {
+      return signedIn() && (shopId == 'elton' || isOwner(shopId));
+    }
     function shopOpen(shopId) {
       let d = shopDoc(shopId);
       return d.published == true || shopId == 'elton' || isOwner(shopId)
@@ -24,18 +28,16 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.ownerUid == request.auth.uid;
 
-      allow update: if signedIn() && (
-        resource.data.ownerUid == request.auth.uid
-        || (!('ownerUid' in resource.data)
-            && request.resource.data.ownerUid == request.auth.uid)
-      );
+      allow update: if canAdmin(shopId)
+        || (signedIn() && !('ownerUid' in resource.data)
+            && request.resource.data.ownerUid == request.auth.uid);
 
       allow delete: if false;
 
       match /items/{itemId} {
         allow read: if shopOpen(shopId);
-        allow create, delete: if isOwner(shopId);
-        allow update: if isOwner(shopId) || (
+        allow create, delete: if canAdmin(shopId);
+        allow update: if canAdmin(shopId) || (
           signedIn()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['claimId'])
           && resource.data.claimId == null
@@ -45,13 +47,13 @@ service cloud.firestore {
 
       match /claims/{claimId} {
         // Open-shop claim reads are public (same data anon auth already exposed).
-        allow read: if isOwner(shopId)
+        allow read: if canAdmin(shopId)
           || shopOpen(shopId)
           || (signedIn() && resource.data.buyerUid == request.auth.uid);
         allow create: if signedIn()
           && request.resource.data.buyerUid == request.auth.uid
           && request.resource.data.status == 'requested';
-        allow update: if isOwner(shopId) || (
+        allow update: if canAdmin(shopId) || (
           signedIn()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['waiters'])
         );
