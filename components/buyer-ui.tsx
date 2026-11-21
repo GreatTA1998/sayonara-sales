@@ -67,7 +67,6 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     setWaited(loadWl(shop));
     const n = getName();
     if (n) setLineName(n);
-    // Soft-upgrade from optional LINE OAuth session if ss-line-name empty.
     else void applyLineSession().then((s) => { if (s?.name) setLineName(s.name); });
   }, [load, shop]);
   useEffect(() => {
@@ -294,7 +293,8 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
                 ))}
               </div>
             </div>
-            {!freeSlots.length && <p className="sw">この日は空きがありません。</p>}
+            {!((state?.days || []).length) ? <p className="sw">予約できる日がありません。</p>
+              : !freeSlots.length ? <p className="sw">この日は空きがありません。</p> : null}
             <p className="total">現金合計 {money(pickedItems.reduce((n, i) => n + (i.price ?? 0), 0))}</p>
             <ul className="claim-items">{pickedItems.map((i) => (
               <li key={i.id}><span>{i.name?.trim() || "無題"}</span><span>{money(i.price)}</span></li>

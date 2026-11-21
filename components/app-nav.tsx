@@ -7,10 +7,7 @@ import {
   adminPath, ensureShopId, getId, getName, openShop, subscribeAuth,
 } from "@/lib/shop";
 
-type Props = {
-  /** Home is the only page with navbar on top. */
-  top?: boolean;
-};
+type Props = { top?: boolean };
 
 export default function AppNav({ top }: Props) {
   const router = useRouter();

@@ -8,7 +8,7 @@ import SquareCam from "@/components/square-cam";
 import { Snack, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { dayLbl } from "@/lib/days";
-import { PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
+import { DEF_LEAD, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
 import { adminPath, getName, getProfile, openShop, saveProfile, subscribeAuth } from "@/lib/shop";
 import { SITE_URL } from "@/lib/site";
 
@@ -20,15 +20,13 @@ type Claim = {
 type AdminState = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
   lineInviteUrl?: string; phone?: string; slots?: string[];
-  pickupFrom?: string; pickupTo?: string; moveOut?: string; published?: boolean;
+  pickupFrom?: string; pickupTo?: string; moveOut?: string; leadDays?: number; published?: boolean;
   items: Item[]; claims: Claim[];
 };
 type Props = { shop: string; name: string };
 const fmtSlot = (a: string, b: string) => `${a}–${b}`;
 const DEF_FROM = PICKUP_DAYS[0];
 const DEF_TO = PICKUP_DAYS[PICKUP_DAYS.length - 1];
-
-// image/* + image/jpg: Android camera often sends non-standard image/jpg or empty MIME.
 const IMG_ACCEPT = "image/*,image/jpeg,image/jpg,image/png,image/heic,image/heif,image/webp,image/gif,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif";
 const api = (shop: string, path: string) => `${path}?shop=${encodeURIComponent(shop)}`;
 const methodJa = (m?: string) => (m === "phone" ? "電話" : m === "line" ? "LINE" : m || "");
@@ -39,7 +37,6 @@ const isRemote = (u: string) => /^https?:\/\//i.test(u);
 const tempId = () => `tmp-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 type PicStatus = "uploading" | "error";
 type PicJob = { file: File; itemId: string; kind: "append" | "create" };
-/** Claim line items high→low for summary (missing ids → 無題 stubs). */
 function claimItems(c: Claim, all: Item[]) {
   return c.itemIds
     .map((id) => all.find((i) => i.id === id) || { id, name: "無題", price: null as number | null })
@@ -76,7 +73,6 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [loginOpen, setLoginOpen] = useState(false);
   const [lineDraft, setLineDraft] = useState("");
   const [camOpen, setCamOpen] = useState(false);
-  /** null = create-from-photo (1枚＝1出品); set = append photos to that listing. */
   const [camItemId, setCamItemId] = useState<string | null>(null);
   const [bio, setBio] = useState("");
   const [jimoty, setJimoty] = useState("");
@@ -90,6 +86,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [slotOpen, setSlotOpen] = useState(false);
   const [pickupFrom, setPickupFrom] = useState(DEF_FROM);
   const [pickupTo, setPickupTo] = useState(DEF_TO);
+  const [leadDays, setLeadDays] = useState(DEF_LEAD);
   const [listOpen, setListOpen] = useState(false);
   const [listDraft, setListDraft] = useState("");
   const listRef = useRef<HTMLInputElement | null>(null);
@@ -136,6 +133,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     setSlots(body.slots?.length ? body.slots : [...PICKUP_SLOTS]);
     setPickupFrom(body.pickupFrom || DEF_FROM);
     setPickupTo(body.pickupTo || body.moveOut || DEF_TO);
+    setLeadDays(body.leadDays ?? DEF_LEAD);
     if (body.published) setPub((p) => { try { return p === "see" || sessionStorage.getItem(`ss-copied-${shop}`) ? "see" : "on"; } catch { return p === "see" ? "see" : "on"; } });
   }, [shop, show]);
 
@@ -146,7 +144,6 @@ export default function ShopAdminView({ shop, name }: Props) {
     if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
   }, []);
 
-  // Pending camera uploads float to top so create-from-photo is visible immediately.
   const items = useMemo(() => {
     const all = data?.items || [];
     const cmp = byPrice(priceDir);
@@ -419,7 +416,6 @@ export default function ShopAdminView({ shop, name }: Props) {
         const body = await postUpload(job.file, job.itemId);
         const remote = String(body.url || (body.item?.photos || []).slice(-1)[0] || "");
         if (!remote) throw new Error("アップロードに失敗しました");
-        // Upload route already persisted; keep other in-flight blob previews.
         patchPhotos(job.itemId, (photos) => photos.map((p) => (p === local ? remote : p)));
       }
       URL.revokeObjectURL(local);
@@ -451,7 +447,6 @@ export default function ShopAdminView({ shop, name }: Props) {
       const local = URL.createObjectURL(file);
       const id = tempId();
       picJobs.current[local] = { file, itemId: id, kind: "create" };
-      // Optimistic card first — never wait on compress/upload.
       upsertItem({ id, name: "", price: 0, photos: [local] });
       void runPicJob(local);
     }
@@ -504,7 +499,6 @@ export default function ShopAdminView({ shop, name }: Props) {
     } finally { setDeleting(null); }
   }
 
-  /** Persist remote photo order without wiping local blob previews via apply(). */
   async function saveRemotePhotos(itemId: string, photos: string[]) {
     if (itemId.startsWith("tmp-")) return true;
     const remotes = photos.filter(isRemote);
@@ -615,11 +609,12 @@ export default function ShopAdminView({ shop, name }: Props) {
     if (body?.slots) setSlots(body.slots as string[]);
   }
 
-  async function saveDates(from: string, to: string) {
-    const body = await act({ action: "dates", pickupFrom: from, pickupTo: to, moveOut: to }, "保存しました");
+  async function saveDates(from: string, to: string, lead = leadDays) {
+    const body = await act({ action: "dates", pickupFrom: from, pickupTo: to, moveOut: to, leadDays: lead }, "保存しました");
     if (!body) return;
     setPickupFrom(String(body.pickupFrom || from));
     setPickupTo(String(body.pickupTo || body.moveOut || to));
+    if (body.leadDays != null) setLeadDays(Number(body.leadDays));
   }
 
   const busyOpen = open ? deleting === open.id : false;
@@ -693,6 +688,15 @@ export default function ShopAdminView({ shop, name }: Props) {
           <span aria-hidden="true">〜</span>
           <DateField label="退去日" value={pickupTo} onChange={(v) => { setPickupTo(v); void saveDates(pickupFrom, v); }} />
         </div>
+        <label className="float lead"><span>最短予約</span>
+          <span className="lead-row">
+            <input type="number" min={0} inputMode="numeric" aria-label="最短予約（日前）"
+              value={leadDays}
+              onChange={(e) => setLeadDays(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+              onBlur={() => void saveDates(pickupFrom, pickupTo, leadDays)} />
+            <span aria-hidden="true">日前</span>
+          </span>
+        </label>
         <div className="slot-edit" role="list" aria-label="受取時間">
           {slots.map((s) => (
             <button key={s} type="button" className="slot" role="listitem"
