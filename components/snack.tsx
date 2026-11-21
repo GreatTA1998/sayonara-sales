@@ -6,7 +6,7 @@ export type SnackAction = { label: string; onClick: () => void };
 export type SnackState = { msg: string; kind: SnackKind; action?: SnackAction } | null;
 
 /** Swallow the click that follows a pointerup mask dismiss (avoids click-through). */
-export function swallowGhostClick() {
+function swallowGhostClick() {
   const stop = (ev: Event) => { ev.preventDefault(); ev.stopPropagation(); };
   document.addEventListener("click", stop, true);
   document.addEventListener("pointerup", stop, true);

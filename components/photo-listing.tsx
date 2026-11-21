@@ -73,7 +73,7 @@ function MultiPhotoHint({ count }: { count: number }) {
   );
 }
 
-export function PhotoCard({
+function PhotoCard({
   item, onClick, className = "", disabled, dense,
 }: {
   item: PhotoItem; onClick?: () => void; className?: string; disabled?: boolean; dense?: boolean;
@@ -103,7 +103,7 @@ export function PhotoCard({
   );
 }
 
-export function TextTile({
+function TextTile({
   item, onClick, className = "", disabled, dense,
 }: {
   item: PhotoItem; onClick?: () => void; className?: string; disabled?: boolean; dense?: boolean;

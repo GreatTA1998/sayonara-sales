@@ -1,7 +1,7 @@
 const WK = "月火水木金土日";
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 
-export function youbi(d: string) {
+function youbi(d: string) {
   const [y, m, day] = d.split("-").map(Number);
   return WK[(new Date(Date.UTC(y, m - 1, day)).getUTCDay() + 6) % 7];
 }
@@ -11,7 +11,7 @@ export function dayLbl(d: string) {
   return `${m}月${day}日（${youbi(d)}）`;
 }
 
-export function dayShort(d: string) {
+function dayShort(d: string) {
   const [, m, day] = d.split("-").map(Number);
   return `${m}月${day}日`;
 }
