@@ -70,7 +70,7 @@ export async function POST(req: Request) {
         }
         case "publish":
           if (!hasBuyerContact(shop, s)) {
-            throw new Error("LINE招待リンクか電話番号のどちらかを入力してください");
+            throw new Error("Jimoty・LINE・電話のいずれかを入力してください");
           }
           s.published = true;
           return { published: true };

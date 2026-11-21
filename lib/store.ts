@@ -11,6 +11,7 @@ export type Item = {
 };
 export type Claim = {
   id: string; code: string; day: string; slot: string; itemIds: string[];
+  /** Soft identity: typed Jimoty username (buyer). */
   contact?: string; contactMethod?: "jimoty" | "line" | "phone";
   status: "booked" | "picked_up" | "cancelled"; createdAt: string;
 };
@@ -27,17 +28,19 @@ export type Store = {
 export const shopPublished = (shop: string, s: Store) =>
   !!s.published || shop === ELTON_SHOP;
 
+/** Resolved buyer contact for a shop (Elton falls back to canonical LINE/phone). */
 export function shopContact(shop: string, s: Store) {
-  const line = (s.lineInviteUrl || "").trim();
+  const jimotyUrl = (s.jimotyUrl || "").trim();
+  const lineInviteUrl = (s.lineInviteUrl || "").trim();
   const phone = (s.phone || "").trim();
-  if (line || phone) return { lineInviteUrl: line, phone };
-  if (shop === ELTON_SHOP) return { lineInviteUrl: CANON_LINE, phone: CANON_PHONE };
-  return { lineInviteUrl: "", phone: "" };
+  if (jimotyUrl || lineInviteUrl || phone) return { jimotyUrl, lineInviteUrl, phone };
+  if (shop === ELTON_SHOP) return { jimotyUrl: "", lineInviteUrl: CANON_LINE, phone: CANON_PHONE };
+  return { jimotyUrl: "", lineInviteUrl: "", phone: "" };
 }
 
 export const hasBuyerContact = (shop: string, s: Store) => {
   const c = shopContact(shop, s);
-  return !!(c.lineInviteUrl || c.phone);
+  return !!(c.jimotyUrl || c.lineInviteUrl || c.phone);
 };
 
 export { PICKUP_DAYS, PICKUP_SLOTS };

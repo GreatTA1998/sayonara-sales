@@ -28,6 +28,7 @@ const DEF_FROM = PICKUP_DAYS[0];
 const DEF_TO = PICKUP_DAYS[PICKUP_DAYS.length - 1];
 const IMG_ACCEPT = "image/*,image/jpeg,image/jpg,image/png,image/heic,image/heif,image/webp,image/gif,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif";
 const api = (shop: string, path: string) => `${path}?shop=${encodeURIComponent(shop)}`;
+type ContactMode = "jimoty" | "line" | "phone";
 const methodJa = (m?: string) => (m === "jimoty" ? "Jimoty" : m === "phone" ? "電話" : m === "line" ? "LINE" : m || "");
 const kuStem = (v: string) => v.replace(/区$/, "");
 const kuFull = (v: string) => { const s = kuStem(v).trim(); return s ? `${s}区` : ""; };
@@ -72,7 +73,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [youtube, setYoutube] = useState("");
   const [lineInvite, setLineInvite] = useState("");
   const [phone, setPhone] = useState("");
-  const [contactMode, setContactMode] = useState<"line" | "phone">("line");
+  const [contactMode, setContactMode] = useState<ContactMode>("jimoty");
   const [slots, setSlots] = useState<string[]>([...PICKUP_SLOTS]);
   const [slotA, setSlotA] = useState("11:00");
   const [slotB, setSlotB] = useState("11:15");
@@ -118,11 +119,11 @@ export default function ShopAdminView({ shop, name }: Props) {
     const local = getProfile();
     const bioVal = body.bio || local.bio || "";
     setBio(bioVal);
-    setJimoty(body.jimotyUrl || local.jimotyUrl || "");
+    const j = body.jimotyUrl || local.jimotyUrl || "";
+    const l = body.lineInviteUrl || "", p = body.phone || "";
+    setJimoty(j); setLineInvite(l); setPhone(p);
     setYoutube(body.youtubeUrl || ytUrl(bioVal) || local.youtubeUrl || "");
-    setLineInvite(body.lineInviteUrl || "");
-    setPhone(body.phone || "");
-    setContactMode((body.phone || "").trim() && !(body.lineInviteUrl || "").trim() ? "phone" : "line");
+    setContactMode((j.trim() && "jimoty") || (l.trim() && "line") || (p.trim() && "phone") || "jimoty");
     setSlots(body.slots?.length ? body.slots : [...PICKUP_SLOTS]);
     setPickupFrom(body.pickupFrom || DEF_FROM);
     setPickupTo(body.pickupTo || body.moveOut || DEF_TO);
@@ -576,8 +577,8 @@ export default function ShopAdminView({ shop, name }: Props) {
     show("コピーしました", "ok");
   }
   function publish() {
-    if (!(contactMode === "line" ? lineInvite.trim() : phone.trim())) {
-      const msg = `${contactMode === "line" ? "LINE招待リンク" : "電話番号"}を入力してください`;
+    if (!(contactMode === "jimoty" ? jimoty : contactMode === "line" ? lineInvite : phone).trim()) {
+      const msg = `${contactMode === "jimoty" ? "Jimoty profile" : contactMode === "line" ? "LINE招待リンク" : "電話番号"}を入力してください`;
       setErr(msg); show(msg, "err"); return;
     }
     setPub("on");
@@ -657,14 +658,17 @@ export default function ShopAdminView({ shop, name }: Props) {
               onBlur={() => void persistProfile(bio, jimoty, youtube)}
               placeholder="内見動画URL" inputMode="url" autoComplete="url" /></label>
         </div>
-        <Seg label="買い手連絡" value={contactMode} onPick={(v) => setContactMode(v as "line" | "phone")}
-          opts={[["line", "LINE"], ["phone", "電話"]]} />
-        <label className="float"><span>{contactMode === "line" ? "LINE招待リンク" : "電話番号"}</span>
-          <input value={contactMode === "line" ? lineInvite : phone}
-            onChange={(e) => (contactMode === "line" ? setLineInvite : setPhone)(e.target.value)}
-            onBlur={() => void persistProfile(bio, jimoty, youtube, lineInvite, phone)}
-            placeholder={contactMode === "line" ? "https://line.me/ti/p/…" : "080-0000-0000"}
-            inputMode={contactMode === "line" ? "url" : "tel"} autoComplete={contactMode === "line" ? "off" : "tel"} /></label>
+        <Seg label="買い手連絡" value={contactMode} onPick={(v) => setContactMode(v as ContactMode)}
+          opts={[["jimoty", "Jimoty"], ["line", "LINE"], ["phone", "電話"]]} />
+        {contactMode !== "jimoty" && (
+          <label className="float"><span>{contactMode === "line" ? "LINE招待リンク" : "電話番号"}</span>
+            <input value={contactMode === "line" ? lineInvite : phone}
+              onChange={(e) => (contactMode === "line" ? setLineInvite : setPhone)(e.target.value)}
+              onBlur={() => void persistProfile(bio, jimoty, youtube, lineInvite, phone)}
+              placeholder={contactMode === "line" ? "https://line.me/ti/p/…" : "080-0000-0000"}
+              inputMode={contactMode === "line" ? "url" : "tel"}
+              autoComplete={contactMode === "line" ? "off" : "tel"} /></label>
+        )}
         <div className="slot-add">
           <DateField label="受取開始" value={pickupFrom} onChange={(v) => { setPickupFrom(v); void saveDates(v, pickupTo); }} />
           <span aria-hidden="true">〜</span>
