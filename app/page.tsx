@@ -1,9 +1,8 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import AppNav from "@/components/app-nav";
 import ShopBuyerView from "@/components/buyer-ui";
 import {
-  DEFAULT_WARD, ELTON_ID, ELTON_LABEL, listSales, type SaleRow,
+  AUTH_EVT, DEFAULT_WARD, ELTON_ID, ELTON_LABEL, listSales, type SaleRow,
 } from "@/lib/shop";
 
 type Card = SaleRow & { count: number };
@@ -30,34 +29,36 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    const onAuth = () => { void refresh(); };
+    window.addEventListener(AUTH_EVT, onAuth);
+    return () => window.removeEventListener(AUTH_EVT, onAuth);
+  }, [refresh]);
 
   const active = cards.find((c) => c.id === selected) || cards[0];
   const shopId = active?.id || ELTON_ID;
 
   return (
-    <>
-      <AppNav top onAuth={() => void refresh()} />
-      <main className="home">
-        <h1 className="slogan">お引越しセール</h1>
-        <p className="subhero">まとめて買って、売って。ジモティの補完に。引っ越しリンクを共有し、まとめて選んで枠で引き取る。確定してからLINE。</p>
-        <div className="home-browse">
-          <div className="shop-tabs" role="tablist" aria-label="ショップ一覧">
-            {cards.map((c) => (
-              <button key={c.id} type="button" role="tab"
-                className={`shop-tab${selected === c.id ? " on" : ""}`}
-                aria-selected={selected === c.id}
-                onClick={() => setSelected(c.id)}>
-                {c.count}点 {c.ward}
-              </button>
-            ))}
-            {!cards.length && <span className="shop-tab ph">読み込み中…</span>}
-          </div>
-          <div className="home-shop">
-            <ShopBuyerView key={shopId} shop={shopId} name={active?.name || ELTON_LABEL} embed />
-          </div>
+    <main className="home">
+      <h1 className="slogan">お引越しセール</h1>
+      <p className="subhero">まとめて買って、売って。ジモティの補完に。引っ越しリンクを共有し、まとめて選んで枠で引き取る。確定してからLINE。</p>
+      <div className="home-browse">
+        <div className="shop-tabs" role="tablist" aria-label="ショップ一覧">
+          {cards.map((c) => (
+            <button key={c.id} type="button" role="tab"
+              className={`shop-tab${selected === c.id ? " on" : ""}`}
+              aria-selected={selected === c.id}
+              onClick={() => setSelected(c.id)}>
+              {c.count}点 {c.ward}
+            </button>
+          ))}
+          {!cards.length && <span className="shop-tab ph">読み込み中…</span>}
         </div>
-        <footer className="soft-promo hint">Made by エルトン</footer>
-      </main>
-    </>
+        <div className="home-shop">
+          <ShopBuyerView key={shopId} shop={shopId} name={active?.name || ELTON_LABEL} embed />
+        </div>
+      </div>
+      <footer className="soft-promo hint">Made by エルトン</footer>
+    </main>
   );
 }

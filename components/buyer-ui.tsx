@@ -1,10 +1,9 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
-import AppNav from "@/components/app-nav";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { byPrice, Listings, ListingTools, money, useDense, usePriceDir } from "@/components/photo-listing";
 import { Snack, useSnack } from "@/components/snack";
 import { dayLbl, pickupSpan } from "@/lib/days";
-import { AUTH_EVT, applyLineSession, getName, openShop } from "@/lib/shop";
+import { applyLineSession, getName, openShop, subscribeAuth } from "@/lib/shop";
 import { telHref, ytUrl } from "@/lib/sale";
 import { SITE_URL } from "@/lib/site";
 
@@ -22,7 +21,7 @@ type Receipt = {
   total?: number; contact?: string; contactMethod?: string;
 };
 type Method = "line" | "phone";
-type Props = { shop: string; name: string; /** Hide bottom nav when embedded on home. */ embed?: boolean };
+type Props = { shop: string; name: string; /** Flatten padding when embedded on home. */ embed?: boolean };
 
 const api = (shop: string, path: string) => `${path}?shop=${encodeURIComponent(shop)}`;
 const wlKey = (shop: string) => `ss-wl-${shop}`;
@@ -40,7 +39,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [slot, setSlot] = useState<string | null>(null);
   const [method, setMethod] = useState<Method | null>(null);
   const [lineName, setLineName] = useState("");
-  const [knownName, setKnownName] = useState("");
+  const knownName = useSyncExternalStore(subscribeAuth, getName, () => "");
   const [lineOk, setLineOk] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -63,20 +62,14 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     setState(data);
     setDay((d) => d && data.days?.includes(d) ? d : (data.days?.[0] || ""));
   }, [shop]);
-  const syncName = useCallback(() => {
-    const n = getName();
-    setKnownName(n);
-    if (n) setLineName(n);
-  }, []);
   useEffect(() => {
     void load();
     setWaited(loadWl(shop));
-    syncName();
+    const n = getName();
+    if (n) setLineName(n);
     // Soft-upgrade from optional LINE OAuth session if ss-line-name empty.
-    if (!getName()) void applyLineSession().then((s) => { if (s) syncName(); });
-    window.addEventListener(AUTH_EVT, syncName);
-    return () => window.removeEventListener(AUTH_EVT, syncName);
-  }, [load, shop, syncName]);
+    else void applyLineSession().then((s) => { if (s?.name) setLineName(s.name); });
+  }, [load, shop]);
   useEffect(() => {
     if (!open && !checkout) return;
     const onKey = (e: KeyboardEvent) => {
@@ -153,7 +146,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
       openShop(name);
       setCheckout(false); setOpen(null); setReceipt({ ...data, contactMethod: method });
       setPicked(new Set()); setSlot(null); setMethod(null); setLineOk(false);
-      syncName(); await load();
+      await load();
     } catch (e) { setErr(e instanceof Error ? e.message : "失敗しました"); await load(); }
     finally { setBusy(false); }
   }
@@ -181,7 +174,6 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             : null}
         </section>
         <button type="button" className="dark" onClick={() => setReceipt(null)}>一覧に戻る</button>
-        {!embed && <AppNav />}
       </main>
     );
   }
@@ -206,7 +198,9 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         </button>
         <button type="button" className="req"
           onClick={() => {
-            syncName(); setOpen(null); setSlot(null);
+            const n = getName();
+            if (n) setLineName(n);
+            setOpen(null); setSlot(null);
             setMethod(canLine ? "line" : canPhone ? "phone" : "line");
             setLineOk(false); setErr(null); setCheckout(true);
           }}>
@@ -341,7 +335,6 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
           </div>
         </div>
       )}
-      {!embed && <AppNav />}
       <Snack snack={snack} />
     </main>
   );

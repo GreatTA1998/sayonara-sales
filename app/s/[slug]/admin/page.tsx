@@ -1,18 +1,19 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ShopAdminView from "@/components/admin-ui";
-import { getId, getName } from "@/lib/shop";
+import { getId, getName, subscribeAuth } from "@/lib/shop";
 
 export default function ShopAdmin() {
   const { slug } = useParams<{ slug: string }>();
   const router = useRouter();
   const id = slug || "";
-  const [label, setLabel] = useState("");
+  const soft = useSyncExternalStore(subscribeAuth, getName, () => "");
+  const myId = useSyncExternalStore(subscribeAuth, getId, () => "");
+  const label = myId === id ? soft : "";
 
   useEffect(() => {
-    if (id === "elton") { router.replace("/admin"); return; }
-    setLabel(getId() === id ? getName() : "");
+    if (id === "elton") router.replace("/admin");
   }, [id, router]);
 
   if (!id || id === "elton") return null;

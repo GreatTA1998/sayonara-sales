@@ -1,7 +1,6 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as PtrEv } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as PtrEv } from "react";
 import { useRouter } from "next/navigation";
-import AppNav from "@/components/app-nav";
 import { DateField, Icon, IconBtn } from "@/components/icons";
 import { LineLoginLink, useLineOAuthReturn } from "@/components/line-oauth";
 import { byPrice, Listings, ListingTools, Seg, useDense, usePriceDir, type PhotoItem } from "@/components/photo-listing";
@@ -10,7 +9,7 @@ import { Snack, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { dayLbl } from "@/lib/days";
 import { PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
-import { AUTH_EVT, adminPath, getName, getProfile, openShop, saveProfile } from "@/lib/shop";
+import { adminPath, getName, getProfile, openShop, saveProfile, subscribeAuth } from "@/lib/shop";
 import { SITE_URL } from "@/lib/site";
 
 type Item = PhotoItem & { claimId?: string | null; note?: string; paused?: boolean };
@@ -71,10 +70,11 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [itemMenu, setItemMenu] = useState(false);
   const [viewPic, setViewPic] = useState<string | null>(null);
   const [claimId, setClaimId] = useState<string | null>(null);
-  const [logged, setLogged] = useState(false);
+  const softName = useSyncExternalStore(subscribeAuth, getName, () => "");
+  const logged = !!softName;
+  const label = softName || (/^\d{5}$/.test(name) ? "" : name);
   const [loginOpen, setLoginOpen] = useState(false);
   const [lineDraft, setLineDraft] = useState("");
-  const [label, setLabel] = useState(/^\d{5}$/.test(name) ? "" : name);
   const [camOpen, setCamOpen] = useState(false);
   /** null = create-from-photo (1枚＝1出品); set = append photos to that listing. */
   const [camItemId, setCamItemId] = useState<string | null>(null);
@@ -140,21 +140,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   }, [shop, show]);
 
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => {
-    const sync = () => {
-      const n = getName();
-      setLogged(!!n);
-      if (n) setLabel(n);
-    };
-    sync();
-    window.addEventListener(AUTH_EVT, sync);
-    return () => window.removeEventListener(AUTH_EVT, sync);
-  }, []);
-  useLineOAuthReturn(() => {
-    const n = getName();
-    setLogged(!!n);
-    if (n) setLabel(n);
-  });
+  useLineOAuthReturn();
   useEffect(() => () => {
     if (addrTimer.current) clearTimeout(addrTimer.current);
     if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
@@ -604,8 +590,6 @@ export default function ShopAdminView({ shop, name }: Props) {
     e.preventDefault();
     const id = openShop(lineDraft);
     if (!id) return;
-    setLogged(true);
-    setLabel(lineDraft.trim());
     setLoginOpen(false);
     if (id !== shop) { router.push(adminPath(id)); return; }
     show("保存しました", "ok");
@@ -928,7 +912,6 @@ export default function ShopAdminView({ shop, name }: Props) {
             onClick={(e) => { e.stopPropagation(); void deletePhoto(open, viewPic); }}>削除</button>
         </div>
       )}
-      <AppNav />
       <Snack snack={snack} />
     </main>
   );
