@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { byPrice, Listings, ListingTools, money, useDense, usePriceDir } from "@/components/photo-listing";
-import { Snack, useSnack } from "@/components/snack";
+import { Snack, useMaskDismiss, useSnack } from "@/components/snack";
 import { dayLbl, pickupSpan } from "@/lib/days";
 import { bookShop, joinWaitLive, listenShop } from "@/lib/live";
 import { applyLineSession, getId, getName, openShop, pushBuy, subscribeAuth } from "@/lib/shop";
@@ -69,7 +69,6 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [priceDir, setPriceDir] = usePriceDir();
   const [dense, setDense] = useDense();
   const { snack, show } = useSnack();
-  const maskPtr = useRef(false);
   const jimotyUrl = (state?.jimotyUrl || "").trim();
   const lineUrl = (state?.lineInviteUrl || "").trim();
   const phoneDisp = (state?.phone || "").trim();
@@ -97,7 +96,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
       if (e.key !== "Escape") return;
       e.preventDefault();
       if (checkout) setCheckout(false);
-      else { maskPtr.current = false; setOpen(null); }
+      else setOpen(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -131,20 +130,8 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     finally { setBusy(false); }
   }
 
-  function swallowGhostClick() {
-    const stop = (ev: Event) => { ev.preventDefault(); ev.stopPropagation(); };
-    document.addEventListener("click", stop, true);
-    document.addEventListener("pointerup", stop, true);
-    window.setTimeout(() => {
-      document.removeEventListener("click", stop, true);
-      document.removeEventListener("pointerup", stop, true);
-    }, 400);
-  }
-
-  function closeDetail() {
-    maskPtr.current = false;
-    setOpen(null);
-  }
+  function closeDetail() { setOpen(null); }
+  const detailMask = useMaskDismiss(closeDetail);
 
   function copyShare() {
     void navigator.clipboard?.writeText(shareUrl).catch(() => undefined);
@@ -237,26 +224,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         classNameFor={(item) => `${picked.has(item.id) ? "on" : ""}${item.taken ? " sold" : ""}`.trim()} />
       {!state && <p className="text-sm text-muted pad">読み込み中…</p>}
       {open && !checkout && (
-        <div className="mask drawer" role="dialog" aria-modal="true" aria-label={open.name}
-          onPointerDownCapture={(e) => {
-            if (e.target !== e.currentTarget) { maskPtr.current = false; return; }
-            e.stopPropagation();
-            maskPtr.current = true;
-          }}
-          onPointerUpCapture={(e) => {
-            if (e.target !== e.currentTarget) return;
-            e.stopPropagation();
-            if (!maskPtr.current) return;
-            const sel = typeof window !== "undefined" ? window.getSelection()?.toString() : "";
-            if (sel) return;
-            swallowGhostClick();
-            closeDetail();
-          }}
-          onClickCapture={(e) => {
-            if (e.target !== e.currentTarget) return;
-            e.stopPropagation();
-            e.preventDefault();
-          }}>
+        <div className="mask drawer" role="dialog" aria-modal="true" aria-label={open.name} {...detailMask}>
           <div className="sheet drawer" onClick={(e) => e.stopPropagation()}>
             {openPics.length > 0 && <div className="pics">{openPics.map((src) => <img key={src} src={src} alt="" loading="lazy" decoding="async" />)}</div>}
             <div className="sp">{money(open.price)}</div>
