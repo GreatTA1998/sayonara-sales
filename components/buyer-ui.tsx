@@ -266,14 +266,12 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
           <div className="sheet checkout" onClick={(e) => e.stopPropagation()}>
             <h2>引き取り日程</h2>
             <div className="when">
-              <select value={day} aria-label="日付" onChange={(e) => {
-                setDay(e.target.value); setSlot(null);
-              }}>
+              <span className="date-ctl"><select value={day} aria-label="日付" onChange={(e) => { setDay(e.target.value); setSlot(null); }}>
                 {(state?.days || []).map((d) => <option key={d} value={d}>{dayLbl(d)}</option>)}
-              </select>
+              </select></span>
               <div className="slots trio" role="group" aria-label="時間帯">
                 {freeSlots.map((s) => (
-                  <button key={s} type="button"
+                  <button key={s} type="button" aria-pressed={slot === s}
                     className={slot === s ? "slot on" : "slot"}
                     onClick={() => setSlot(s)}>{s}</button>
                 ))}
