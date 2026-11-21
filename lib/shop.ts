@@ -1,6 +1,6 @@
-/** Soft identity → shop id (getName: Jimoty key first, legacy fallback). */
-export const NAME_KEY = "ss-line-name";
-const JIMOTY_NAME_KEY = "ss-jimoty-name";
+/** Soft Jimoty username → shop id. Legacy `ss-line-name` read fallback. */
+export const NAME_KEY = "ss-jimoty-name";
+const LEGACY_NAME_KEY = "ss-line-name";
 export const ID_KEY = "ss-shop-id";
 const MAP_KEY = "ss-shop-map";
 const UID_KEY = "ss-line-uid";
@@ -30,7 +30,7 @@ export type SaleRow = {
 };
 
 export const getName = () => typeof window === "undefined" ? ""
-  : (localStorage.getItem(JIMOTY_NAME_KEY) || localStorage.getItem(NAME_KEY) || "").trim();
+  : (localStorage.getItem(NAME_KEY) || localStorage.getItem(LEGACY_NAME_KEY) || "").trim();
 export const getId = () => typeof window === "undefined" ? "" : (localStorage.getItem(ID_KEY) || "").trim();
 export const adminPath = (id: string) => id === ELTON_ID ? "/admin" : `/s/${id}/admin`;
 export const notifyAuth = () => { if (typeof window !== "undefined") window.dispatchEvent(new Event(AUTH_EVT)); };
@@ -80,10 +80,10 @@ const readUidMap = (): Record<string, string> => {
 };
 
 const clearNames = () => {
-  localStorage.removeItem(NAME_KEY); localStorage.removeItem(JIMOTY_NAME_KEY);
+  localStorage.removeItem(NAME_KEY); localStorage.removeItem(LEGACY_NAME_KEY);
 };
 const writeName = (v: string) => {
-  localStorage.setItem(JIMOTY_NAME_KEY, v); localStorage.removeItem(NAME_KEY);
+  localStorage.setItem(NAME_KEY, v); localStorage.removeItem(LEGACY_NAME_KEY);
 };
 
 /** Persist soft name → id; known sellers reclaim; else reuse guest dig5. */

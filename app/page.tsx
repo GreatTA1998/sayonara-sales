@@ -41,7 +41,7 @@ export default function HomePage() {
   return (
     <main className="home">
       <h1 className="slogan">お引越しセール</h1>
-      <p className="subhero">まとめて買って、売って。ジモティの補完に。引っ越しリンクを共有し、まとめて選んで枠で引き取る。確定してからLINE。</p>
+      <p className="subhero">まとめて買って、売って。ジモティの補完に。引っ越しリンクを共有し、まとめて選んで枠で引き取る。確定してからジモティ。</p>
       <div className="home-browse">
         <div className="shop-tabs" role="tablist" aria-label="ショップ一覧">
           {cards.map((c) => (

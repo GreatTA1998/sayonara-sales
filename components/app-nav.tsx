@@ -7,7 +7,7 @@ import { adminPath, ensureShopId, getId, getName, subscribeAuth } from "@/lib/sh
 
 type Props = { top?: boolean };
 
-/** logo+サヨナラ | 投稿/投稿一覧 | ログイン/name → マイページ */
+/** logo+サヨナラ | 投稿/投稿一覧 | ログイン/ジモティ名 → マイページ */
 export default function AppNav({ top }: Props) {
   const router = useRouter();
   const path = usePathname() || "";
