@@ -106,6 +106,7 @@ export default function SquareCam({ open, onClose, onShot, accept, tip, sharp }:
   const [tab, setTab] = useState<"cam" | "album">("cam");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
   const [ready, setReady] = useState(false);
   useBodyScrollLock(open);
 
@@ -188,7 +189,8 @@ export default function SquareCam({ open, onClose, onShot, accept, tip, sharp }:
 
   async function shutter() {
     const v = videoRef.current;
-    if (!v || !ready || busy) return;
+    if (!v || !ready || busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     try {
       const file = await squareFromVideo(v);
@@ -198,6 +200,7 @@ export default function SquareCam({ open, onClose, onShot, accept, tip, sharp }:
     } catch (e) {
       setErr(e instanceof Error ? e.message : "撮影に失敗しました");
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   }
