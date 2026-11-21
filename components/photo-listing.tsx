@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { byPrice, type PriceDir } from "@/lib/sale";
 import "./photo-layout.css";
 
@@ -25,14 +25,34 @@ export function useDense(): [boolean, (on: boolean) => void] {
   return [v === "1", (on) => set(on ? "1" : "0")];
 }
 
+function DensIco({ list }: { list?: boolean }) {
+  return list ? (
+    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+      <circle cx="2.25" cy="3.25" r="1.1" fill="currentColor" />
+      <rect x="5" y="2.5" width="7.5" height="1.5" rx=".6" fill="currentColor" />
+      <circle cx="2.25" cy="7" r="1.1" fill="currentColor" />
+      <rect x="5" y="6.25" width="7.5" height="1.5" rx=".6" fill="currentColor" />
+      <circle cx="2.25" cy="10.75" r="1.1" fill="currentColor" />
+      <rect x="5" y="10" width="7.5" height="1.5" rx=".6" fill="currentColor" />
+    </svg>
+  ) : (
+    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+      <rect x="1.5" y="1.5" width="4.5" height="4.5" rx="1" fill="currentColor" />
+      <rect x="8" y="1.5" width="4.5" height="4.5" rx="1" fill="currentColor" />
+      <rect x="1.5" y="8" width="4.5" height="4.5" rx="1" fill="currentColor" />
+      <rect x="8" y="8" width="4.5" height="4.5" rx="1" fill="currentColor" />
+    </svg>
+  );
+}
+
 export function Seg({ label, opts, value, onPick }: {
-  label: string; opts: [string, string][]; value: string; onPick: (v: string) => void;
+  label: string; opts: [string, ReactNode, string?][]; value: string; onPick: (v: string) => void;
 }) {
   return (
     <div className="seg" role="group" aria-label={label}>
-      {opts.map(([v, t]) => (
+      {opts.map(([v, t, a]) => (
         <button key={v} type="button" className={value === v ? "on" : undefined}
-          aria-pressed={value === v} onClick={() => onPick(v)}>{t}</button>
+          aria-pressed={value === v} aria-label={a} onClick={() => onPick(v)}>{t}</button>
       ))}
     </div>
   );
@@ -47,7 +67,7 @@ export function ListingTools({
   return (
     <div className="psort-row">
       <Seg label="表示" value={dense ? "1" : "0"} onPick={(v) => onDense(v === "1")}
-        opts={[["0", "通常"], ["1", "密集"]]} />
+        opts={[["0", <DensIco />, "通常"], ["1", <DensIco list />, "密集"]]} />
       <Seg label="価格順" value={dir} onPick={(v) => onDir(v as PriceDir)}
         opts={[["asc", "安→高"], ["desc", "高→安"]]} />
     </div>
