@@ -1,7 +1,7 @@
 "use client";
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
-import { getAuth, onAuthStateChanged, signInAnonymously, type Auth, type User } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
+import type { User } from "firebase/auth";
 
 const cfg = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "",
@@ -13,7 +13,6 @@ const cfg = {
 };
 
 let app: FirebaseApp | null = null;
-let auth: Auth | null = null;
 let db: Firestore | null = null;
 let authReady: Promise<User> | null = null;
 
@@ -31,16 +30,18 @@ export function getDb(): Firestore {
 /** Soft path: anonymous Firebase Auth (UID owns shops). Display name stays Jimoty localStorage. */
 export function ensureAuth(): Promise<User> {
   if (authReady) return authReady;
-  authReady = new Promise((resolve, reject) => {
-    if (!auth) auth = getAuth(appOrThrow());
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      unsub();
-      try {
-        if (u) { resolve(u); return; }
-        const cred = await signInAnonymously(auth!);
-        resolve(cred.user);
-      } catch (e) { authReady = null; reject(e); }
-    }, (e) => { authReady = null; reject(e); });
-  });
+  authReady = (async () => {
+    const { getAuth, onAuthStateChanged, signInAnonymously } = await import("firebase/auth");
+    const auth = getAuth(appOrThrow());
+    return new Promise<User>((resolve, reject) => {
+      const unsub = onAuthStateChanged(auth, async (u) => {
+        unsub();
+        try {
+          if (u) { resolve(u); return; }
+          resolve((await signInAnonymously(auth)).user);
+        } catch (e) { authReady = null; reject(e); }
+      }, (e) => { authReady = null; reject(e); });
+    });
+  })();
   return authReady;
 }

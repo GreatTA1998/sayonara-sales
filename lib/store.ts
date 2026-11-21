@@ -136,9 +136,11 @@ function claimOf(s: Store, item: Item) {
   return item.claimId ? s.claims.find((c) => c.id === item.claimId) : undefined;
 }
 
-/** taken = confirmed 予約済; requested = pending soft notice. */
+/** taken = confirmed 予約済; requested = pending soft notice. claimId without claim → soft lock. */
 export function itemFlags(s: Store, item: Item) {
+  if (!item.claimId) return { taken: false, requested: false };
   const st = claimOf(s, item)?.status;
+  if (!st) return { taken: false, requested: true };
   return { taken: st === "booked" || st === "picked_up", requested: st === "requested" };
 }
 

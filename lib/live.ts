@@ -37,7 +37,7 @@ const emptySeed = (id: string): Store =>
     ? { address: "目黒区", lineInviteUrl: "", phone: "", items: [], claims: [], published: true }
     : { address: "目黒区", items: [], claims: [] };
 
-/** Live shop: shop doc + items + claims. Creates shop + claims ownerUid on first admin open. */
+/** Live shop: public onSnapshot (no auth). Owner claim only when opts.claimOwner. */
 export function listenShop(
   shopRaw: string,
   onData: (s: Store) => void,
@@ -47,30 +47,27 @@ export function listenShop(
   const shop = parseShop(shopRaw);
   const db = getDb();
   const state: ShopSnap = { meta: null, items: new Map(), claims: new Map() };
-  let ready = { shop: false, items: false, claims: false };
+  let ready = { shop: false, items: false };
   const emit = () => {
-    if (!ready.shop || !ready.items || !ready.claims) return;
+    if (!ready.shop || !ready.items) return;
     onData(assemble(state));
   };
   const fail = (e: unknown) => onErr?.(e instanceof Error ? e : new Error(String(e)));
 
-  void (async () => {
-    try {
-      const user = await ensureAuth();
-      if (opts?.claimOwner) {
-        const ref = doc(db, "shops", shop);
-        const snap = await getDoc(ref);
-        if (!snap.exists()) {
-          const seed = emptySeed(shop);
-          seed.ownerUid = user.uid;
-          if (shop === ELTON_SHOP) seed.published = true;
-          await setDoc(ref, { ...shopFields(seed), ownerUid: user.uid, updatedAt: new Date().toISOString() });
-        } else if (!snap.data()?.ownerUid) {
-          await updateDoc(ref, { ownerUid: user.uid, updatedAt: new Date().toISOString() });
-        }
+  if (opts?.claimOwner) {
+    void ensureAuth().then(async (user) => {
+      const ref = doc(db, "shops", shop);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) {
+        const seed = emptySeed(shop);
+        seed.ownerUid = user.uid;
+        if (shop === ELTON_SHOP) seed.published = true;
+        await setDoc(ref, { ...shopFields(seed), ownerUid: user.uid, updatedAt: new Date().toISOString() });
+      } else if (!snap.data()?.ownerUid) {
+        await updateDoc(ref, { ownerUid: user.uid, updatedAt: new Date().toISOString() });
       }
-    } catch (e) { fail(e); }
-  })();
+    }).catch(fail);
+  }
 
   const u1 = onSnapshot(doc(db, "shops", shop), (snap) => {
     state.meta = snap.exists() ? (snap.data() as Record<string, unknown>) : { address: "目黒区" };
@@ -84,17 +81,18 @@ export function listenShop(
   }, fail);
   const u3 = onSnapshot(collection(db, "shops", shop, "claims"), (snap) => {
     state.claims = new Map(snap.docs.map((d) => [d.id, d.data() as Record<string, unknown>]));
-    ready.claims = true;
     emit();
-  }, fail);
+  }, (e) => {
+    if ((e as { code?: string }).code === "permission-denied") { emit(); return; }
+    fail(e);
+  });
 
   return () => { u1(); u2(); u3(); };
 }
 
-/** One-shot peek (home tabs). */
+/** Home tabs — public shop+items. */
 export async function peekShop(shopRaw: string): Promise<{ address: string; count: number }> {
   const shop = parseShop(shopRaw);
-  await ensureAuth();
   const db = getDb();
   const [meta, items] = await Promise.all([
     getDoc(doc(db, "shops", shop)),

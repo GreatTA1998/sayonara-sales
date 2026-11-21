@@ -15,6 +15,7 @@ service cloud.firestore {
     }
 
     match /shops/{shopId} {
+      // Browse: published / elton / unclaimed — no auth. Owner draft needs auth.
       allow read: if resource.data.published == true
         || shopId == 'elton'
         || (signedIn() && resource.data.ownerUid == request.auth.uid)
@@ -43,14 +44,14 @@ service cloud.firestore {
       }
 
       match /claims/{claimId} {
+        // Open-shop claim reads are public (same data anon auth already exposed).
         allow read: if isOwner(shopId)
-          || (signedIn() && resource.data.buyerUid == request.auth.uid)
-          || (signedIn() && shopOpen(shopId));
+          || shopOpen(shopId)
+          || (signedIn() && resource.data.buyerUid == request.auth.uid);
         allow create: if signedIn()
           && request.resource.data.buyerUid == request.auth.uid
           && request.resource.data.status == 'requested';
         allow update: if isOwner(shopId) || (
-          // Buyer appends waiters only
           signedIn()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['waiters'])
         );

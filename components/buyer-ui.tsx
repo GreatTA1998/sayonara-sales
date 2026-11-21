@@ -56,7 +56,8 @@ function toBuyerState(shop: string, s: Store, account: string): State {
 export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [state, setState] = useState<State | null>(null);
   const [day, setDay] = useState("");
-  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const cartKey = `ss-cart-${shop}`;
+  const [picked, setPicked] = useState<Set<string>>(() => new Set());
   const [open, setOpen] = useState<Item | null>(null);
   const [checkout, setCheckout] = useState(false);
   const [slot, setSlot] = useState<string | null>(null);
@@ -81,6 +82,10 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const contactVal = (method === "jimoty" && loggedIn ? knownName : lineName).trim();
 
   useEffect(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem(cartKey) || "[]");
+      if (Array.isArray(raw)) setPicked(new Set(raw.map(String)));
+    } catch { /* ignore */ }
     const unsub = listenShop(shop, (s) => {
       const next = toBuyerState(shop, s, getId());
       setState(next);
@@ -91,7 +96,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     if (n) setLineName(n);
     else void applyLineSession().then((s) => { if (s?.name) setLineName(s.name); });
     return unsub;
-  }, [shop]);
+  }, [shop, cartKey]);
   useEffect(() => {
     if (!open && !checkout) return;
     const onKey = (e: KeyboardEvent) => {
@@ -119,7 +124,11 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   function toggle(id: string) {
     const it = state?.items.find((i) => i.id === id);
     if (!it || locked(it)) return;
-    setPicked((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    setPicked((p) => {
+      const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id);
+      try { localStorage.setItem(cartKey, JSON.stringify([...n])); } catch { /* ignore */ }
+      return n;
+    });
   }
 
   async function joinWait(id: string) {
@@ -161,7 +170,9 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
       });
       setCheckout(false); setOpen(null);
       setReceipt({ code: String(data.code || ""), day, slot, total: data.total });
-      setPicked(new Set()); setSlot(null); setMethod(null); setChanOk(false);
+      setPicked(new Set());
+      try { localStorage.removeItem(cartKey); } catch { /* ignore */ }
+      setSlot(null); setMethod(null); setChanOk(false);
     } catch (e) { setErr(e instanceof Error ? e.message : "失敗しました"); }
     finally { setBusy(false); }
   }
