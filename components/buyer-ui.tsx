@@ -26,7 +26,8 @@ type Method = "jimoty" | "line" | "phone";
 type Props = { shop: string; name: string; /** Flatten padding when embedded on home. */ embed?: boolean };
 const CH = { jimoty: ["ジモティー", "メッセージ済み", "ジモティ名（依頼の識別）"], line: ["LINE", "LINEで友だち追加しました", "LINE名"], phone: ["電話", "電話しました", "電話番号"] } as const;
 
-const locked = (i: Item) => i.taken || !!i.requested;
+/** Confirmed only — pending is disclaimer + still 依頼可. */
+const locked = (i: Item) => i.taken;
 
 function toBuyerState(shop: string, s: Store, account: string): State {
   const days = bookableDays(s);
@@ -179,12 +180,11 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     );
   }
 
-  const lockOpen = open ? locked(open) : false;
   const takenOpen = !!open?.taken;
   const onOpen = open ? picked.has(open.id) : false;
   const waiting = !!(open && state?.waiting?.includes(open.id));
   const openPics = open?.photos || [];
-  const needWlName = lockOpen && !waiting && !(getName() || lineName).trim();
+  const needWlName = takenOpen && !waiting && !(getName() || lineName).trim();
   const yt = (state?.youtubeUrl || "").trim() || ytUrl(state?.bio || "");
   const bioShow = yt && state?.bio
     ? state.bio.replace(yt, "").replace(/[：:]\s*$/m, "").trimEnd()
@@ -235,11 +235,9 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             <div className="sp">{money(open.price)}</div>
             <h2>{open.name}</h2>
             {open.note ? <p className="sn">{open.note}</p> : null}
-            {lockOpen ? (
+            {takenOpen ? (
               <>
-                <p className={takenOpen ? "sw sold" : "sw"}>
-                  {takenOpen ? "予約済 — 他の方が引き取り予定" : "他の方が先に依頼中です（まだ確定していません）"}
-                </p>
+                <p className="sw sold">予約済 — 他の方が引き取り予定</p>
                 {needWlName && (
                   <label className="float"><span>ジモティ名</span>
                     <input value={lineName} onChange={(e) => setLineName(e.target.value)}
@@ -252,8 +250,13 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
                 </button>
               </>
             ) : (
-              <button type="button" className={`cta${onOpen ? " soft" : " go"}`}
-                onClick={() => { toggle(open.id); closeDetail(); }}>{onOpen ? "外す" : "追加"}</button>
+              <>
+                {open.requested ? (
+                  <p className="sw">他の方が先に依頼中です（まだ確定していません）</p>
+                ) : null}
+                <button type="button" className={`cta${onOpen ? " soft" : " go"}`}
+                  onClick={() => { toggle(open.id); closeDetail(); }}>{onOpen ? "外す" : "追加"}</button>
+              </>
             )}
           </div>
         </div>

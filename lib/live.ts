@@ -10,7 +10,7 @@ import {
 import { ensureAuth, getDb } from "./fb";
 import {
   applyDates, applyMins, bookableDays, cartMeets, cartRule, claimFields, ELTON_SHOP, hasBuyerContact,
-  itemFields, itemStatus, normalizeSlots, parseShop, shortCode, shopFields, shopSlots,
+  itemFields, normalizeSlots, parseShop, shortCode, shopFields, shopSlots,
   storeFromDocs, takenSlots, uid, type Claim, type Item, type Store,
 } from "./store";
 
@@ -121,10 +121,16 @@ const numPrice = (v: unknown) => {
 };
 
 async function setClaimStatus(shop: string, id: string, from: string, to: string) {
-  const cref = doc(getDb(), "shops", shop, "claims", id);
+  const db = getDb();
+  const cref = doc(db, "shops", shop, "claims", id);
   const csnap = await getDoc(cref);
   if (!csnap.exists() || csnap.data().status !== from) throw new Error("No claim");
   await updateDoc(cref, { status: to });
+  // Confirm binds items to this claim so parallel pending 依頼 yield to 予約済.
+  if (to === "booked") {
+    const ids = Array.isArray(csnap.data().itemIds) ? csnap.data().itemIds.map(String) : [];
+    await Promise.all(ids.map((iid: string) => updateDoc(doc(db, "shops", shop, "items", iid), { claimId: id })));
+  }
   return asClaim(csnap.id, { ...csnap.data(), status: to });
 }
 
@@ -269,7 +275,7 @@ export async function joinWaitLive(shopRaw: string, itemId: string, account: str
     const cref = doc(db, "shops", shop, "claims", claimId);
     const csnap = await tx.get(cref);
     const st = csnap.exists() ? String(csnap.data()!.status || "") : "";
-    if (st !== "requested" && st !== "booked") throw new Error("待機できません");
+    if (st !== "booked") throw new Error("待機できません");
     const prev = Array.isArray(csnap.data()!.waiters) ? csnap.data()!.waiters as { account?: string; at?: string }[] : [];
     if (prev.some((w) => w.account === a)) return { ok: true as const };
     tx.update(cref, { waiters: [...prev, { account: a, at: new Date().toISOString() }] });
@@ -313,9 +319,19 @@ export async function bookShop(shopRaw: string, body: {
         claimId: r.claimId ? String(r.claimId) : null, paused: !!r.paused,
       };
     });
+    // Claims may move under us — re-check status inside the tx.
+    const claimCache = new Map<string, string>();
     for (const it of items) {
-      const st = itemStatus(it);
-      if (!st.ok) throw new Error(`${it.name}: ${st.reason}`);
+      if (it.paused) throw new Error(`${it.name}: 一時停止中`);
+      const cur = it.claimId || "";
+      if (!cur) continue;
+      let st = claimCache.get(cur);
+      if (st == null) {
+        const csnap = await tx.get(doc(db, "shops", shop, "claims", cur));
+        st = csnap.exists() ? String(csnap.data()!.status || "") : "";
+        claimCache.set(cur, st);
+      }
+      if (st === "booked" || st === "picked_up") throw new Error(`${it.name}: 予約済みです`);
     }
     const totalPre = items.reduce((n, it) => n + (it.price ?? 0), 0);
     if (!cartMeets(pre, items.length, totalPre)) {
@@ -329,9 +345,9 @@ export async function bookShop(shopRaw: string, body: {
       status: "requested", createdAt: new Date().toISOString(), buyerUid: user.uid, waiters: [],
     };
     tx.set(doc(db, "shops", shop, "claims", claimId), claimFields(claim));
-    for (let i = 0; i < itemSnaps.length; i++) {
-      if (itemSnaps[i].data()!.claimId) throw new Error(`${items[i].name}: 予約済みです`);
-      tx.update(doc(db, "shops", shop, "items", itemIds[i]), { claimId });
+    // Only bind free items. Pending/orphan keep pointer; confirm() rebinds on 予約済.
+    for (let i = 0; i < items.length; i++) {
+      if (!items[i].claimId) tx.update(doc(db, "shops", shop, "items", itemIds[i]), { claimId });
     }
     const total = items.reduce((n, it) => n + (it.price ?? 0), 0);
     return {
