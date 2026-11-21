@@ -77,7 +77,7 @@ export default function AppNav({ top }: Props) {
               if (shopId) return;
               e.preventDefault();
               router.push(adminPath(ensureShopId()));
-            }}>{name ? "投稿一覧" : "投稿"}</Link>
+            }}>{shopId ? "投稿一覧" : "投稿"}</Link>
         </div>
         <div className="nav-end">
           <div className="nav-help">
