@@ -37,6 +37,7 @@ export default function ReportInbox() {
           <article className="tl-card" style={{ cursor: "default" }}>
             {r.title ? <span className="tl-when">{r.title}</span> : null}
             <span className="tl-sum" style={{ whiteSpace: "pre-wrap" }}>{r.body}</span>
+            {r.screenshotUrl ? <a className="help-shot-link" href={r.screenshotUrl} target="_blank" rel="noreferrer"><img src={r.screenshotUrl} alt="" /></a> : null}
             <span className="hint" style={{ marginTop: 6, display: "block" }}>
               {new Date(r.createdAt).toLocaleString("ja-JP")}
               {r.name ? ` · ${r.name}` : ""}

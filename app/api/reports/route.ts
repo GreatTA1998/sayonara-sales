@@ -19,6 +19,7 @@ export async function POST(req: Request) {
       userAgent: body.userAgent,
       name: body.name,
       shopId: body.shopId,
+      screenshotUrl: body.screenshotUrl,
     });
     return NextResponse.json(report);
   } catch (e) {
