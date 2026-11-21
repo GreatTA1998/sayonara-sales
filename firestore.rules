@@ -1,0 +1,61 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function shopDoc(shopId) {
+      return get(/databases/$(database)/documents/shops/$(shopId)).data;
+    }
+    function isOwner(shopId) {
+      return signedIn() && shopDoc(shopId).ownerUid == request.auth.uid;
+    }
+    function shopOpen(shopId) {
+      let d = shopDoc(shopId);
+      return d.published == true || shopId == 'elton' || isOwner(shopId)
+        || !('ownerUid' in d);
+    }
+
+    match /shops/{shopId} {
+      allow read: if resource.data.published == true
+        || shopId == 'elton'
+        || (signedIn() && resource.data.ownerUid == request.auth.uid)
+        || !('ownerUid' in resource.data);
+
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid;
+
+      allow update: if signedIn() && (
+        resource.data.ownerUid == request.auth.uid
+        || (!('ownerUid' in resource.data)
+            && request.resource.data.ownerUid == request.auth.uid)
+      );
+
+      allow delete: if false;
+
+      match /items/{itemId} {
+        allow read: if shopOpen(shopId);
+        allow create, delete: if isOwner(shopId);
+        allow update: if isOwner(shopId) || (
+          signedIn()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['claimId'])
+          && resource.data.claimId == null
+          && request.resource.data.claimId is string
+        );
+      }
+
+      match /claims/{claimId} {
+        allow read: if isOwner(shopId)
+          || (signedIn() && resource.data.buyerUid == request.auth.uid)
+          || (signedIn() && shopOpen(shopId));
+        allow create: if signedIn()
+          && request.resource.data.buyerUid == request.auth.uid
+          && request.resource.data.status == 'requested';
+        allow update: if isOwner(shopId) || (
+          // Buyer appends waiters only
+          signedIn()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['waiters'])
+        );
+        allow delete: if false;
+      }
+    }
+  }
+}

@@ -1,8 +1,9 @@
 "use client";
 import Link from "next/link";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { LineLoginLink } from "@/components/line-oauth";
 import { dayLbl } from "@/lib/days";
+import { listenShop } from "@/lib/live";
 import { adminPath, getId, getName, listBuys, logout, openShop, subscribeAuth, type BuyRow } from "@/lib/shop";
 
 type Claim = { id: string; day: string; slot?: string; contact?: string; itemIds: string[]; status: string };
@@ -21,16 +22,14 @@ export default function MePage() {
     const sync = () => { setDraft(getName()); setBuys(listBuys()); };
     sync(); return subscribeAuth(sync);
   }, [name]);
-  const loadSell = useCallback(async () => {
+  useEffect(() => {
     const id = getId();
     if (!id) { setItems([]); setSelling([]); return; }
-    const res = await fetch(`/api/admin?shop=${encodeURIComponent(id)}`, { cache: "no-store" });
-    if (!res.ok) return;
-    const b = await res.json() as { claims?: Claim[]; items?: Item[] };
-    setItems(b.items || []);
-    setSelling((b.claims || []).filter((c) => c.status !== "cancelled"));
-  }, []);
-  useEffect(() => { void loadSell(); }, [loadSell, shopId, name]);
+    return listenShop(id, (s) => {
+      setItems(s.items.map((i) => ({ id: i.id, name: i.name })));
+      setSelling(s.claims.filter((c) => c.status !== "cancelled"));
+    }, undefined, { claimOwner: true });
+  }, [shopId, name]);
 
   if (!name) {
     return (
@@ -68,7 +67,7 @@ export default function MePage() {
         <div className="claims-h">売る · 引き取り履歴</div>
         {selling.length ? <ul className="timeline">{selling.map((c) => (
           <li key={c.id}><div className="tl-card" style={{ cursor: "default" }}>
-            <b className="tl-when">{when(c.day, c.slot, c.contact)}{c.status === "picked_up" ? " · 受取済" : ""}</b>
+            <b className="tl-when">{when(c.day, c.slot, c.contact)}{c.status === "picked_up" ? " · 受取済" : c.status === "requested" ? " · 未確定" : ""}</b>
             <span className="tl-sum">{pts(c.itemIds.map((id) => items.find((i) => i.id === id)?.name))}</span>
           </div></li>
         ))}</ul> : null}

@@ -1,9 +1,13 @@
 "use client";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { byPrice, Listings, ListingTools, money, useDense, usePriceDir } from "@/components/photo-listing";
 import { Snack, useSnack } from "@/components/snack";
 import { dayLbl, pickupSpan } from "@/lib/days";
+import { bookShop, joinWaitLive, listenShop } from "@/lib/live";
 import { applyLineSession, getId, getName, openShop, pushBuy, subscribeAuth } from "@/lib/shop";
+import {
+  bookableDays, itemFlags, shopContact, shopSlots, takenSlots, type Store,
+} from "@/lib/store";
 import { telHref, ytUrl } from "@/lib/sale";
 import { SITE_URL } from "@/lib/site";
 
@@ -22,15 +26,29 @@ type Method = "jimoty" | "line" | "phone";
 type Props = { shop: string; name: string; /** Flatten padding when embedded on home. */ embed?: boolean };
 const CH = { jimoty: ["Jimoty", "ジモティでメッセージしました", "ジモティ名"], line: ["LINE", "LINEで友だち追加しました", "LINE名"], phone: ["電話", "電話しました", "電話番号"] } as const;
 
-const api = (shop: string, path: string) => `${path}?shop=${encodeURIComponent(shop)}`;
 const locked = (i: Item) => i.taken || !!i.requested;
-async function postBook(shop: string, body: object) {
-  const res = await fetch(api(shop, "/api/book"), {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "失敗しました");
-  return data;
+
+function toBuyerState(shop: string, s: Store, account: string): State {
+  const days = bookableDays(s);
+  const slots = shopSlots(s);
+  const contact = shopContact(shop, s);
+  const taken: Record<string, string[]> = {};
+  for (const d of days) taken[d] = takenSlots(s, d);
+  const waiting = account
+    ? s.items.filter((it) => {
+        const c = s.claims.find((x) => x.id === it.claimId);
+        return !!c?.waiters?.some((w) => w.account === account);
+      }).map((it) => it.id)
+    : [];
+  return {
+    address: s.address, bio: s.bio || "", jimotyUrl: s.jimotyUrl || "", youtubeUrl: s.youtubeUrl || "",
+    days, slots, taken, waiting,
+    lineInviteUrl: contact.lineInviteUrl || null, phone: contact.phone || null,
+    items: s.items.filter((i) => !i.paused).map((it) => {
+      const { id, name, price, note, photos } = it;
+      return { id, name, price, note, photos: photos || [], ...itemFlags(s, it) };
+    }),
+  };
 }
 
 export default function ShopBuyerView({ shop, name, embed }: Props) {
@@ -61,20 +79,18 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const loggedIn = !!knownName;
   const contactVal = (method === "jimoty" && loggedIn ? knownName : lineName).trim();
 
-  const load = useCallback(async () => {
-    const acc = getId();
-    const url = `${api(shop, "/api/state")}${acc ? `&account=${encodeURIComponent(acc)}` : ""}`;
-    const data = (await fetch(url, { cache: "no-store" }).then((r) => r.json())) as State;
-    setState(data);
-    setWaited(new Set(data.waiting || []));
-    setDay((d) => d && data.days?.includes(d) ? d : (data.days?.[0] || ""));
-  }, [shop]);
   useEffect(() => {
-    void load();
+    const unsub = listenShop(shop, (s) => {
+      const next = toBuyerState(shop, s, getId());
+      setState(next);
+      setWaited(new Set(next.waiting || []));
+      setDay((d) => (d && next.days?.includes(d) ? d : (next.days?.[0] || "")));
+    }, (e) => setErr(e.message || "読み込みに失敗しました"));
     const n = getName();
     if (n) setLineName(n);
     else void applyLineSession().then((s) => { if (s?.name) setLineName(s.name); });
-  }, [load, shop]);
+    return unsub;
+  }, [shop]);
   useEffect(() => {
     if (!open && !checkout) return;
     const onKey = (e: KeyboardEvent) => {
@@ -108,7 +124,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     const account = openShop(n) || n;
     setLineName(n); setErr(null); setBusy(true);
     try {
-      await postBook(shop, { action: "wait", itemId: id, account, contact: n });
+      await joinWaitLive(shop, id, account);
       setWaited((prev) => new Set(prev).add(id));
       setOpen(null);
     } catch (e) { setErr(e instanceof Error ? e.message : "失敗しました"); }
@@ -139,8 +155,13 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     const itemIds = pickedItems.map((i) => i.id);
     if (!itemIds.length || !slot || !method || !contactVal || busy || !canSend) return;
     setBusy(true); setErr(null);
+    setState((prev) => prev && {
+      ...prev,
+      items: prev.items.map((it) => itemIds.includes(it.id) ? { ...it, requested: true } : it),
+      taken: { ...prev.taken, [day]: [...new Set([...(prev.taken[day] || []), slot])] },
+    });
     try {
-      const data = await postBook(shop, { day, slot, itemIds, contactMethod: method, contact: contactVal });
+      const data = await bookShop(shop, { day, slot, itemIds, contactMethod: method, contact: contactVal });
       if (method === "jimoty" || (method === "line" && !loggedIn)) openShop(contactVal);
       pushBuy({
         code: String(data.code || ""), shop, day, slot,
@@ -149,8 +170,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
       setCheckout(false); setOpen(null);
       setReceipt({ code: String(data.code || ""), day, slot, total: data.total });
       setPicked(new Set()); setSlot(null); setMethod(null); setChanOk(false);
-      await load();
-    } catch (e) { setErr(e instanceof Error ? e.message : "失敗しました"); await load(); }
+    } catch (e) { setErr(e instanceof Error ? e.message : "失敗しました"); }
     finally { setBusy(false); }
   }
 

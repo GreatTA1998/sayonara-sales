@@ -1,6 +1,3 @@
-import { promises as fs } from "fs";
-import path from "path";
-import { put, get } from "@vercel/blob";
 import { addDays, daysBetween, tokyoYmd } from "./days";
 import { CANON_LINE, CANON_PHONE, DEF_LEAD, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "./sale";
 export { CANON_LINE, CANON_PHONE, telHref, ytUrl } from "./sale";
@@ -11,12 +8,11 @@ export type Item = {
 };
 export type Claim = {
   id: string; code: string; day: string; slot: string; itemIds: string[];
-  /** Soft identity: typed Jimoty username (buyer). */
   contact?: string; contactMethod?: "jimoty" | "line" | "phone";
   /** requested = pending; booked = confirmed 予約済. */
   status: "requested" | "booked" | "picked_up" | "cancelled"; createdAt: string;
-  /** Account-FIFO waiters (soft Jimoty / shop account id). */
   waiters?: { account: string; at: string }[];
+  buyerUid?: string;
 };
 export type Store = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
@@ -25,13 +21,13 @@ export type Store = {
   pickupFrom?: string; pickupTo?: string; moveOut?: string;
   leadDays?: number;
   published?: boolean;
+  ownerUid?: string;
   items: Item[]; claims: Claim[];
 };
 
-export const shopPublished = (shop: string, s: Store) =>
-  !!s.published || shop === ELTON_SHOP;
+export const ELTON_SHOP = "elton";
+export const shopPublished = (shop: string, s: Store) => !!s.published || shop === ELTON_SHOP;
 
-/** Resolved buyer contact for a shop (Elton falls back to canonical LINE/phone). */
 export function shopContact(shop: string, s: Store) {
   const jimotyUrl = (s.jimotyUrl || "").trim();
   const lineInviteUrl = (s.lineInviteUrl || "").trim();
@@ -90,7 +86,6 @@ export function applyDates(s: Store, raw: { pickupFrom?: unknown; pickupTo?: unk
   return { pickupFrom: s.pickupFrom, pickupTo: s.pickupTo, moveOut: s.moveOut, leadDays: shopLeadDays(s) };
 }
 
-export const ELTON_SHOP = "elton";
 export const parseShop = (raw: string | null | undefined) => {
   const s = (raw || "").trim().toLowerCase();
   if (!s || s === ELTON_SHOP) return ELTON_SHOP;
@@ -101,98 +96,6 @@ export const shopFromUrl = (req: Request) => {
   try { return parseShop(new URL(req.url).searchParams.get("shop")); }
   catch { return ELTON_SHOP; }
 };
-
-const blobKey = (shop: string) =>
-  shop === ELTON_SHOP ? "sayonara-store.json" : `sayonara-store-${shop}.json`;
-const localPath = (shop: string) =>
-  path.join(process.cwd(), "data", shop === ELTON_SHOP ? "store.json" : `store-${shop}.json`);
-
-const eltonSeed = (): Store => ({
-  address: "目黒区",
-  lineInviteUrl: CANON_LINE,
-  phone: CANON_PHONE,
-  items: [
-    { id: "i1", name: "IKEA desk", price: 3000, photos: ["https://picsum.photos/seed/desk/600/400"] },
-    { id: "i2", name: "Office chair", price: 2000, note: "slight wear" },
-    { id: "i3", name: "Microwave", price: 1500 },
-    { id: "i4", name: "Rice cooker", price: null },
-    { id: "i5", name: "Floor lamp", price: 800 },
-    { id: "i6", name: "Bookshelf", price: 1000, photos: ["https://picsum.photos/seed/shelf1/400/400", "https://picsum.photos/seed/shelf2/400/400"] },
-    { id: "i7", name: "Hangers (set)", price: null },
-    { id: "i8", name: "Small fridge", price: 5000, note: "needs cleaning",
-      photos: ["https://picsum.photos/seed/fridge/600/400"] },
-  ],
-  claims: [],
-});
-const emptySeed = (): Store => ({ address: "目黒区", items: [], claims: [] });
-
-const mem = new Map<string, Store>();
-const chains = new Map<string, Promise<unknown>>();
-const useBlob = () => !!process.env.BLOB_READ_WRITE_TOKEN;
-
-async function readRaw(shop: string): Promise<Store> {
-  if (useBlob()) {
-    const res = await get(blobKey(shop), { access: "public" });
-    if (!res) return shop === ELTON_SHOP ? eltonSeed() : emptySeed();
-    return (await new Response(res.stream).json()) as Store;
-  }
-  try { return JSON.parse(await fs.readFile(localPath(shop), "utf8")) as Store; }
-  catch {
-    const s = shop === ELTON_SHOP ? eltonSeed() : emptySeed();
-    await fs.mkdir(path.dirname(localPath(shop)), { recursive: true });
-    await fs.writeFile(localPath(shop), JSON.stringify(s, null, 2));
-    return s;
-  }
-}
-
-async function writeRaw(shop: string, s: Store) {
-  mem.set(shop, s);
-  if (useBlob()) {
-    await put(blobKey(shop), JSON.stringify(s), {
-      access: "public", addRandomSuffix: false, allowOverwrite: true, contentType: "application/json",
-    });
-    return;
-  }
-  await fs.mkdir(path.dirname(localPath(shop)), { recursive: true });
-  await fs.writeFile(localPath(shop), JSON.stringify(s, null, 2));
-}
-
-export function withStore<T>(shop: string, fn: (s: Store) => T | Promise<T>): Promise<T> {
-  const key = parseShop(shop);
-  const prev = chains.get(key) || Promise.resolve();
-  const run = prev.then(async () => {
-    const s = scrub(await readRaw(key));
-    mem.set(key, s);
-    const result = await fn(s);
-    await writeRaw(key, s);
-    return result;
-  });
-  chains.set(key, run.then(() => undefined, () => undefined));
-  return run;
-}
-
-function scrub(s: Store) {
-  delete (s as { capacity?: unknown }).capacity;
-  for (const it of s.items) {
-    const raw = it as Item & { availableAfter?: string; availableFrom?: string; availableTo?: string; lateOnly?: boolean };
-    delete raw.availableAfter;
-    delete raw.availableFrom;
-    delete raw.availableTo;
-    delete raw.lateOnly;
-    if (!it.paused) delete it.paused;
-  }
-  if (!(s.youtubeUrl || "").trim()) {
-    const y = ytUrl(s.bio || "");
-    if (y) s.youtubeUrl = y;
-  }
-  return s;
-}
-
-export async function getStore(shop: string = ELTON_SHOP): Promise<Store> {
-  const key = parseShop(shop);
-  if (!mem.has(key)) mem.set(key, scrub(await readRaw(key)));
-  return structuredClone(mem.get(key)!);
-}
 
 export function takenSlots(s: Store, day: string): string[] {
   return s.claims
@@ -231,4 +134,93 @@ export function joinWait(s: Store, itemId: string, account: string) {
   const list = claim.waiters || (claim.waiters = []);
   if (!list.some((w) => w.account === a)) list.push({ account: a, at: new Date().toISOString() });
   return { ok: true as const };
+}
+
+export function shopFields(s: Store): Record<string, unknown> {
+  return {
+    address: s.address || "",
+    bio: s.bio || "",
+    jimotyUrl: s.jimotyUrl || "",
+    youtubeUrl: s.youtubeUrl || "",
+    lineInviteUrl: s.lineInviteUrl || "",
+    phone: s.phone || "",
+    slots: s.slots?.length ? s.slots : [],
+    pickupFrom: s.pickupFrom || "",
+    pickupTo: s.pickupTo || "",
+    moveOut: s.moveOut || "",
+    leadDays: shopLeadDays(s),
+    published: !!s.published,
+    ...(s.ownerUid ? { ownerUid: s.ownerUid } : {}),
+  };
+}
+
+export function itemFields(it: Item, pos: number): Record<string, unknown> {
+  return {
+    name: it.name, price: it.price, note: it.note || null, claimId: it.claimId || null,
+    photos: it.photos || [], paused: !!it.paused, pos,
+  };
+}
+
+export function claimFields(c: Claim): Record<string, unknown> {
+  return {
+    code: c.code, day: c.day, slot: c.slot || null, itemIds: c.itemIds || [],
+    contact: c.contact || null, contactMethod: c.contactMethod || null,
+    status: c.status, createdAt: c.createdAt,
+    waiters: c.waiters || [],
+    ...(c.buyerUid ? { buyerUid: c.buyerUid } : {}),
+  };
+}
+
+export function storeFromDocs(
+  shop: Record<string, unknown>,
+  items: { id: string; data: Record<string, unknown> }[],
+  claims: { id: string; data: Record<string, unknown> }[],
+): Store {
+  const s: Store = {
+    address: String(shop.address || ""),
+    items: [...items].sort((a, b) => Number(a.data.pos || 0) - Number(b.data.pos || 0)).map(({ id, data: r }) => {
+      const it: Item = { id, name: String(r.name || ""), price: r.price == null ? null : Number(r.price) };
+      if (r.note) it.note = String(r.note);
+      if (r.claimId) it.claimId = String(r.claimId);
+      if (Array.isArray(r.photos) && r.photos.length) it.photos = r.photos.map(String);
+      if (r.paused) it.paused = true;
+      return it;
+    }),
+    claims: [...claims]
+      .sort((a, b) => String(b.data.createdAt || "").localeCompare(String(a.data.createdAt || "")))
+      .map(({ id, data: r }) => {
+        const c: Claim = {
+          id, code: String(r.code || ""), day: String(r.day || ""), slot: String(r.slot || ""),
+          itemIds: Array.isArray(r.itemIds) ? r.itemIds.map(String) : [],
+          status: (r.status as Claim["status"]) || "booked", createdAt: String(r.createdAt || ""),
+        };
+        if (r.contact) c.contact = String(r.contact);
+        if (r.contactMethod) c.contactMethod = r.contactMethod as Claim["contactMethod"];
+        if (r.buyerUid) c.buyerUid = String(r.buyerUid);
+        if (Array.isArray(r.waiters)) {
+          c.waiters = r.waiters.map((w) => {
+            const row = w as { account?: string; at?: string };
+            return { account: String(row.account || ""), at: String(row.at || "") };
+          }).filter((w) => w.account);
+        }
+        return c;
+      }),
+  };
+  if (shop.bio) s.bio = String(shop.bio);
+  if (shop.jimotyUrl) s.jimotyUrl = String(shop.jimotyUrl);
+  if (shop.youtubeUrl) s.youtubeUrl = String(shop.youtubeUrl);
+  if (shop.lineInviteUrl) s.lineInviteUrl = String(shop.lineInviteUrl);
+  if (shop.phone) s.phone = String(shop.phone);
+  if (Array.isArray(shop.slots) && shop.slots.length) s.slots = shop.slots.map(String);
+  if (shop.pickupFrom) s.pickupFrom = String(shop.pickupFrom);
+  if (shop.pickupTo) s.pickupTo = String(shop.pickupTo);
+  if (shop.moveOut) s.moveOut = String(shop.moveOut);
+  if (shop.leadDays != null && Number.isFinite(Number(shop.leadDays))) s.leadDays = Number(shop.leadDays);
+  if (shop.published) s.published = true;
+  if (shop.ownerUid) s.ownerUid = String(shop.ownerUid);
+  if (!(s.youtubeUrl || "").trim()) {
+    const y = ytUrl(s.bio || "");
+    if (y) s.youtubeUrl = y;
+  }
+  return s;
 }

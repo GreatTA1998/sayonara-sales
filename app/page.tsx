@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import ShopBuyerView from "@/components/buyer-ui";
+import { peekShop } from "@/lib/live";
 import {
   AUTH_EVT, DEFAULT_WARD, ELTON_ID, ELTON_LABEL, listSales, type SaleRow,
 } from "@/lib/shop";
@@ -15,11 +16,11 @@ export default function HomePage() {
     const rows = listSales();
     const enriched = await Promise.all(rows.map(async (r) => {
       try {
-        const d = await fetch(`/api/state?shop=${encodeURIComponent(r.id)}`, { cache: "no-store" }).then((x) => x.json());
+        const d = await peekShop(r.id);
         return {
           ...r,
           ward: (d.address || "").trim() || r.ward || DEFAULT_WARD,
-          count: Array.isArray(d.items) ? d.items.length : 0,
+          count: d.count,
         } as Card;
       } catch {
         return { ...r, count: 0 } as Card;
