@@ -2,14 +2,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as PtrEv } from "react";
 import { useRouter } from "next/navigation";
 import { DateField, Icon, IconBtn } from "@/components/icons";
-import { LineLoginLink, useLineOAuthReturn } from "@/components/line-oauth";
 import { byPrice, Listings, ListingTools, Seg, useDense, usePriceDir, type PhotoItem } from "@/components/photo-listing";
 import SquareCam from "@/components/square-cam";
 import { Snack, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { dayLbl } from "@/lib/days";
-import { PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
-import { adminPath, getName, getProfile, openShop, saveProfile, subscribeAuth } from "@/lib/shop";
+import { DEF_LEAD, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
+import { getName, getProfile, saveProfile, subscribeAuth } from "@/lib/shop";
 import { SITE_URL } from "@/lib/site";
 
 type Item = PhotoItem & { claimId?: string | null; note?: string; paused?: boolean };
@@ -20,18 +19,16 @@ type Claim = {
 type AdminState = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
   lineInviteUrl?: string; phone?: string; slots?: string[];
-  pickupFrom?: string; pickupTo?: string; moveOut?: string; published?: boolean;
+  pickupFrom?: string; pickupTo?: string; moveOut?: string; leadDays?: number; published?: boolean;
   items: Item[]; claims: Claim[];
 };
 type Props = { shop: string; name: string };
 const fmtSlot = (a: string, b: string) => `${a}–${b}`;
 const DEF_FROM = PICKUP_DAYS[0];
 const DEF_TO = PICKUP_DAYS[PICKUP_DAYS.length - 1];
-
-// image/* + image/jpg: Android camera often sends non-standard image/jpg or empty MIME.
 const IMG_ACCEPT = "image/*,image/jpeg,image/jpg,image/png,image/heic,image/heif,image/webp,image/gif,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif";
 const api = (shop: string, path: string) => `${path}?shop=${encodeURIComponent(shop)}`;
-const methodJa = (m?: string) => (m === "phone" ? "電話" : m === "line" ? "LINE" : m || "");
+const methodJa = (m?: string) => (m === "jimoty" ? "Jimoty" : m === "phone" ? "電話" : m === "line" ? "LINE" : m || "");
 const kuStem = (v: string) => v.replace(/区$/, "");
 const kuFull = (v: string) => { const s = kuStem(v).trim(); return s ? `${s}区` : ""; };
 const itemLabel = (it?: Item | null) => it?.name?.trim() || "無題";
@@ -39,21 +36,16 @@ const isRemote = (u: string) => /^https?:\/\//i.test(u);
 const tempId = () => `tmp-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 type PicStatus = "uploading" | "error";
 type PicJob = { file: File; itemId: string; kind: "append" | "create" };
-/** Claim line items high→low for summary (missing ids → 無題 stubs). */
 function claimItems(c: Claim, all: Item[]) {
   return c.itemIds
     .map((id) => all.find((i) => i.id === id) || { id, name: "無題", price: null as number | null })
     .sort(byPrice("desc"));
 }
-function claimSummary(c: Claim, all: Item[]) {
+const claimSummary = (c: Claim, all: Item[]) => {
   const list = claimItems(c, all);
-  const n = list.length;
-  const top = itemLabel(list[0]);
-  return n <= 1 ? `1点 · ${top}` : `${n}点 · ${top}…`;
-}
-const claimWhen = (c: Claim) =>
-  [c.contact && c.contact !== "LINE" ? c.contact : "", `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}`]
-    .filter(Boolean).join(" · ");
+  return list.length <= 1 ? `1点 · ${itemLabel(list[0])}` : `${list.length}点 · ${itemLabel(list[0])}…`;
+};
+const claimWhen = (c: Claim) => [c.contact && c.contact !== "LINE" && c.contact !== "Jimoty" ? c.contact : "", `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}`].filter(Boolean).join(" · ");
 
 export default function ShopAdminView({ shop, name }: Props) {
   const router = useRouter();
@@ -73,10 +65,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const softName = useSyncExternalStore(subscribeAuth, getName, () => "");
   const logged = !!softName;
   const label = softName || (/^\d{5}$/.test(name) ? "" : name);
-  const [loginOpen, setLoginOpen] = useState(false);
-  const [lineDraft, setLineDraft] = useState("");
   const [camOpen, setCamOpen] = useState(false);
-  /** null = create-from-photo (1枚＝1出品); set = append photos to that listing. */
   const [camItemId, setCamItemId] = useState<string | null>(null);
   const [bio, setBio] = useState("");
   const [jimoty, setJimoty] = useState("");
@@ -90,6 +79,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [slotOpen, setSlotOpen] = useState(false);
   const [pickupFrom, setPickupFrom] = useState(DEF_FROM);
   const [pickupTo, setPickupTo] = useState(DEF_TO);
+  const [leadDays, setLeadDays] = useState(DEF_LEAD);
   const [listOpen, setListOpen] = useState(false);
   const [listDraft, setListDraft] = useState("");
   const listRef = useRef<HTMLInputElement | null>(null);
@@ -136,17 +126,16 @@ export default function ShopAdminView({ shop, name }: Props) {
     setSlots(body.slots?.length ? body.slots : [...PICKUP_SLOTS]);
     setPickupFrom(body.pickupFrom || DEF_FROM);
     setPickupTo(body.pickupTo || body.moveOut || DEF_TO);
+    setLeadDays(body.leadDays ?? DEF_LEAD);
     if (body.published) setPub((p) => { try { return p === "see" || sessionStorage.getItem(`ss-copied-${shop}`) ? "see" : "on"; } catch { return p === "see" ? "see" : "on"; } });
   }, [shop, show]);
 
   useEffect(() => { void load(); }, [load]);
-  useLineOAuthReturn();
   useEffect(() => () => {
     if (addrTimer.current) clearTimeout(addrTimer.current);
     if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
   }, []);
 
-  // Pending camera uploads float to top so create-from-photo is visible immediately.
   const items = useMemo(() => {
     const all = data?.items || [];
     const cmp = byPrice(priceDir);
@@ -156,7 +145,6 @@ export default function ShopAdminView({ shop, name }: Props) {
   }, [data?.items, priceDir]);
   const open = useMemo(() => items.find((i) => i.id === openId) || null, [items, openId]);
   const pending = useMemo(() => (data?.claims || []).filter((c) => c.status === "booked"), [data?.claims]);
-  const done = useMemo(() => (data?.claims || []).filter((c) => c.status === "picked_up"), [data?.claims]);
   const claimOpen = useMemo(
     () => pending.find((c) => c.id === claimId) || null,
     [pending, claimId],
@@ -419,7 +407,6 @@ export default function ShopAdminView({ shop, name }: Props) {
         const body = await postUpload(job.file, job.itemId);
         const remote = String(body.url || (body.item?.photos || []).slice(-1)[0] || "");
         if (!remote) throw new Error("アップロードに失敗しました");
-        // Upload route already persisted; keep other in-flight blob previews.
         patchPhotos(job.itemId, (photos) => photos.map((p) => (p === local ? remote : p)));
       }
       URL.revokeObjectURL(local);
@@ -451,7 +438,6 @@ export default function ShopAdminView({ shop, name }: Props) {
       const local = URL.createObjectURL(file);
       const id = tempId();
       picJobs.current[local] = { file, itemId: id, kind: "create" };
-      // Optimistic card first — never wait on compress/upload.
       upsertItem({ id, name: "", price: 0, photos: [local] });
       void runPicJob(local);
     }
@@ -504,7 +490,6 @@ export default function ShopAdminView({ shop, name }: Props) {
     } finally { setDeleting(null); }
   }
 
-  /** Persist remote photo order without wiping local blob previews via apply(). */
   async function saveRemotePhotos(itemId: string, photos: string[]) {
     if (itemId.startsWith("tmp-")) return true;
     const remotes = photos.filter(isRemote);
@@ -586,15 +571,6 @@ export default function ShopAdminView({ shop, name }: Props) {
     if (d.over !== d.from) void reorderPhotos(open, d.from, d.over);
   }
 
-  function saveLogin(e: { preventDefault(): void }) {
-    e.preventDefault();
-    const id = openShop(lineDraft);
-    if (!id) return;
-    setLoginOpen(false);
-    if (id !== shop) { router.push(adminPath(id)); return; }
-    show("保存しました", "ok");
-  }
-
   function publish() {
     const href = `/s/${shop}`;
     if (pub === "see") { router.push(href); return; }
@@ -615,11 +591,12 @@ export default function ShopAdminView({ shop, name }: Props) {
     if (body?.slots) setSlots(body.slots as string[]);
   }
 
-  async function saveDates(from: string, to: string) {
-    const body = await act({ action: "dates", pickupFrom: from, pickupTo: to, moveOut: to }, "保存しました");
+  async function saveDates(from: string, to: string, lead = leadDays) {
+    const body = await act({ action: "dates", pickupFrom: from, pickupTo: to, moveOut: to, leadDays: lead }, "保存しました");
     if (!body) return;
     setPickupFrom(String(body.pickupFrom || from));
     setPickupTo(String(body.pickupTo || body.moveOut || to));
+    if (body.leadDays != null) setLeadDays(Number(body.leadDays));
   }
 
   const busyOpen = open ? deleting === open.id : false;
@@ -640,7 +617,7 @@ export default function ShopAdminView({ shop, name }: Props) {
         </label>
         <span className="spacer" aria-hidden="true" />
         <button type="button" className="req"
-          onClick={logged ? publish : () => { setLineDraft(getName()); setLoginOpen(true); }}>
+          onClick={logged ? publish : () => router.push("/me")}>
           {logged ? (pub === "see" ? "見る" : pub === "on" ? "URLコピー" : "公開する") : "ログインして保存"}
         </button>
       </header>
@@ -693,6 +670,15 @@ export default function ShopAdminView({ shop, name }: Props) {
           <span aria-hidden="true">〜</span>
           <DateField label="退去日" value={pickupTo} onChange={(v) => { setPickupTo(v); void saveDates(pickupFrom, v); }} />
         </div>
+        <label className="float lead"><span>最短予約</span>
+          <span className="lead-row">
+            <input type="number" min={0} inputMode="numeric" aria-label="最短予約（日前）"
+              value={leadDays}
+              onChange={(e) => setLeadDays(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+              onBlur={() => void saveDates(pickupFrom, pickupTo, leadDays)} />
+            <span aria-hidden="true">日前</span>
+          </span>
+        </label>
         <div className="slot-edit" role="list" aria-label="受取時間">
           {slots.map((s) => (
             <button key={s} type="button" className="slot" role="listitem"
@@ -768,22 +754,9 @@ export default function ShopAdminView({ shop, name }: Props) {
         </>
       )}
 
-      {done.length > 0 && (
-        <section className="claims done">
-          <div className="claims-h">完了</div>
-          <p className="hint thanks">ありがとう。スムーズな受け渡しでした。</p>
-          <ul>
-            {done.map((c) => (
-              <li key={c.id} className="claim">
-                <div className="text-sm text-muted">{claimWhen(c)} · 受取済</div>
-              </li>
-            ))}
-          </ul>
-          <p className="soft-promo hint">
-            ほかの小さなアプリも →{" "}
-            <a className="linelink" href="https://linelton.dev" target="_blank" rel="noopener noreferrer">linelton.dev</a>
-          </p>
-        </section>
+      {(data?.claims || []).some((c) => c.status === "picked_up") && (
+        <p className="hint thanks pad">ありがとう。履歴はマイページ。ほかの小さなアプリも →{" "}
+          <a className="linelink" href="https://linelton.dev" target="_blank" rel="noopener noreferrer">linelton.dev</a></p>
       )}
 
       {claimOpen && (
@@ -809,22 +782,6 @@ export default function ShopAdminView({ shop, name }: Props) {
               }}>受取済み</button>
             </div>
           </div>
-        </div>
-      )}
-
-      {loginOpen && (
-        <div className="mask" role="dialog" aria-modal="true" aria-label="ログインして保存"
-          onClick={() => setLoginOpen(false)}>
-          <form className="sheet" onClick={(e) => e.stopPropagation()} onSubmit={saveLogin}>
-            <h2>ログインして保存</h2>
-            <p className="hint">LINE名だけでOK。ゲスト出品はこの名前に紐づきます。</p>
-            <label className="float"><span>LINE名</span>
-              <input value={lineDraft} onChange={(e) => setLineDraft(e.target.value)}
-                placeholder="表示名" autoComplete="nickname" autoFocus /></label>
-            <button type="submit" className="cta go" disabled={!lineDraft.trim()}>サインイン</button>
-            <p className="hint" style={{ marginTop: 10 }}>より安全に使う場合はLINE連携</p>
-            <LineLoginLink />
-          </form>
         </div>
       )}
 

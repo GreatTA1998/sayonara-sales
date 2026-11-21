@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { byPrice, Listings, ListingTools, money, useDense, usePriceDir } from "@/components/photo-listing";
 import { Snack, useSnack } from "@/components/snack";
 import { dayLbl, pickupSpan } from "@/lib/days";
-import { applyLineSession, getName, openShop, subscribeAuth } from "@/lib/shop";
+import { applyLineSession, getName, openShop, pushBuy, subscribeAuth } from "@/lib/shop";
 import { telHref, ytUrl } from "@/lib/sale";
 import { SITE_URL } from "@/lib/site";
 
@@ -16,10 +16,7 @@ type State = {
   days: string[]; slots: string[]; taken: Record<string, string[]>;
   lineInviteUrl?: string | null; phone?: string | null; items: Item[];
 };
-type Receipt = {
-  code: string; day: string; slot: string; address: string; items: string[];
-  total?: number; contact?: string; contactMethod?: string;
-};
+type Receipt = { code: string; day: string; slot: string; total?: number };
 type Method = "line" | "phone";
 type Props = { shop: string; name: string; /** Flatten padding when embedded on home. */ embed?: boolean };
 
@@ -67,7 +64,6 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     setWaited(loadWl(shop));
     const n = getName();
     if (n) setLineName(n);
-    // Soft-upgrade from optional LINE OAuth session if ss-line-name empty.
     else void applyLineSession().then((s) => { if (s?.name) setLineName(s.name); });
   }, [load, shop]);
   useEffect(() => {
@@ -144,7 +140,12 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "失敗しました");
       openShop(name);
-      setCheckout(false); setOpen(null); setReceipt({ ...data, contactMethod: method });
+      pushBuy({
+        code: String(data.code || ""), shop, day, slot,
+        items: Array.isArray(data.items) ? data.items.map(String) : [],
+      });
+      setCheckout(false); setOpen(null);
+      setReceipt({ code: String(data.code || ""), day, slot, total: data.total });
       setPicked(new Set()); setSlot(null); setMethod(null); setLineOk(false);
       await load();
     } catch (e) { setErr(e instanceof Error ? e.message : "失敗しました"); await load(); }
@@ -152,27 +153,11 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   }
 
   if (receipt) {
-    const viaLine = (receipt.contactMethod || method) === "line";
     return (
       <main className="wrap">
         <h1>依頼を送信しました</h1>
-        <p className="hint">{name}に送信済み（未確定）。来る前に確認を待ってください。</p>
-        <p>コード: <b>{receipt.code}</b></p>
-        <p>日付: {dayLbl(receipt.day)}</p>
-        <p>時間: {receipt.slot}</p>
-        <p>現金合計: {money(receipt.total ?? 0)}</p>
-        <p>エリア: {receipt.address}</p>
-        {receipt.contact ? <p>LINE名: {receipt.contact}</p> : null}
-        <ul>{receipt.items.map((n) => <li key={n}>{n}</li>)}</ul>
-        <section className="field">
-          <span>{viaLine ? "連絡：LINE（未追加なら招待リンク）" : "連絡：電話"}</span>
-          {viaLine && lineUrl
-            ? <a className="linelink" href={lineUrl} target="_blank" rel="noopener noreferrer">LINE招待リンク</a>
-            : null}
-          {!viaLine && phoneDisp
-            ? <a className="linelink" href={telHref(phoneDisp)}>{phoneDisp}</a>
-            : null}
-        </section>
+        <p className="hint">{name}に送信済み（未確定）。コード {receipt.code} · {dayLbl(receipt.day)} {receipt.slot} · {money(receipt.total ?? 0)}</p>
+        <p className="hint">履歴はマイページ。来る前に確認を待ってください。</p>
         <button type="button" className="dark" onClick={() => setReceipt(null)}>一覧に戻る</button>
       </main>
     );
@@ -294,7 +279,8 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
                 ))}
               </div>
             </div>
-            {!freeSlots.length && <p className="sw">この日は空きがありません。</p>}
+            {!((state?.days || []).length) ? <p className="sw">予約できる日がありません。</p>
+              : !freeSlots.length ? <p className="sw">この日は空きがありません。</p> : null}
             <p className="total">現金合計 {money(pickedItems.reduce((n, i) => n + (i.price ?? 0), 0))}</p>
             <ul className="claim-items">{pickedItems.map((i) => (
               <li key={i.id}><span>{i.name?.trim() || "無題"}</span><span>{money(i.price)}</span></li>

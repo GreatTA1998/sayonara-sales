@@ -2,7 +2,6 @@
 import { useEffect } from "react";
 import { applyLineSession } from "@/lib/shop";
 
-/** Strip line_* query flags after OAuth return. */
 function cleanUrl() {
   const u = new URL(window.location.href);
   let dirty = false;
@@ -12,7 +11,7 @@ function cleanUrl() {
   if (dirty) window.history.replaceState({}, "", u.pathname + u.search + u.hash);
 }
 
-/** Soft-upgrade after LINE OAuth callback (?line_ok=1). */
+/** Soft-upgrade after LINE OAuth (?line_ok=1). AppNav mounts this app-wide. */
 export function useLineOAuthReturn(onDone?: () => void) {
   useEffect(() => {
     const u = new URL(window.location.href);
@@ -20,22 +19,16 @@ export function useLineOAuthReturn(onDone?: () => void) {
       if (u.searchParams.has("line_err")) cleanUrl();
       return;
     }
-    void applyLineSession().then(() => {
-      cleanUrl();
-      onDone?.();
-    });
-    // OAuth return is one-shot from URL; ignore onDone identity churn.
+    void applyLineSession().then(() => { cleanUrl(); onDone?.(); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 }
 
 export const lineLoginHref = () => {
   if (typeof window === "undefined") return "/api/auth/line";
-  const path = window.location.pathname + window.location.search;
-  return `/api/auth/line?return=${encodeURIComponent(path || "/")}`;
+  return `/api/auth/line?return=${encodeURIComponent(window.location.pathname + window.location.search || "/")}`;
 };
 
-/** Secondary affordance under soft LINE名 form. */
 export function LineLoginLink() {
   return (
     <a className="cta line" href="/api/auth/line"

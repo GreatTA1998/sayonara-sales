@@ -1,25 +1,20 @@
 # Sayonara Sales
 
-Phone-first move-out sale. Hub `/`: **買う** = Elton listings + ward map/sales list; **売る** = real admin UI + 「ログインして保存」(LINE名). Independent shops: `/s/{5-digit}` + `/s/{id}/admin` (own Blob key). Elton: `/s/elton`, `/admin` (legacy Blob).
+Phone-first move-out sale. Hub `/`; shops `/s/{5-digit}` + `/s/{id}/admin`; Elton `/s/elton`, `/admin`.
 
-**Production:** https://sayonara.tokyo (apex; `www` 308→apex)
+**Production:** https://sayonara.tokyo
 
 ## Env (Vercel)
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `BLOB_READ_WRITE_TOKEN` | prod | Vercel Blob persistence (auto when Blob linked) |
-| `LINE_CHANNEL_ID` | optional | LINE Login channel ID (real OAuth) |
-| `LINE_CHANNEL_SECRET` | optional | LINE Login channel secret |
-| `LINE_CALLBACK_URL` | optional | Callback URI; default `{origin}/api/auth/line/callback` |
-| `NEXT_PUBLIC_SITE_URL` | optional | Canonical origin (default `https://sayonara.tokyo`) |
+| `BLOB_READ_WRITE_TOKEN` | prod | Vercel Blob |
+| `LINE_CHANNEL_ID` / `LINE_CHANNEL_SECRET` | optional | LINE Login |
+| `LINE_CALLBACK_URL` | optional | default `{origin}/api/auth/line/callback` |
+| `NEXT_PUBLIC_SITE_URL` | optional | default `https://sayonara.tokyo` |
 
-Soft LINE名 login always works. Real LINE Login is optional; console steps live in the project store doc `docs/line-login-setup.md`.
-
-## Dev
+Soft LINE名 always works. Pickup lead default 2 days (`leadDays`, 0 ok). Blob: `sayonara-store.json` / `sayonara-store-{id}.json`.
 
 ```bash
 npm i && npm run build
 ```
-
-Pickup days: Nov 1–8 (Asia/Tokyo) in `lib/sale.ts`. Blob keys: `sayonara-store.json` (Elton), `sayonara-store-{id}.json` (others).

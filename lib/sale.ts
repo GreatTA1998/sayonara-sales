@@ -1,10 +1,9 @@
-/** Pickup calendar for this sale (Asia/Tokyo dates). */
 export const PICKUP_DAYS = [
   "2026-11-01", "2026-11-02", "2026-11-03", "2026-11-04",
   "2026-11-05", "2026-11-06", "2026-11-07", "2026-11-08",
 ];
 export const PICKUP_SLOTS = ["10:00–10:15", "14:00–14:15", "20:00–20:15"];
-/** Static shop label (Elton). */
+export const DEF_LEAD = 2;
 export const SHOP_NAME = "エルトン";
 
 export const CANON_LINE = "https://line.me/ti/p/yBg2x2X_ut";
@@ -25,11 +24,9 @@ export const ytUrl = (s: string) => {
   return m ? m[0].replace(/[)\].,;]+$/, "") : "";
 };
 
-/** Listing grid price order — default cheapest first; unset/null last (¥0 is real). */
 export type PriceDir = "asc" | "desc";
 const priced = (p: number | null | undefined) => p != null;
 
-/** Asc/desc by price; null/unset last; explicit 0 sorts with cheapest; stable by id. */
 export function byPrice(dir: PriceDir) {
   return <T extends { id: string; price: number | null }>(a: T, b: T) => {
     const pa = priced(a.price);
