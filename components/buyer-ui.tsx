@@ -2,7 +2,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { byPrice, Listings, ListingTools, money, Seg, useDense, usePriceDir } from "@/components/photo-listing";
 import { Snack, useMaskDismiss, useSnack } from "@/components/snack";
-import { dayLbl, pickupSpan } from "@/lib/days";
+import { dayLbl, moveOutLeft } from "@/lib/days";
 import { bookShop, joinWaitLive, listenShop } from "@/lib/live";
 import { applyLineSession, getId, getName, openShop, pushBuy, subscribeAuth } from "@/lib/shop";
 import {
@@ -76,7 +76,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const lineUrl = (state?.lineInviteUrl || "").trim();
   const phoneDisp = (state?.phone || "").trim();
   const canJimoty = !!jimotyUrl, canLine = !!lineUrl, canPhone = !!phoneDisp;
-  const barDates = pickupSpan(state?.days || []);
+  const barMove = moveOutLeft(state?.days || []);
   const shareUrl = `${SITE_URL}/s/${shop}`;
   const loggedIn = !!knownName;
   const contactVal = (method === "jimoty" && loggedIn ? knownName : lineName).trim();
@@ -203,7 +203,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     <main className={`buy${embed ? " embed" : ""}`}>
       <header className="bar">
         <span className="area">{(state?.address || "").trim() || "区"}</span>
-        <span className="span">{barDates}</span>
+        <span className="span">{barMove}</span>
         <button type="button" className="share" onClick={copyShare}>
           URLコピー
         </button>

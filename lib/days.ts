@@ -11,11 +11,6 @@ export function dayLbl(d: string) {
   return `${m}月${day}日（${youbi(d)}）`;
 }
 
-function dayShort(d: string) {
-  const [, m, day] = d.split("-").map(Number);
-  return `${m}月${day}日`;
-}
-
 export function daysBetween(from: string, to: string): string[] {
   if (!YMD.test(from) || !YMD.test(to) || to < from) return [];
   const out: string[] = [];
@@ -36,10 +31,8 @@ export function addDays(ymd: string, n: number) {
   return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
 }
 
-export function pickupSpan(days: string[]) {
+export function moveOutLeft(days: string[]) {
   if (!days.length) return "";
-  const end = days[days.length - 1];
-  const left = daysBetween(tokyoYmd(), end);
-  const rel = left.length ? ` · あと${left.length - 1}日` : "";
-  return `${dayShort(days[0])}–${dayShort(end)}${rel}`;
+  const left = daysBetween(tokyoYmd(), days[days.length - 1]);
+  return left.length ? `退去まであと${left.length - 1}日` : "";
 }
