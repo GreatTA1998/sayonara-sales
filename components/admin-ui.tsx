@@ -523,14 +523,12 @@ export default function ShopAdminView({ shop, name }: Props) {
       show("写真を削除しました", "ok");
       return;
     }
-    const photos = (item.photos || []).filter((p) => p !== url);
+    const prev = item.photos || [];
+    const photos = prev.filter((p) => p !== url);
     patchPhotos(item.id, () => photos);
-    setDeleting(item.id); show("削除中…", "busy");
-    try {
-      const ok = await saveRemotePhotos(item.id, photos);
-      if (ok) setViewPic((v) => (v === url ? null : v));
-      show(ok ? "写真を削除しました" : "削除に失敗しました", ok ? "ok" : "err");
-    } finally { setDeleting(null); }
+    setViewPic((v) => (v === url ? null : v));
+    show("写真を削除しました", "ok");
+    if (!(await saveRemotePhotos(item.id, photos))) patchPhotos(item.id, () => prev);
   }
 
   async function reorderPhotos(item: Item, from: number, to: number) {
