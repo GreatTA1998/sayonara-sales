@@ -12,6 +12,7 @@ export type Claim = {
   status: "requested" | "booked" | "picked_up" | "cancelled"; createdAt: string;
   waiters?: { account: string; at: string }[];
   buyerUid?: string;
+  declineReason?: string;
 };
 export type Store = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
@@ -19,6 +20,8 @@ export type Store = {
   slots?: string[];
   pickupFrom?: string; pickupTo?: string; moveOut?: string;
   leadDays?: number;
+  /** 0 = off. Both set → count OR ¥ total. */
+  minItems?: number; minTotal?: number;
   published?: boolean;
   ownerUid?: string;
   items: Item[]; claims: Claim[];
@@ -79,6 +82,34 @@ export function applyDates(s: Store, raw: { pickupFrom?: unknown; pickupTo?: unk
     s.leadDays = Math.floor(n);
   }
   return { pickupFrom: s.pickupFrom, pickupTo: s.pickupTo, moveOut: s.moveOut, leadDays: shopLeadDays(s) };
+}
+
+const asMin = (v: unknown) => {
+  const n = Math.floor(Number(v));
+  return Number.isFinite(n) && n > 0 ? n : 0;
+};
+type Mins = { minItems?: number; minTotal?: number };
+export const shopMins = (s: Mins) => ({
+  minItems: asMin(s.minItems), minTotal: asMin(s.minTotal),
+});
+/** Both set → count OR ¥. One set → that gate. Neither → open. */
+export function cartMeets(s: Mins, count: number, total: number) {
+  const { minItems: n, minTotal: y } = shopMins(s);
+  if (!n && !y) return true;
+  if (n && y) return count >= n || total >= y;
+  return n ? count >= n : total >= y;
+}
+export function cartRule(s: Mins): string | null {
+  const { minItems: n, minTotal: y } = shopMins(s);
+  if (!n && !y) return null;
+  const pts = n ? `${n}点以上` : "";
+  const yen = y ? `合計¥${y.toLocaleString("ja-JP")}以上` : "";
+  return `引き取り条件：${pts && yen ? `${pts}、または${yen}` : pts || yen}`;
+}
+export function applyMins(s: Store, raw: { minItems?: unknown; minTotal?: unknown }) {
+  s.minItems = asMin(raw.minItems);
+  s.minTotal = asMin(raw.minTotal);
+  return shopMins(s);
 }
 
 export const parseShop = (raw: string | null | undefined) => {
@@ -144,6 +175,7 @@ export function shopFields(s: Store): Record<string, unknown> {
     pickupTo: s.pickupTo || "",
     moveOut: s.moveOut || "",
     leadDays: shopLeadDays(s),
+    ...shopMins(s),
     published: !!s.published,
     ...(s.ownerUid ? { ownerUid: s.ownerUid } : {}),
   };
@@ -163,6 +195,7 @@ export function claimFields(c: Claim): Record<string, unknown> {
     status: c.status, createdAt: c.createdAt,
     waiters: c.waiters || [],
     ...(c.buyerUid ? { buyerUid: c.buyerUid } : {}),
+    ...(c.declineReason ? { declineReason: c.declineReason } : {}),
   };
 }
 
@@ -192,6 +225,7 @@ export function storeFromDocs(
         if (r.contact) c.contact = String(r.contact);
         if (r.contactMethod) c.contactMethod = r.contactMethod as Claim["contactMethod"];
         if (r.buyerUid) c.buyerUid = String(r.buyerUid);
+        if (r.declineReason) c.declineReason = String(r.declineReason);
         if (Array.isArray(r.waiters)) {
           c.waiters = r.waiters.map((w) => {
             const row = w as { account?: string; at?: string };
@@ -211,6 +245,8 @@ export function storeFromDocs(
   if (shop.pickupTo) s.pickupTo = String(shop.pickupTo);
   if (shop.moveOut) s.moveOut = String(shop.moveOut);
   if (shop.leadDays != null && Number.isFinite(Number(shop.leadDays))) s.leadDays = Number(shop.leadDays);
+  { const n = asMin(shop.minItems); if (n) s.minItems = n; }
+  { const n = asMin(shop.minTotal); if (n) s.minTotal = n; }
   if (shop.published) s.published = true;
   if (shop.ownerUid) s.ownerUid = String(shop.ownerUid);
   if (!(s.youtubeUrl || "").trim()) {

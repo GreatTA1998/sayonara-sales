@@ -7,10 +7,10 @@ import SquareCam from "@/components/square-cam";
 import { Snack, useMaskDismiss, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { dayLbl } from "@/lib/days";
-import { DEF_LEAD, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
+import { DECLINE_PRESETS, DEF_LEAD, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
 import { adminAct, listenShop } from "@/lib/live";
 import { getName, getProfile, saveProfile, subscribeAuth } from "@/lib/shop";
-import { shopPublished, type Store } from "@/lib/store";
+import { shopMins, shopPublished, type Store } from "@/lib/store";
 import { SITE_URL } from "@/lib/site";
 
 type Item = PhotoItem & { claimId?: string | null; note?: string; paused?: boolean };
@@ -21,7 +21,8 @@ type Claim = {
 type AdminState = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
   lineInviteUrl?: string; phone?: string; slots?: string[];
-  pickupFrom?: string; pickupTo?: string; moveOut?: string; leadDays?: number; published?: boolean;
+  pickupFrom?: string; pickupTo?: string; moveOut?: string; leadDays?: number;
+  minItems?: number; minTotal?: number; published?: boolean;
   items: Item[]; claims: Claim[];
 };
 type Props = { shop: string; name: string };
@@ -64,6 +65,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [itemMenu, setItemMenu] = useState(false);
   const [viewPic, setViewPic] = useState<string | null>(null);
   const [claimId, setClaimId] = useState<string | null>(null);
+  const [decline, setDecline] = useState(false);
   const softName = useSyncExternalStore(subscribeAuth, getName, () => "");
   const logged = !!softName;
   const label = softName || (/^\d{5}$/.test(name) ? "" : name);
@@ -82,6 +84,8 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [pickupFrom, setPickupFrom] = useState(DEF_FROM);
   const [pickupTo, setPickupTo] = useState(DEF_TO);
   const [leadDays, setLeadDays] = useState(DEF_LEAD);
+  const [minItems, setMinItems] = useState(0);
+  const [minTotal, setMinTotal] = useState(0);
   const [listOpen, setListOpen] = useState(false);
   const [listDraft, setListDraft] = useState("");
   const listRef = useRef<HTMLInputElement | null>(null);
@@ -125,6 +129,8 @@ export default function ShopAdminView({ shop, name }: Props) {
     setPickupFrom(body.pickupFrom || DEF_FROM);
     setPickupTo(body.pickupTo || body.moveOut || DEF_TO);
     setLeadDays(body.leadDays ?? DEF_LEAD);
+    const m = shopMins(body);
+    setMinItems(m.minItems); setMinTotal(m.minTotal);
     if (shopPublished(shop, body)) setPub("on");
   }, [shop]);
 
@@ -598,6 +604,14 @@ export default function ShopAdminView({ shop, name }: Props) {
     setPickupTo(String(body.pickupTo || body.moveOut || to));
     if (body.leadDays != null) setLeadDays(Number(body.leadDays));
   }
+  async function saveMins(n = minItems, y = minTotal) {
+    const body = await act({ action: "mins", minItems: n, minTotal: y }, "保存しました");
+    if (!body) return;
+    setMinItems(Number(body.minItems) || 0);
+    setMinTotal(Number(body.minTotal) || 0);
+  }
+  function openClaim(id: string) { setDecline(false); setClaimId(id); }
+  function closeClaim() { setDecline(false); setClaimId(null); }
 
   const busyOpen = open ? deleting === open.id : false;
   const editMask = useMaskDismiss(closeEdit, busyOpen);
@@ -633,7 +647,7 @@ export default function ShopAdminView({ shop, name }: Props) {
           <ol className="timeline">
             {list.map((c) => (
               <li key={c.id}>
-                <button type="button" className="tl-card" onClick={() => setClaimId(c.id)}>
+                <button type="button" className="tl-card" onClick={() => openClaim(c.id)}>
                   <b className="tl-when">{claimWhen(c)}</b>
                   <span className="tl-sum">{claimSummary(c, data?.items || [])}</span>
                 </button>
@@ -684,6 +698,26 @@ export default function ShopAdminView({ shop, name }: Props) {
             <span aria-hidden="true">日前</span>
           </span>
         </label>
+        <div className="name-price">
+          <label className="float lead"><span>最低点数</span>
+            <span className="lead-row">
+              <input type="number" min={0} inputMode="numeric" aria-label="最低点数（0でなし）"
+                value={minItems}
+                onChange={(e) => setMinItems(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+                onBlur={() => void saveMins()} />
+              <span aria-hidden="true">点</span>
+            </span>
+          </label>
+          <label className="float lead"><span>最低合計</span>
+            <span className="lead-row">
+              <input type="number" min={0} inputMode="numeric" aria-label="最低合計円（0でなし）"
+                value={minTotal}
+                onChange={(e) => setMinTotal(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+                onBlur={() => void saveMins()} />
+              <span aria-hidden="true">円</span>
+            </span>
+          </label>
+        </div>
         <div className="slot-edit" role="list" aria-label="受取時間">
           {slots.map((s) => (
             <button key={s} type="button" className="slot" role="listitem"
@@ -766,7 +800,7 @@ export default function ShopAdminView({ shop, name }: Props) {
 
       {claimOpen && (
         <div className="mask" role="dialog" aria-modal="true" aria-label="予約詳細"
-          onClick={() => setClaimId(null)}>
+          onClick={closeClaim}>
           <div className="sheet claim-sheet" onClick={(e) => e.stopPropagation()}>
             <b className="tl-when">{claimWhen(claimOpen)}</b>
             {claimOpen.contactMethod ? <div className="text-sm text-muted" style={{ marginBottom: 8 }}>{methodJa(claimOpen.contactMethod)}</div> : null}
@@ -778,20 +812,38 @@ export default function ShopAdminView({ shop, name }: Props) {
                 </li>
               ))}
             </ul>
-            <div className="claim-acts">
-              <button type="button" onClick={() => {
-                void act({ action: "cancel", id: claimOpen.id }, "保存しました").then((ok) => { if (ok) setClaimId(null); });
-              }}>キャンセル</button>
-              {claimOpen.status === "requested" ? (
-                <button type="button" onClick={() => {
-                  void act({ action: "confirm", id: claimOpen.id }, "確認しました").then((ok) => { if (ok) setClaimId(null); });
-                }}>確認する</button>
-              ) : (
-                <button type="button" onClick={() => {
-                  void act({ action: "picked_up", id: claimOpen.id }, "受取済み").then((ok) => { if (ok) setClaimId(null); });
-                }}>受取済み</button>
-              )}
-            </div>
+            {claimOpen.status === "requested" && decline ? (
+              <div className="decline-list" role="group" aria-label="お断り理由">
+                <p className="hint">丁寧なお断り文を選んでください</p>
+                {DECLINE_PRESETS.map((t) => (
+                  <button key={t} type="button" className="decline-opt" onClick={() => {
+                    void act({ action: "cancel", id: claimOpen.id, reason: t }, "お断りしました")
+                      .then((ok) => { if (ok) closeClaim(); });
+                  }}>{t}</button>
+                ))}
+                <button type="button" className="decline-back" onClick={() => setDecline(false)}>戻る</button>
+              </div>
+            ) : (
+              <div className="claim-acts">
+                {claimOpen.status === "requested" ? (
+                  <>
+                    <button type="button" onClick={() => setDecline(true)}>お断り</button>
+                    <button type="button" onClick={() => {
+                      void act({ action: "confirm", id: claimOpen.id }, "確認しました").then((ok) => { if (ok) closeClaim(); });
+                    }}>確認する</button>
+                  </>
+                ) : (
+                  <>
+                    <button type="button" onClick={() => {
+                      void act({ action: "cancel", id: claimOpen.id }, "キャンセルしました").then((ok) => { if (ok) closeClaim(); });
+                    }}>キャンセル</button>
+                    <button type="button" onClick={() => {
+                      void act({ action: "picked_up", id: claimOpen.id }, "受取済み").then((ok) => { if (ok) closeClaim(); });
+                    }}>受取済み</button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

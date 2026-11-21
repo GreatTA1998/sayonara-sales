@@ -9,9 +9,9 @@ import {
 } from "firebase/firestore";
 import { ensureAuth, getDb } from "./fb";
 import {
-  applyDates, bookableDays, claimFields, ELTON_SHOP, hasBuyerContact, itemFields, itemStatus,
-  joinWait, normalizeSlots, parseShop, shortCode, shopFields, shopSlots, storeFromDocs, takenSlots, uid,
-  type Claim, type Item, type Store,
+  applyDates, applyMins, bookableDays, cartMeets, cartRule, claimFields, ELTON_SHOP, hasBuyerContact,
+  itemFields, itemStatus, joinWait, normalizeSlots, parseShop, shortCode, shopFields, shopSlots,
+  storeFromDocs, takenSlots, uid, type Claim, type Item, type Store,
 } from "./store";
 
 const asClaim = (id: string, data: Record<string, unknown>): Claim =>
@@ -187,6 +187,13 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       await updateDoc(shopRef, { ...out, updatedAt: new Date().toISOString() });
       return out;
     }
+    case "mins": {
+      const meta = (await getDoc(shopRef)).data() || {};
+      const s = storeFromDocs(meta as Record<string, unknown>, [], []);
+      const out = applyMins(s, body);
+      await updateDoc(shopRef, { ...out, updatedAt: new Date().toISOString() });
+      return out;
+    }
     case "slots": {
       const slots = normalizeSlots(body.slots);
       await updateDoc(shopRef, { slots, updatedAt: new Date().toISOString() });
@@ -210,13 +217,16 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       const open = (st: string) => st === "booked" || st === "requested";
       if (!csnap.exists() || !open(String(csnap.data().status))) throw new Error("No claim");
       const c = csnap.data();
-      await updateDoc(cref, { status: "cancelled", waiters: [] });
+      const reason = String(body.reason || "").trim();
+      const patch: Record<string, unknown> = { status: "cancelled", waiters: [] };
+      if (reason) patch.declineReason = reason;
+      await updateDoc(cref, patch);
       for (const iid of (Array.isArray(c.itemIds) ? c.itemIds.map(String) : [])) {
         const iref = doc(db, "shops", shop, "items", iid);
         const isnap = await getDoc(iref);
         if (isnap.exists() && isnap.data().claimId === id) await updateDoc(iref, { claimId: null });
       }
-      return asClaim(id, { ...c, status: "cancelled", waiters: [] });
+      return asClaim(id, { ...c, ...patch });
     }
     default:
       throw new Error("Unknown action");
@@ -285,6 +295,10 @@ export async function bookShop(shopRaw: string, body: {
     for (const it of items) {
       const st = itemStatus(it);
       if (!st.ok) throw new Error(`${it.name}: ${st.reason}`);
+    }
+    const totalPre = items.reduce((n, it) => n + (it.price ?? 0), 0);
+    if (!cartMeets(pre, items.length, totalPre)) {
+      throw new Error(cartRule(pre) || "引き取り条件を満たしていません");
     }
     const claimId = uid("c");
     const code = shortCode();
