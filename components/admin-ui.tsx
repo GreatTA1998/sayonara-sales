@@ -689,16 +689,16 @@ export default function ShopAdminView({ shop, name }: Props) {
           <span aria-hidden="true">〜</span>
           <DateField label="退去日" value={pickupTo} onChange={(v) => { setPickupTo(v); void saveDates(pickupFrom, v); }} />
         </div>
-        <label className="float lead"><span>最短予約</span>
-          <span className="lead-row">
-            <input type="number" min={0} inputMode="numeric" aria-label="最短予約（日前）"
-              value={leadDays}
-              onChange={(e) => setLeadDays(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-              onBlur={() => void saveDates(pickupFrom, pickupTo, leadDays)} />
-            <span aria-hidden="true">日前</span>
-          </span>
-        </label>
         <div className="name-price">
+          <label className="float lead"><span>最短予約</span>
+            <span className="lead-row">
+              <input type="number" min={0} inputMode="numeric" aria-label="最短予約（日前）"
+                value={leadDays}
+                onChange={(e) => setLeadDays(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+                onBlur={() => void saveDates(pickupFrom, pickupTo, leadDays)} />
+              <span aria-hidden="true">日前</span>
+            </span>
+          </label>
           <label className="float lead"><span>最低点数</span>
             <span className="lead-row">
               <input type="number" min={0} inputMode="numeric" aria-label="最低点数（0でなし）"
