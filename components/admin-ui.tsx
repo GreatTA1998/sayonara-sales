@@ -36,9 +36,9 @@ const kuStem = (v: string) => v.replace(/区$/, "");
 const kuFull = (v: string) => { const s = kuStem(v).trim(); return s ? `${s}区` : ""; };
 const itemLabel = (it?: Item | null) => it?.name?.trim() || "無題";
 const isRemote = (u: string) => /^https?:\/\//i.test(u);
-const hasBlob = (it: Item) => (it.photos || []).some((p) => p.startsWith("blob:"));
 type PicStatus = "uploading" | "error";
-type PicJob = { file: File; itemId: string; kind: "append" | "create"; busy?: boolean };
+/** In-flight uploads only — listing rows come from onSnapshot. */
+type PicJob = { file: File; itemId: string; busy?: boolean };
 function claimItems(c: Claim, all: Item[]) {
   return c.itemIds
     .map((id) => all.find((i) => i.id === id) || { id, name: "無題", price: null as number | null })
@@ -57,8 +57,8 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [listBusy, setListBusy] = useState(false);
   const [picBusy, setPicBusy] = useState<Record<string, PicStatus>>({});
   const picJobs = useRef<Record<string, PicJob>>({});
-  /** Ids removed locally — block snap resurrection + late create writes. */
-  const gone = useRef(new Set<string>());
+  /** Blob previews by real item id (not listing SOT). */
+  const [localPics, setLocalPics] = useState<Record<string, string[]>>({});
   const [deleting, setDeleting] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -112,21 +112,7 @@ export default function ShopAdminView({ shop, name }: Props) {
 
   const applySnap = useCallback((body: Store) => {
     setErr(null);
-    setData((prev) => {
-      const jobs = picJobs.current, drop = gone.current, prevItems = prev?.items || [];
-      const live = (p?: string[]) => (p || []).some((u) => jobs[u]);
-      const byId = new Map(prevItems.map((i) => [i.id, i]));
-      const items = (body.items as Item[]).filter((it) => !drop.has(it.id)).map((it) => {
-        const loc = byId.get(it.id);
-        return loc && live(loc.photos) ? { ...it, photos: loc.photos } : it;
-      });
-      const seen = new Set(items.map((i) => i.id));
-      for (const loc of prevItems) {
-        if (!seen.has(loc.id) && !drop.has(loc.id) && live(loc.photos)) items.push(loc);
-      }
-      for (const id of [...drop]) if (!(body.items as Item[]).some((i) => i.id === id)) drop.delete(id);
-      return { ...(body as AdminState), items };
-    });
+    setData(body as AdminState);
     addrSaved.current = body.address || "";
     if (!addrDirty.current) {
       const stem = kuStem(body.address || "");
@@ -162,14 +148,17 @@ export default function ShopAdminView({ shop, name }: Props) {
     if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
   }, []);
 
-  const items = useMemo(() => {
-    const all = data?.items || [];
-    const cmp = byPrice(priceDir);
-    const pending = all.filter(hasBlob);
-    const rest = all.filter((i) => !hasBlob(i)).sort(cmp);
-    return pending.length ? [...pending, ...rest] : [...all].sort(cmp);
-  }, [data?.items, priceDir]);
+  const items = useMemo(
+    () => [...(data?.items || [])].sort(byPrice(priceDir)),
+    [data?.items, priceDir],
+  );
   const open = useMemo(() => items.find((i) => i.id === openId) || null, [items, openId]);
+  const pics = useMemo(() => {
+    if (!open) return [] as string[];
+    const remotes = open.photos || [];
+    const locals = localPics[open.id] || [];
+    return locals.length ? [...remotes, ...locals.filter((u) => !remotes.includes(u))] : remotes;
+  }, [open, localPics]);
   const active = useMemo(
     () => (data?.claims || []).filter((c) => c.status === "requested" || c.status === "booked"),
     [data?.claims],
@@ -181,40 +170,11 @@ export default function ShopAdminView({ shop, name }: Props) {
     () => (claimOpen && data ? claimItems(claimOpen, data.items) : []),
     [claimOpen, data],
   );
-  function apply(action: string, payload: Record<string, unknown>, body: Record<string, unknown>) {
-    setData((d) => {
-      if (!d) return d;
-      if (action === "add") {
-        const item = body as unknown as Item;
-        return { ...d, items: [...d.items.filter((i) => i.id !== item.id), item] };
-      }
-      if (action === "edit") {
-        const next = body as Record<string, unknown>;
-        return {
-          ...d,
-          items: d.items.map((i) => i.id !== next.id ? i : {
-            ...i, ...next, id: i.id,
-            paused: "paused" in next ? !!next.paused : i.paused,
-          }),
-        };
-      }
-      if (action === "remove") return { ...d, items: d.items.filter((i) => i.id !== payload.id) };
-      if (action === "confirm" || action === "cancel" || action === "picked_up") {
-        const next = body as unknown as Claim;
-        const items = action === "cancel"
-          ? d.items.map((i) => (i.claimId === next.id ? { ...i, claimId: null } : i))
-          : d.items;
-        return { ...d, items, claims: d.claims.map((c) => (c.id === next.id ? { ...c, ...next } : c)) };
-      }
-      return d;
-    });
-  }
 
   async function act(payload: Record<string, unknown>, okMsg?: string) {
     setErr(null);
     try {
       const body = await adminAct(shop, payload) as Record<string, unknown>;
-      apply(String(payload.action), payload, body);
       if (okMsg) show(okMsg, "ok");
       return body;
     } catch (e) {
@@ -234,7 +194,6 @@ export default function ShopAdminView({ shop, name }: Props) {
       if (req !== addrReq.current) return;
       const saved = String(body.address ?? next);
       addrSaved.current = saved;
-      setData((d) => d && { ...d, address: saved });
       if (kuFull(addrDraftRef.current) === saved) addrDirty.current = false;
       show("保存しました", "ok");
     } catch (e) {
@@ -358,17 +317,6 @@ export default function ShopAdminView({ shop, name }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [openId, deleting, viewPic]);
 
-  function upsertItem(item: Item) {
-    setData((d) => {
-      if (!d) return d;
-      const idx = d.items.findIndex((i) => i.id === item.id);
-      if (idx < 0) return { ...d, items: [...d.items, item] };
-      const items = d.items.slice();
-      items[idx] = { ...items[idx], ...item };
-      return { ...d, items };
-    });
-  }
-
   function setPicStatus(url: string, st: PicStatus | null) {
     setPicBusy((s) => {
       if (!st) {
@@ -381,13 +329,32 @@ export default function ShopAdminView({ shop, name }: Props) {
     });
   }
 
-  function patchPhotos(itemId: string, fn: (photos: string[]) => string[]) {
-    setData((d) => {
-      if (!d) return d;
-      return {
-        ...d,
-        items: d.items.map((i) => (i.id === itemId ? { ...i, photos: fn(i.photos || []) } : i)),
-      };
+  function pushLocalPic(itemId: string, url: string) {
+    setLocalPics((s) => ({ ...s, [itemId]: [...(s[itemId] || []), url] }));
+  }
+
+  function dropLocalPic(itemId: string, url: string) {
+    setLocalPics((s) => {
+      const next = (s[itemId] || []).filter((u) => u !== url);
+      if (!next.length) {
+        const { [itemId]: _, ...rest } = s;
+        return rest;
+      }
+      return { ...s, [itemId]: next };
+    });
+  }
+
+  function clearItemLocals(itemId: string) {
+    for (const [url, job] of Object.entries(picJobs.current)) {
+      if (job.itemId !== itemId) continue;
+      if (url.startsWith("blob:")) URL.revokeObjectURL(url);
+      delete picJobs.current[url];
+      setPicStatus(url, null);
+    }
+    setLocalPics((s) => {
+      if (!(itemId in s)) return s;
+      const { [itemId]: _, ...rest } = s;
+      return rest;
     });
   }
 
@@ -402,7 +369,8 @@ export default function ShopAdminView({ shop, name }: Props) {
     return body as { url?: string; itemId?: string };
   }
 
-  function clearPicLocal(local: string) {
+  function clearPicLocal(local: string, itemId?: string) {
+    if (itemId) dropLocalPic(itemId, local);
     URL.revokeObjectURL(local);
     delete picJobs.current[local];
     setPicStatus(local, null);
@@ -410,10 +378,7 @@ export default function ShopAdminView({ shop, name }: Props) {
 
   async function runPicJob(local: string) {
     const job = picJobs.current[local];
-    if (!job || job.busy || gone.current.has(job.itemId)) {
-      if (job && gone.current.has(job.itemId)) clearPicLocal(local);
-      return;
-    }
+    if (!job || job.busy) return;
     job.busy = true;
     setPicStatus(local, "uploading");
     setErr(null);
@@ -421,19 +386,9 @@ export default function ShopAdminView({ shop, name }: Props) {
       const up = await postUpload(job.file, job.itemId);
       const remote = String(up.url || "");
       if (!remote) throw new Error("アップロードに失敗しました");
-      if (gone.current.has(job.itemId)) { clearPicLocal(local); return; }
-      if (job.kind === "create") await adminAct(shop, { action: "add", id: job.itemId, name: "", photos: [remote] });
-      else await adminAct(shop, { action: "edit", id: job.itemId, appendPhoto: remote });
-      if (gone.current.has(job.itemId)) {
-        await adminAct(shop, { action: "remove", id: job.itemId }).catch(() => undefined);
-        clearPicLocal(local);
-        return;
-      }
-      patchPhotos(job.itemId, (photos) =>
-        photos.some((p) => p === local)
-          ? photos.map((p) => (p === local ? remote : p))
-          : [...photos, remote]);
-      clearPicLocal(local);
+      if (!picJobs.current[local]) return;
+      await adminAct(shop, { action: "edit", id: job.itemId, appendPhoto: remote });
+      clearPicLocal(local, job.itemId);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "アップロードに失敗しました";
       setErr(msg); show(msg, "err");
@@ -447,23 +402,28 @@ export default function ShopAdminView({ shop, name }: Props) {
     if (!images.length) { show("画像を選択してください", "err"); return; }
     for (const file of images) {
       const local = URL.createObjectURL(file);
-      picJobs.current[local] = { file, itemId, kind: "append" };
-      patchPhotos(itemId, (photos) => [...photos, local]);
+      picJobs.current[local] = { file, itemId };
+      pushLocalPic(itemId, local);
       void runPicJob(local);
     }
   }
 
+  /** Write empty listing to Firestore first; UI follows snap; then upload→appendPhoto. */
   function addFromPhotos(files: File[]) {
     const images = files.filter(isImageFile);
     if (!images.length) { show("画像を選択してください", "err"); return; }
     setErr(null);
     for (const file of images) {
-      const local = URL.createObjectURL(file);
       const id = uid("i");
-      gone.current.delete(id);
-      picJobs.current[local] = { file, itemId: id, kind: "create" };
-      upsertItem({ id, name: "", price: 0, photos: [local] });
-      void runPicJob(local);
+      void (async () => {
+        try {
+          await adminAct(shop, { action: "add", id, name: "", photos: [] });
+          queueAppend(id, [file]);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "失敗しました";
+          setErr(msg); show(msg, "err");
+        }
+      })();
     }
   }
 
@@ -490,13 +450,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   async function deleteItem(item: Item) {
     if (!confirm(`「${item.name || "無題"}」を削除しますか？`)) return;
     setDeleting(item.id); show("削除中…", "busy");
-    gone.current.add(item.id);
-    (item.photos || []).forEach((u) => {
-      if (u.startsWith("blob:")) URL.revokeObjectURL(u);
-      delete picJobs.current[u];
-      setPicStatus(u, null);
-    });
-    setData((d) => d && { ...d, items: d.items.filter((i) => i.id !== item.id) });
+    clearItemLocals(item.id);
     if (openId === item.id || editIdRef.current === item.id) {
       if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
       editIdRef.current = null;
@@ -507,56 +461,51 @@ export default function ShopAdminView({ shop, name }: Props) {
       await adminAct(shop, { action: "remove", id: item.id });
       show("削除しました", "ok");
     } catch (e) {
-      gone.current.delete(item.id);
       const msg = e instanceof Error ? e.message : "失敗しました";
       setErr(msg); show(msg, "err");
     } finally { setDeleting(null); }
   }
 
-  async function saveRemotePhotos(itemId: string, photos: string[]) {
-    const remotes = photos.filter(isRemote);
-    try {
-      await adminAct(shop, { action: "edit", id: itemId, photos: remotes });
-      return true;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "失敗しました";
-      setErr(msg); show(msg, "err");
-      return false;
-    }
-  }
-
   async function deletePhoto(item: Item, url: string) {
     if (!confirm(`この写真を削除しますか？`)) return;
     if (url.startsWith("blob:")) {
-      URL.revokeObjectURL(url);
-      delete picJobs.current[url];
-      setPicStatus(url, null);
-      patchPhotos(item.id, (photos) => photos.filter((p) => p !== url));
+      clearPicLocal(url, item.id);
       setViewPic((v) => (v === url ? null : v));
       show("写真を削除しました", "ok");
       return;
     }
-    const prev = item.photos || [];
-    patchPhotos(item.id, (photos) => photos.filter((p) => p !== url));
     setViewPic((v) => (v === url ? null : v));
-    show("写真を削除しました", "ok");
     try {
       await adminAct(shop, { action: "edit", id: item.id, removePhoto: url });
+      show("写真を削除しました", "ok");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "失敗しました";
       setErr(msg); show(msg, "err");
-      patchPhotos(item.id, () => prev);
     }
   }
 
-  async function reorderPhotos(item: Item, from: number, to: number) {
-    if (from === to || from < 0 || to < 0) return;
-    const photos = [...(item.photos || [])];
+  async function reorderPhotos(from: number, to: number) {
+    if (!open || from === to || from < 0 || to < 0) return;
+    const photos = [...pics];
     if (to >= photos.length) return;
     const [moved] = photos.splice(from, 1);
     photos.splice(to, 0, moved);
-    upsertItem({ ...item, photos });
-    await saveRemotePhotos(item.id, photos);
+    const remotes = photos.filter(isRemote);
+    const locals = photos.filter((u) => !isRemote(u));
+    setLocalPics((s) => {
+      if (!locals.length) {
+        if (!(open.id in s)) return s;
+        const { [open.id]: _, ...rest } = s;
+        return rest;
+      }
+      return { ...s, [open.id]: locals };
+    });
+    try {
+      await adminAct(shop, { action: "edit", id: open.id, photos: remotes });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "失敗しました";
+      setErr(msg); show(msg, "err");
+    }
   }
 
   function onPicPointerDown(e: PtrEv<HTMLDivElement>, i: number) {
@@ -565,12 +514,12 @@ export default function ShopAdminView({ shop, name }: Props) {
     if (t.closest("button, .pic-retry")) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     dragRef.current = { from: i, over: i, x: e.clientX, y: e.clientY, moved: false };
-    if ((open?.photos || []).length > 1) { setDragFrom(i); setDragOver(i); }
+    if (pics.length > 1) { setDragFrom(i); setDragOver(i); }
   }
 
   function onPicPointerMove(e: PtrEv<HTMLDivElement>) {
     const d = dragRef.current;
-    if (!d || (open?.photos || []).length < 2) return;
+    if (!d || pics.length < 2) return;
     if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 10) return;
     d.moved = true;
     const hit = document.elementsFromPoint(e.clientX, e.clientY)
@@ -589,8 +538,8 @@ export default function ShopAdminView({ shop, name }: Props) {
     setDragFrom(null);
     setDragOver(null);
     if (!d || !open) return;
-    if (!d.moved) { const src = open.photos?.[d.from]; if (src) setViewPic(src); return; }
-    if (d.over !== d.from) void reorderPhotos(open, d.from, d.over);
+    if (!d.moved) { const src = pics[d.from]; if (src) setViewPic(src); return; }
+    if (d.over !== d.from) void reorderPhotos(d.from, d.over);
   }
 
   function copyUrl() {
@@ -631,7 +580,6 @@ export default function ShopAdminView({ shop, name }: Props) {
   const busyOpen = open ? deleting === open.id : false;
   useBodyScrollLock(!!openId || !!claimId);
   const editMask = useMaskDismiss(closeEdit, busyOpen);
-  const pics = open?.photos || [];
   const empty = !!data && !items.length;
   const areaN = Math.max(2, Array.from(addrDraft || "目黒").length);
 
