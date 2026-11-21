@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { byPrice, Listings, ListingTools, money, Seg, useDense, usePriceDir } from "@/components/photo-listing";
-import { Snack, useBodyScrollLock, useMaskDismiss, useSnack } from "@/components/snack";
+import { useBodyScrollLock, useMaskDismiss } from "@/components/snack";
 import { dayLbl, moveOutLeft } from "@/lib/days";
 import { bookShop, joinWaitLive, listenShop } from "@/lib/live";
 import { applyLineSession, getId, getName, openShop, pushBuy, subscribeAuth } from "@/lib/shop";
@@ -9,7 +9,6 @@ import {
   bookableDays, cartMeets, cartRule, itemFlags, shopContact, shopSlots, takenSlots, type Store,
 } from "@/lib/store";
 import { telHref, ytUrl } from "@/lib/sale";
-import { SITE_URL } from "@/lib/site";
 
 type Item = {
   id: string; name: string; price: number | null; note?: string;
@@ -71,13 +70,11 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [waited, setWaited] = useState<Set<string>>(new Set());
   const [priceDir, setPriceDir] = usePriceDir();
   const [dense, setDense] = useDense();
-  const { snack, show } = useSnack();
   const jimotyUrl = (state?.jimotyUrl || "").trim();
   const lineUrl = (state?.lineInviteUrl || "").trim();
   const phoneDisp = (state?.phone || "").trim();
   const canJimoty = !!jimotyUrl, canLine = !!lineUrl, canPhone = !!phoneDisp;
   const barMove = moveOutLeft(state?.days || []);
-  const shareUrl = `${SITE_URL}/s/${shop}`;
   const loggedIn = !!knownName;
   const contactVal = (method === "jimoty" && loggedIn ? knownName : lineName).trim();
 
@@ -148,11 +145,6 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   function closeDetail() { setOpen(null); }
   const detailMask = useMaskDismiss(closeDetail);
 
-  function copyShare() {
-    void navigator.clipboard?.writeText(shareUrl).catch(() => undefined);
-    show(`コピーしました\n${shareUrl}`, "ok");
-  }
-
   async function book() {
     const itemIds = pickedItems.map((i) => i.id);
     if (!itemIds.length || !slot || !method || !contactVal || busy || !canSend || !minsOk) return;
@@ -204,9 +196,6 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
       <header className="bar">
         <span className="area">{(state?.address || "").trim() || "区"}</span>
         <span className="span">{barMove}</span>
-        <button type="button" className="share" onClick={copyShare}>
-          URLコピー
-        </button>
         <button type="button" className="req"
           onClick={() => {
             const n = getName();
@@ -324,7 +313,6 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
           </div>
         </div>
       )}
-      <Snack snack={snack} />
     </main>
   );
 }
