@@ -17,8 +17,9 @@ type State = {
   lineInviteUrl?: string | null; phone?: string | null; items: Item[];
 };
 type Receipt = { code: string; day: string; slot: string; total?: number };
-type Method = "line" | "phone";
+type Method = "jimoty" | "line" | "phone";
 type Props = { shop: string; name: string; /** Flatten padding when embedded on home. */ embed?: boolean };
+const CH = { jimoty: ["Jimoty", "ジモティでメッセージしました", "ジモティ名"], line: ["LINE", "LINEで友だち追加しました", "LINE名"], phone: ["電話", "電話しました", "電話番号"] } as const;
 
 const api = (shop: string, path: string) => `${path}?shop=${encodeURIComponent(shop)}`;
 const wlKey = (shop: string) => `ss-wl-${shop}`;
@@ -37,7 +38,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [method, setMethod] = useState<Method | null>(null);
   const [lineName, setLineName] = useState("");
   const knownName = useSyncExternalStore(subscribeAuth, getName, () => "");
-  const [lineOk, setLineOk] = useState(false);
+  const [chanOk, setChanOk] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
@@ -46,13 +47,14 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [dense, setDense] = useDense();
   const { snack, show } = useSnack();
   const maskPtr = useRef(false);
+  const jimotyUrl = (state?.jimotyUrl || "").trim();
   const lineUrl = (state?.lineInviteUrl || "").trim();
   const phoneDisp = (state?.phone || "").trim();
-  const canLine = !!lineUrl;
-  const canPhone = !!phoneDisp;
+  const canJimoty = !!jimotyUrl, canLine = !!lineUrl, canPhone = !!phoneDisp;
   const barDates = pickupSpan(state?.days || []);
   const shareUrl = `${SITE_URL}/s/${shop}`;
   const loggedIn = !!knownName;
+  const contactVal = (method === "jimoty" && loggedIn ? knownName : lineName).trim();
 
   const load = useCallback(async () => {
     const data = (await fetch(api(shop, "/api/state"), { cache: "no-store" }).then((r) => r.json())) as State;
@@ -84,8 +86,8 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   }, [state, day, slot]);
   const gridItems = [...(state?.items || [])].sort(byPrice(priceDir));
   const pickedItems = (state?.items || []).filter((i) => picked.has(i.id) && !i.taken);
-  const canSend = !!slot && !!method && !!lineName.trim() && pickedItems.length > 0
-    && ((method === "line" && canLine && lineOk) || (method === "phone" && canPhone));
+  const canSend = !!slot && !!method && !!contactVal && chanOk && pickedItems.length > 0
+    && (method === "jimoty" ? canJimoty : method === "line" ? canLine : canPhone);
 
   function toggle(id: string) {
     const it = state?.items.find((i) => i.id === id);
@@ -95,7 +97,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
 
   function joinWait(id: string) {
     const n = (getName() || lineName).trim();
-    if (!n) { setErr("LINE名を入力してください"); return; }
+    if (!n) { setErr("ジモティ名を入力してください"); return; }
     openShop(n); setLineName(n); setErr(null);
     setWaited((prev) => {
       const next = new Set(prev); next.add(id);
@@ -126,27 +128,26 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   }
 
   async function book() {
-    const name = lineName.trim();
     const itemIds = pickedItems.map((i) => i.id);
-    if (!itemIds.length || !slot || !method || !name || busy || (method === "line" && !lineOk)) return;
+    if (!itemIds.length || !slot || !method || !contactVal || busy || !canSend) return;
     setBusy(true); setErr(null);
     try {
       const res = await fetch(api(shop, "/api/book"), {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          day, slot, itemIds, contactMethod: method, contact: name,
+          day, slot, itemIds, contactMethod: method, contact: contactVal,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "失敗しました");
-      openShop(name);
+      if (method === "jimoty" || (method === "line" && !loggedIn)) openShop(contactVal);
       pushBuy({
         code: String(data.code || ""), shop, day, slot,
         items: Array.isArray(data.items) ? data.items.map(String) : [],
       });
       setCheckout(false); setOpen(null);
       setReceipt({ code: String(data.code || ""), day, slot, total: data.total });
-      setPicked(new Set()); setSlot(null); setMethod(null); setLineOk(false);
+      setPicked(new Set()); setSlot(null); setMethod(null); setChanOk(false);
       await load();
     } catch (e) { setErr(e instanceof Error ? e.message : "失敗しました"); await load(); }
     finally { setBusy(false); }
@@ -186,8 +187,8 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             const n = getName();
             if (n) setLineName(n);
             setOpen(null); setSlot(null);
-            setMethod(canLine ? "line" : canPhone ? "phone" : "line");
-            setLineOk(false); setErr(null); setCheckout(true);
+            setMethod(canJimoty ? "jimoty" : canLine ? "line" : canPhone ? "phone" : null);
+            setChanOk(false); setErr(null); setCheckout(true);
           }}>
           {pickedItems.length ? `引き取りを依頼 (${pickedItems.length})` : "引き取りを依頼"}
         </button>
@@ -243,7 +244,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
               <>
                 <p className="sw sold">予約済 — 他の方が引き取り予定</p>
                 {needWlName && (
-                  <label className="float"><span>LINE名</span>
+                  <label className="float"><span>ジモティ名</span>
                     <input value={lineName} onChange={(e) => setLineName(e.target.value)}
                       placeholder="表示名" autoComplete="nickname" enterKeyHint="done" /></label>
                 )}
@@ -284,35 +285,33 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
               <li key={i.id}><span>{i.name?.trim() || "無題"}</span><span>{money(i.price)}</span></li>
             ))}</ul>
             <div className="field"><span>連絡方法</span>
-              {(canLine || canPhone) && (
-                <div className="slots pair">
-                  {canLine && (
-                    <button type="button" className={method === "line" ? "slot on" : "slot"}
-                      onClick={() => { setMethod("line"); setLineOk(false); }}>LINE</button>
-                  )}
-                  {canPhone && (
-                    <button type="button" className={method === "phone" ? "slot on" : "slot"}
-                      onClick={() => setMethod("phone")}>電話</button>
-                  )}
+              {(canJimoty || canLine || canPhone) ? (
+                <div className="slots trio">
+                  {([["jimoty", canJimoty], ["line", canLine], ["phone", canPhone]] as const)
+                    .filter(([, ok]) => ok).map(([id]) => (
+                    <button key={id} type="button" className={method === id ? "slot on" : "slot"}
+                      onClick={() => { setMethod(id); setChanOk(false); }}>{CH[id][0]}</button>
+                  ))}
                 </div>
-              )}
-              {method === "line" && canLine && <div className="linebox">
-                <a className="linelink" href={lineUrl} target="_blank" rel="noopener noreferrer">LINE招待リンク</a>
-                <label className="late-check"><input type="checkbox" checked={lineOk}
-                  onChange={(e) => setLineOk(e.target.checked)} />LINEで友だち追加しました</label>
-              </div>}
-              {method === "phone" && canPhone && (
-                <a className="linelink" href={telHref(phoneDisp)}>{phoneDisp}</a>
-              )}
-              {!canLine && !canPhone && (
-                <p className="sw">出品者の連絡先が未設定です。しばらくしてから再度お試しください。</p>
-              )}
+              ) : <p className="sw">出品者の連絡先が未設定です。しばらくしてから再度お試しください。</p>}
+              {method && <>
+                <div className="linebox">
+                  <a className="linelink" target="_blank" rel="noopener noreferrer"
+                    href={method === "jimoty" ? jimotyUrl : method === "line" ? lineUrl : telHref(phoneDisp)}>
+                    {method === "jimoty" ? "ジモティ" : method === "line" ? "LINE招待リンク" : phoneDisp}
+                  </a>
+                  <label className="late-check"><input type="checkbox" checked={chanOk}
+                    onChange={(e) => setChanOk(e.target.checked)} />{CH[method][1]}</label>
+                </div>
+                {!(loggedIn && method === "jimoty") && (
+                  <label className="float"><span>{CH[method][2]}</span>
+                    <input value={lineName} onChange={(e) => setLineName(e.target.value)}
+                      placeholder={method === "phone" ? "080-0000-0000" : "表示名"}
+                      inputMode={method === "phone" ? "tel" : "text"} autoComplete="nickname"
+                      enterKeyHint="done" /></label>
+                )}
+              </>}
             </div>
-            {!loggedIn && (
-              <label className="float"><span>LINE名</span>
-                <input value={lineName} onChange={(e) => setLineName(e.target.value)}
-                  placeholder="表示名" autoComplete="nickname" enterKeyHint="done" /></label>
-            )}
             {err && <div className="err">{err}</div>}
             <button type="button" className={`cta${canSend ? " go" : ""}`} disabled={busy || !canSend}
               onClick={book}>{busy ? "送信中…" : "依頼を送信"}</button>

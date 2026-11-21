@@ -11,7 +11,7 @@ export type Item = {
 };
 export type Claim = {
   id: string; code: string; day: string; slot: string; itemIds: string[];
-  contact?: string; contactMethod?: "line" | "phone";
+  contact?: string; contactMethod?: "jimoty" | "line" | "phone";
   status: "booked" | "picked_up" | "cancelled"; createdAt: string;
 };
 export type Store = {
