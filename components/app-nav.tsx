@@ -51,7 +51,7 @@ export default function AppNav({ top }: Props) {
       });
       const data = await res.json() as { error?: string };
       if (!res.ok) throw new Error(data.error || "送信失敗");
-      setMsg("送信しました。ありがとう。"); setBody("");
+      setMsg("ありがとう。開発者がすぐ確認します。急ぎのバグはAIが直してサイトに反映することも。"); setBody("");
     } catch (err) {
       setMsg(`!${err instanceof Error ? err.message : "送信失敗"}`);
     } finally { setBusy(false); }
