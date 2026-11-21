@@ -793,7 +793,7 @@ export default function ShopAdminView({ shop, name }: Props) {
       )}
 
       {(data?.claims || []).some((c) => c.status === "picked_up") && (
-        <p className="hint thanks pad">ありがとう。履歴はマイページ。ほかの小さなアプリも →{" "}
+        <p className="hint thanks pad">ありがとう。ほかの小さなアプリも →{" "}
           <a className="linelink" href="https://linelton.dev" target="_blank" rel="noopener noreferrer">linelton.dev</a></p>
       )}
 

@@ -3,12 +3,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useLineOAuthReturn } from "@/components/line-oauth";
-import { adminPath, ensureShopId, getId, getName, subscribeAuth } from "@/lib/shop";
-import "@/components/photo-layout.css";
+import { adminPath, ensureShopId, getId, getName, logout, subscribeAuth } from "@/lib/shop";
 
 type Props = { top?: boolean };
 
-/** logo+サヨナラ | 投稿/投稿一覧 | ヘルプ | ログイン/ジモティ名 → マイページ */
+/** logo+サヨナラ | 投稿/投稿一覧 | ヘルプ | ログイン → /me · name → profile menu-pop */
 export default function AppNav({ top }: Props) {
   const router = useRouter();
   const path = usePathname() || "";
@@ -19,12 +18,21 @@ export default function AppNav({ top }: Props) {
   const [helpBusy, setHelpBusy] = useState(false);
   const [helpErr, setHelpErr] = useState("");
   const [helpOk, setHelpOk] = useState(false);
+  const [profOpen, setProfOpen] = useState(false);
 
   useEffect(() => {
     if (shopId) router.prefetch(adminPath(shopId));
     router.prefetch("/me");
   }, [shopId, router]);
   useLineOAuthReturn();
+  useEffect(() => {
+    if (!profOpen) return;
+    const close = (e: PointerEvent) => {
+      if (!(e.target as Element).closest(".nav-me")) setProfOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [profOpen]);
 
   async function sendHelp(e: { preventDefault(): void }) {
     e.preventDefault();
@@ -75,8 +83,23 @@ export default function AppNav({ top }: Props) {
             }}>{name ? "投稿一覧" : "投稿"}</Link>
           <button type="button" className="nav-a"
             onClick={() => { setHelpOpen(true); setHelpOk(false); setHelpErr(""); }}>ヘルプ</button>
-          <Link className={`nav-a${meOn ? " on" : ""}`} href="/me" prefetch
-            aria-current={meOn ? "page" : undefined}>{name || "ログイン"}</Link>
+          {name ? (
+            <div className="nav-me" style={{ position: "relative" }}>
+              <button type="button" className={`nav-a${meOn || profOpen ? " on" : ""}`}
+                aria-expanded={profOpen} aria-haspopup="menu"
+                onClick={() => setProfOpen((v) => !v)}>{name}</button>
+              {profOpen && (
+                <div className={`menu-pop${top ? "" : " up"}`} role="menu">
+                  <button type="button" role="menuitem"
+                    onClick={() => { setProfOpen(false); router.push("/me"); }}>履歴</button>
+                  <button type="button" className="danger" role="menuitem"
+                    onClick={() => { setProfOpen(false); void logout(); }}>ログアウト</button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <Link className="nav-a" href="/me" prefetch>ログイン</Link>
+          )}
         </div>
       </nav>
 
