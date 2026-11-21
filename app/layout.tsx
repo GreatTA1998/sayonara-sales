@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import AppShell from "@/components/app-shell";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
@@ -26,7 +27,7 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1, maxi
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ja">
-      <body>{children}</body>
+      <body><AppShell>{children}</AppShell></body>
     </html>
   );
 }

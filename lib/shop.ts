@@ -34,6 +34,11 @@ export const adminPath = (id: string) => id === ELTON_ID ? "/admin" : `/s/${id}/
 export const notifyAuth = () => {
   if (typeof window !== "undefined") window.dispatchEvent(new Event(AUTH_EVT));
 };
+/** For useSyncExternalStore — identity known on first client paint (no useEffect flash). */
+export const subscribeAuth = (cb: () => void) => {
+  window.addEventListener(AUTH_EVT, cb);
+  return () => window.removeEventListener(AUTH_EVT, cb);
+};
 
 const readMap = (): Record<string, string> => {
   try { return JSON.parse(localStorage.getItem(MAP_KEY) || "{}") as Record<string, string>; }
@@ -65,6 +70,7 @@ export const ensureShopId = () => {
   if (isShop(id)) return id;
   id = newId();
   localStorage.setItem(ID_KEY, id);
+  notifyAuth();
   return id;
 };
 

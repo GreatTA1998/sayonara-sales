@@ -1,49 +1,36 @@
 "use client";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { LineLoginLink, useLineOAuthReturn } from "@/components/line-oauth";
 import {
-  AUTH_EVT, adminPath, ensureShopId, getId, getName, openShop,
+  adminPath, ensureShopId, getId, getName, openShop, subscribeAuth,
 } from "@/lib/shop";
 
 type Props = {
   /** Home is the only page with navbar on top. */
   top?: boolean;
-  onAuth?: () => void;
 };
 
 /** State-aware app chrome: logo+サヨナラ | 出品/マイ出品 | login/LINE名 (+ LINE popover). */
-export default function AppNav({ top, onAuth }: Props) {
+export default function AppNav({ top }: Props) {
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [shopId, setShopId] = useState("");
+  const path = usePathname() || "";
+  const name = useSyncExternalStore(subscribeAuth, getName, () => "");
+  const shopId = useSyncExternalStore(subscribeAuth, getId, () => "");
   const [loginOpen, setLoginOpen] = useState(false);
   const [profOpen, setProfOpen] = useState(false);
   const [draft, setDraft] = useState("");
-  const [path, setPath] = useState("");
 
-  function sync() {
-    setName(getName());
-    setShopId(getId());
-  }
-  useEffect(() => {
-    sync();
-    setPath(location.pathname);
-    window.addEventListener(AUTH_EVT, sync);
-    return () => window.removeEventListener(AUTH_EVT, sync);
-  }, []);
-  // Prefetch マイ出品 so nav feels instant (cheap win vs full remount wait).
   useEffect(() => {
     router.prefetch(shopId ? adminPath(shopId) : "/admin");
   }, [shopId, router]);
-  useLineOAuthReturn(sync);
+  useLineOAuthReturn();
 
   function saveLogin(e: { preventDefault(): void }) {
     e.preventDefault();
     if (!openShop(draft)) return;
     setLoginOpen(false);
-    onAuth?.();
   }
 
   const sellHref = shopId ? adminPath(shopId) : "/admin";
@@ -54,9 +41,7 @@ export default function AppNav({ top, onAuth }: Props) {
   return (
     <>
       <nav className={`app-nav${top ? " top" : " bot"}`} aria-label="アプリ">
-        {/* Cream bar is full-bleed; inner row matches page/shop content column. */}
         <div className="app-nav-inner">
-          {/* Brand is identity, not a tab — never show active orange dot on home. */}
           <Link href="/" className="brand" prefetch aria-label="サヨナラ ホーム">
             <img className="logo" src="/sun-logo.png" alt="" width={52} height={27} decoding="async" />
             <span>サヨナラ</span>
@@ -67,7 +52,6 @@ export default function AppNav({ top, onAuth }: Props) {
               if (shopId) return;
               e.preventDefault();
               const id = ensureShopId();
-              setShopId(id);
               router.push(adminPath(id));
             }}>{sellLabel}</Link>
           {logged ? (
