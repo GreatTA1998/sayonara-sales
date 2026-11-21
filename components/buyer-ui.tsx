@@ -67,7 +67,6 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
-  const [waited, setWaited] = useState<Set<string>>(new Set());
   const [priceDir, setPriceDir] = usePriceDir();
   const [dense, setDense] = useDense();
   const jimotyUrl = (state?.jimotyUrl || "").trim();
@@ -86,7 +85,6 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     const unsub = listenShop(shop, (s) => {
       const next = toBuyerState(shop, s, getId());
       setState(next);
-      setWaited(new Set(next.waiting || []));
       setDay((d) => (d && next.days?.includes(d) ? d : (next.days?.[0] || "")));
     }, (e) => setErr(e.message || "読み込みに失敗しました"));
     const n = getName();
@@ -113,6 +111,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   }, [state, day, slot]);
   const gridItems = [...(state?.items || [])].sort(byPrice(priceDir));
   const pickedItems = (state?.items || []).filter((i) => picked.has(i.id) && !locked(i));
+  const waitItems = (state?.items || []).filter((i) => state?.waiting?.includes(i.id));
   const cartTotal = pickedItems.reduce((n, i) => n + (i.price ?? 0), 0);
   const minsOk = !state || cartMeets(state, pickedItems.length, cartTotal);
   const canSend = !!slot && !!method && !!contactVal && chanOk && pickedItems.length > 0 && minsOk
@@ -136,7 +135,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     setLineName(n); setErr(null); setBusy(true);
     try {
       await joinWaitLive(shop, id, account);
-      setWaited((prev) => new Set(prev).add(id));
+      setState((prev) => prev && { ...prev, waiting: [...new Set([...(prev.waiting || []), id])] });
       setOpen(null);
     } catch (e) { setErr(e instanceof Error ? e.message : "失敗しました"); }
     finally { setBusy(false); }
@@ -183,7 +182,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const lockOpen = open ? locked(open) : false;
   const takenOpen = !!open?.taken;
   const onOpen = open ? picked.has(open.id) : false;
-  const waiting = open ? waited.has(open.id) : false;
+  const waiting = !!(open && state?.waiting?.includes(open.id));
   const openPics = open?.photos || [];
   const needWlName = lockOpen && !waiting && !(getName() || lineName).trim();
   const yt = (state?.youtubeUrl || "").trim() || ytUrl(state?.bio || "");
@@ -281,7 +280,9 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             <p className="total">現金合計 {money(cartTotal)}</p>
             <ul className="claim-items">{pickedItems.map((i) => (
               <li key={i.id}><span>{i.name?.trim() || "無題"}</span><span>{money(i.price)}</span></li>
-            ))}</ul>
+            )).concat(waitItems.map((i) => (
+              <li key={i.id}><span>{i.name?.trim() || "無題"} · キャンセル待ち</span><span>{money(i.price)}</span></li>
+            )))}</ul>
             {rule ? <p className={minsOk ? "hint" : "sw"}>{rule}{minsOk ? "" : " — まだ足りません"}</p> : null}
             <div className="field"><span>連絡方法</span>
               {(canJimoty || canLine || canPhone) ? (
