@@ -38,5 +38,8 @@ export function addDays(ymd: string, n: number) {
 
 export function pickupSpan(days: string[]) {
   if (!days.length) return "";
-  return `${dayShort(days[0])}–${dayShort(days[days.length - 1])}`;
+  const end = days[days.length - 1];
+  const left = daysBetween(tokyoYmd(), end);
+  const rel = left.length ? ` · あと${left.length - 1}日` : "";
+  return `${dayShort(days[0])}–${dayShort(end)}${rel}`;
 }
