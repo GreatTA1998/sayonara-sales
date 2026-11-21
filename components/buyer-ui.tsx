@@ -25,7 +25,7 @@ type State = {
 type Receipt = { code: string; day: string; slot: string; total?: number };
 type Method = "jimoty" | "line" | "phone";
 type Props = { shop: string; name: string; /** Flatten padding when embedded on home. */ embed?: boolean };
-const CH = { jimoty: ["Jimoty", "ジモティでメッセージしました", "ジモティ名（依頼の識別）"], line: ["LINE", "LINEで友だち追加しました", "LINE名"], phone: ["電話", "電話しました", "電話番号"] } as const;
+const CH = { jimoty: ["ジモティー", "ジモティでメッセージしました", "ジモティ名（依頼の識別）"], line: ["LINE", "LINEで友だち追加しました", "LINE名"], phone: ["電話", "電話しました", "電話番号"] } as const;
 
 const locked = (i: Item) => i.taken || !!i.requested;
 

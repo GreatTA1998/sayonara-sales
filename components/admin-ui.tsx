@@ -31,7 +31,7 @@ const DEF_FROM = PICKUP_DAYS[0];
 const DEF_TO = PICKUP_DAYS[PICKUP_DAYS.length - 1];
 const IMG_ACCEPT = "image/*,image/jpeg,image/jpg,image/png,image/heic,image/heif,image/webp,image/gif,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif";
 type ContactMode = "jimoty" | "line" | "phone";
-const methodJa = (m?: string) => (m === "jimoty" ? "Jimoty" : m === "phone" ? "電話" : m === "line" ? "LINE" : m || "");
+const methodJa = (m?: string) => (m === "jimoty" ? "ジモティー" : m === "phone" ? "電話" : m === "line" ? "LINE" : m || "");
 const kuStem = (v: string) => v.replace(/区$/, "");
 const kuFull = (v: string) => { const s = kuStem(v).trim(); return s ? `${s}区` : ""; };
 const itemLabel = (it?: Item | null) => it?.name?.trim() || "無題";
@@ -48,7 +48,7 @@ const claimSummary = (c: Claim, all: Item[]) => {
   const list = claimItems(c, all);
   return list.length <= 1 ? `1点 · ${itemLabel(list[0])}` : `${list.length}点 · ${itemLabel(list[0])}…`;
 };
-const claimWhen = (c: Claim) => [c.contact && c.contact !== "LINE" && c.contact !== "Jimoty" ? c.contact : "", `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}`].filter(Boolean).join(" · ");
+const claimWhen = (c: Claim) => [c.contact && c.contact !== "LINE" && c.contact !== "ジモティー" ? c.contact : "", `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}`].filter(Boolean).join(" · ");
 
 export default function ShopAdminView({ shop, name }: Props) {
   const router = useRouter();
@@ -663,7 +663,7 @@ export default function ShopAdminView({ shop, name }: Props) {
             onBlur={() => void persistProfile(bio, jimoty, youtube)}
             placeholder="動作確認・値引き・引越し・車・まとめ買い優先など" /></label>
         <Seg label="買い手連絡" value={contactMode} onPick={(v) => setContactMode(v as ContactMode)}
-          opts={[["jimoty", "Jimoty"], ["line", "LINE"], ["phone", "電話"]]} />
+          opts={[["jimoty", "ジモティー"], ["line", "LINE"], ["phone", "電話"]]} />
         {contactMode !== "jimoty" && (
           <label className="float"><span>{contactMode === "line" ? "LINE招待リンク" : "電話番号"}</span>
             <input value={contactMode === "line" ? lineInvite : phone}
