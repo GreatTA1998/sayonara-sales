@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { DateField, Icon, IconBtn } from "@/components/icons";
 import { byPrice, Listings, ListingTools, Seg, useDense, usePriceDir, type PhotoItem } from "@/components/photo-listing";
 import SquareCam from "@/components/square-cam";
-import { Snack, useMaskDismiss, useSnack } from "@/components/snack";
+import { Snack, useBodyScrollLock, useMaskDismiss, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { dayLbl } from "@/lib/days";
 import { DECLINE_PRESETS, DEF_LEAD, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
@@ -613,6 +613,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   function closeClaim() { setDecline(false); setClaimId(null); }
 
   const busyOpen = open ? deleting === open.id : false;
+  useBodyScrollLock(!!openId || !!claimId);
   const editMask = useMaskDismiss(closeEdit, busyOpen);
   const pics = open?.photos || [];
   const empty = !!data && !items.length;

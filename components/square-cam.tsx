@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { useBodyScrollLock } from "@/components/snack";
 
 type Shot = { url: string; file: File };
 type Props = {
@@ -106,6 +107,7 @@ export default function SquareCam({ open, onClose, onShot, accept, tip, sharp }:
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
+  useBodyScrollLock(open);
 
   function stopStream() {
     streamRef.current?.getTracks().forEach((t) => t.stop());

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { byPrice, Listings, ListingTools, money, Seg, useDense, usePriceDir } from "@/components/photo-listing";
-import { Snack, useMaskDismiss, useSnack } from "@/components/snack";
+import { Snack, useBodyScrollLock, useMaskDismiss, useSnack } from "@/components/snack";
 import { dayLbl, moveOutLeft } from "@/lib/days";
 import { bookShop, joinWaitLive, listenShop } from "@/lib/live";
 import { applyLineSession, getId, getName, openShop, pushBuy, subscribeAuth } from "@/lib/shop";
@@ -97,6 +97,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     else void applyLineSession().then((s) => { if (s?.name) setLineName(s.name); });
     return unsub;
   }, [shop, cartKey]);
+  useBodyScrollLock(!!open || checkout);
   useEffect(() => {
     if (!open && !checkout) return;
     const onKey = (e: KeyboardEvent) => {
