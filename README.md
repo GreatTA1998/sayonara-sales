@@ -28,7 +28,9 @@ shops/{shopId}/claims/{claimId}   # code, day, slot, itemIds, contact, buyerUid,
 | `LINE_CHANNEL_ID` / `LINE_CHANNEL_SECRET` | optional | LINE Login |
 | `LINE_CALLBACK_URL` | optional | default `{origin}/api/auth/line/callback` |
 | `NEXT_PUBLIC_SITE_URL` | optional | default `https://sayonara.tokyo` |
-| `REPORT_WEBHOOK_URL` | optional | POST JSON on each bug report |
+| `REPORT_WEBHOOK_URL` | optional | Cursor Automation webhook — POST on each Help report |
+| `REPORT_WEBHOOK_AUTH` | optional | Bearer for that webhook (`Generate auth header`) |
+| `AUTOFIX_DAILY_CAP` | optional | Max kicks / UTC day (default `5`; `0` = off) |
 
 **Do not set** `FIREBASE_CLIENT_EMAIL` / `FIREBASE_PRIVATE_KEY` — no server SA path.
 
