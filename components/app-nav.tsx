@@ -56,7 +56,6 @@ export default function AppNav({ top }: Props) {
 
   const sellHref = shopId ? adminPath(shopId) : "/";
   const sellOn = /\/s\/[^/]+\/admin\/?$/.test(path);
-  const helpOn = path === "/admin";
   const meOn = path === "/me" || path.startsWith("/me/");
 
   return (
@@ -74,8 +73,7 @@ export default function AppNav({ top }: Props) {
               e.preventDefault();
               router.push(adminPath(ensureShopId()));
             }}>{name ? "投稿一覧" : "投稿"}</Link>
-          <button type="button" className={`nav-a${helpOn ? " on" : ""}`}
-            aria-current={helpOn ? "page" : undefined}
+          <button type="button" className="nav-a"
             onClick={() => { setHelpOpen(true); setHelpOk(false); setHelpErr(""); }}>ヘルプ</button>
           <Link className={`nav-a${meOn ? " on" : ""}`} href="/me" prefetch
             aria-current={meOn ? "page" : undefined}>{name || "ログイン"}</Link>
@@ -97,8 +95,6 @@ export default function AppNav({ top }: Props) {
             <button type="submit" className="cta go" disabled={!helpBody.trim() || helpBusy}>
               {helpBusy ? "送信中…" : "送信"}
             </button>
-            <Link href="/admin" className="cta soft" style={{ marginTop: 8 }}
-              onClick={() => setHelpOpen(false)}>報告 inbox を見る</Link>
           </form>
         </div>
       )}

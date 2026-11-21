@@ -1,6 +1,6 @@
 # Sayonara Sales
 
-Phone-first move-out sale. Hub `/`; seller UI `/s/{id}/admin` (Elton `/s/elton/admin`). Navbar **ヘルプ** → report. `/admin` = unified Help/report inbox (not shop admin).
+Phone-first move-out sale. Hub `/`; seller UI `/s/{id}/admin` (Elton `/s/elton/admin`). Navbar **ヘルプ** → report. `/admin` = Elton-only report inbox (not public; not shop admin).
 
 **Production:** https://sayonara.tokyo
 
