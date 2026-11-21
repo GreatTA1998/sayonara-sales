@@ -1,0 +1,23 @@
+name: ci
+on:
+  push:
+    branches: [main, "cursor/**"]
+  pull_request:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run test:store-race
+      - run: npx tsc --noEmit
+      - run: npm run build
+        env:
+          # Build does not call DB; placeholders satisfy any import-time checks.
+          SUPABASE_URL: https://nqxfrzjkvsnxsmqhfdag.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ci-placeholder
+          BLOB_READ_WRITE_TOKEN: ci-placeholder
