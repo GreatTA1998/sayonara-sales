@@ -1,7 +1,7 @@
 /** Soft Jimoty username → shop id. Legacy `ss-line-name` read fallback. */
-export const NAME_KEY = "ss-jimoty-name";
+const NAME_KEY = "ss-jimoty-name";
 const LEGACY_NAME_KEY = "ss-line-name";
-export const ID_KEY = "ss-shop-id";
+const ID_KEY = "ss-shop-id";
 const MAP_KEY = "ss-shop-map";
 const UID_KEY = "ss-line-uid";
 const UID_MAP = "ss-line-uid-map";

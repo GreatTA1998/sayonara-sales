@@ -29,7 +29,6 @@ const fmtSlot = (a: string, b: string) => `${a}–${b}`;
 const DEF_FROM = PICKUP_DAYS[0];
 const DEF_TO = PICKUP_DAYS[PICKUP_DAYS.length - 1];
 const IMG_ACCEPT = "image/*,image/jpeg,image/jpg,image/png,image/heic,image/heif,image/webp,image/gif,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif";
-const api = (shop: string, path: string) => `${path}?shop=${encodeURIComponent(shop)}`;
 type ContactMode = "jimoty" | "line" | "phone";
 const methodJa = (m?: string) => (m === "jimoty" ? "Jimoty" : m === "phone" ? "電話" : m === "line" ? "LINE" : m || "");
 const kuStem = (v: string) => v.replace(/区$/, "");
@@ -369,7 +368,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     const fd = new FormData();
     fd.set("file", compressed);
     if (itemId && !itemId.startsWith("tmp-")) fd.set("itemId", itemId);
-    const res = await fetch(api(shop, "/api/admin/upload"), { method: "POST", body: fd });
+    const res = await fetch(`/api/admin/upload?shop=${encodeURIComponent(shop)}`, { method: "POST", body: fd });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || "アップロードに失敗しました");
     return body as { url?: string; itemId?: string };
@@ -629,7 +628,7 @@ export default function ShopAdminView({ shop, name }: Props) {
       {!data && !err && <p className="text-sm text-muted pad">読み込み中…</p>}
 
       {([["依頼", requests], ["引き取り予定", pending]] as const).map(([title, list]) => list.length > 0 && (
-        <section key={title} className="claims pending">
+        <section key={title} className="claims">
           <div className="claims-h">{title}</div>
           <ol className="timeline">
             {list.map((c) => (

@@ -17,12 +17,8 @@ let auth: Auth | null = null;
 let db: Firestore | null = null;
 let authReady: Promise<User> | null = null;
 
-export function firebaseReady() {
-  return !!(cfg.apiKey && cfg.projectId && cfg.appId);
-}
-
 function appOrThrow(): FirebaseApp {
-  if (!firebaseReady()) throw new Error("NEXT_PUBLIC_FIREBASE_* が未設定です");
+  if (!(cfg.apiKey && cfg.projectId && cfg.appId)) throw new Error("NEXT_PUBLIC_FIREBASE_* が未設定です");
   if (!app) app = getApps()[0] || initializeApp(cfg);
   return app;
 }
@@ -32,21 +28,16 @@ export function getDb(): Firestore {
   return db;
 }
 
-export function getFbAuth(): Auth {
-  if (!auth) auth = getAuth(appOrThrow());
-  return auth;
-}
-
 /** Soft path: anonymous Firebase Auth (UID owns shops). Display name stays Jimoty localStorage. */
 export function ensureAuth(): Promise<User> {
   if (authReady) return authReady;
   authReady = new Promise((resolve, reject) => {
-    const a = getFbAuth();
-    const unsub = onAuthStateChanged(a, async (u) => {
+    if (!auth) auth = getAuth(appOrThrow());
+    const unsub = onAuthStateChanged(auth, async (u) => {
       unsub();
       try {
         if (u) { resolve(u); return; }
-        const cred = await signInAnonymously(a);
+        const cred = await signInAnonymously(auth!);
         resolve(cred.user);
       } catch (e) { authReady = null; reject(e); }
     }, (e) => { authReady = null; reject(e); });

@@ -45,12 +45,12 @@ const YMD = /^\d{4}-\d{2}-\d{2}$/;
 const asYmd = (v: unknown) => { const s = String(v || "").trim(); return YMD.test(s) ? s : ""; };
 export const shopSlots = (s: Store) => (s.slots?.length ? s.slots : [...PICKUP_SLOTS]);
 
-export const shopDays = (s: Store) => {
+const shopDays = (s: Store) => {
   const days = daysBetween(s.pickupFrom || PICKUP_DAYS[0], s.pickupTo || PICKUP_DAYS[PICKUP_DAYS.length - 1]);
   return days.length ? days : [...PICKUP_DAYS];
 };
 
-export const shopLeadDays = (s: Store) =>
+const shopLeadDays = (s: Store) =>
   s.leadDays == null || !Number.isFinite(s.leadDays) ? DEF_LEAD : Math.max(0, Math.floor(Number(s.leadDays)));
 
 export const bookableDays = (s: Store) =>
@@ -101,7 +101,7 @@ export function takenSlots(s: Store, day: string): string[] {
 export const uid = (p: string) => `${p}${Math.random().toString(36).slice(2, 8)}`;
 export const shortCode = () => Math.random().toString(36).slice(2, 6).toUpperCase();
 
-export function claimOf(s: Store, item: Item) {
+function claimOf(s: Store, item: Item) {
   return item.claimId ? s.claims.find((c) => c.id === item.claimId) : undefined;
 }
 

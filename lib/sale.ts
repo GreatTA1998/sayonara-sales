@@ -4,7 +4,6 @@ export const PICKUP_DAYS = [
 ];
 export const PICKUP_SLOTS = ["10:00–10:15", "14:00–14:15", "20:00–20:15"];
 export const DEF_LEAD = 2;
-export const SHOP_NAME = "エルトン";
 
 export const CANON_LINE = "https://line.me/ti/p/yBg2x2X_ut";
 export const CANON_PHONE = "080-4919-2027";

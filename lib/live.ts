@@ -111,6 +111,14 @@ const numPrice = (v: unknown) => {
   return Math.max(0, Number(v));
 };
 
+async function setClaimStatus(shop: string, id: string, from: string, to: string) {
+  const cref = doc(getDb(), "shops", shop, "claims", id);
+  const csnap = await getDoc(cref);
+  if (!csnap.exists() || csnap.data().status !== from) throw new Error("No claim");
+  await updateDoc(cref, { status: to });
+  return asClaim(csnap.id, { ...csnap.data(), status: to });
+}
+
 /** Admin mutations — same action surface as old /api/admin. */
 export async function adminAct(shopRaw: string, body: Record<string, unknown>): Promise<unknown> {
   const shop = parseShop(shopRaw);
@@ -191,13 +199,10 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       await updateDoc(shopRef, { published: true, updatedAt: new Date().toISOString() });
       return { published: true };
     }
-    case "confirm": {
-      const cref = doc(db, "shops", shop, "claims", String(body.id));
-      const csnap = await getDoc(cref);
-      if (!csnap.exists() || csnap.data().status !== "requested") throw new Error("No claim");
-      await updateDoc(cref, { status: "booked" });
-      return asClaim(csnap.id, { ...csnap.data(), status: "booked" });
-    }
+    case "confirm":
+      return setClaimStatus(shop, String(body.id), "requested", "booked");
+    case "picked_up":
+      return setClaimStatus(shop, String(body.id), "booked", "picked_up");
     case "cancel": {
       const id = String(body.id);
       const cref = doc(db, "shops", shop, "claims", id);
@@ -212,13 +217,6 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
         if (isnap.exists() && isnap.data().claimId === id) await updateDoc(iref, { claimId: null });
       }
       return asClaim(id, { ...c, status: "cancelled", waiters: [] });
-    }
-    case "picked_up": {
-      const cref = doc(db, "shops", shop, "claims", String(body.id));
-      const csnap = await getDoc(cref);
-      if (!csnap.exists() || csnap.data().status !== "booked") throw new Error("No claim");
-      await updateDoc(cref, { status: "picked_up" });
-      return asClaim(csnap.id, { ...csnap.data(), status: "picked_up" });
     }
     default:
       throw new Error("Unknown action");
