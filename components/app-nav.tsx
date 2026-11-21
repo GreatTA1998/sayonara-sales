@@ -7,12 +7,8 @@ import {
   adminPath, ensureShopId, getId, getName, openShop, subscribeAuth,
 } from "@/lib/shop";
 
-type Props = {
-  /** Home is the only page with navbar on top. */
-  top?: boolean;
-};
+type Props = { top?: boolean };
 
-/** State-aware app chrome: logo+サヨナラ | 出品/マイ出品 | login/LINE名 (+ LINE popover). */
 export default function AppNav({ top }: Props) {
   const router = useRouter();
   const path = usePathname() || "";

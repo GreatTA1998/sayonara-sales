@@ -25,7 +25,6 @@ export function useDense(): [boolean, (on: boolean) => void] {
   return [v === "1", (on) => set(on ? "1" : "0")];
 }
 
-/** Dual-option pill — selected = current mode (not flip-to). */
 export function Seg({ label, opts, value, onPick }: {
   label: string; opts: [string, string][]; value: string; onPick: (v: string) => void;
 }) {
@@ -39,7 +38,6 @@ export function Seg({ label, opts, value, onPick }: {
   );
 }
 
-/** Shared tools: 通常|密集 + 安→高|高→安 (buyer + admin). */
 export function ListingTools({
   dir, onDir, dense, onDense,
 }: {
@@ -63,7 +61,6 @@ function labelName(name: string) {
   return t || "無題";
 }
 
-/** Quiet “more photos” hint — bottom-right when count > 1. */
 function MultiPhotoHint({ count }: { count: number }) {
   if (count < 2) return null;
   return (
@@ -76,7 +73,6 @@ function MultiPhotoHint({ count }: { count: number }) {
   );
 }
 
-/** Shared buyer/admin photo card — B: photo + optional price + name @ 16px. Dense = photo only. */
 export function PhotoCard({
   item, onClick, className = "", disabled, dense,
 }: {
@@ -107,7 +103,6 @@ export function PhotoCard({
   );
 }
 
-/** Shared photoless tile — price + name; dense = name only (CSS columns). */
 export function TextTile({
   item, onClick, className = "", disabled, dense,
 }: {
@@ -132,7 +127,6 @@ type ListProps<T extends PhotoItem> = {
   dense?: boolean;
 };
 
-/** Photo cards first, then photoless tiles — same on buyer + admin. */
 export function Listings<T extends PhotoItem>(p: ListProps<T>) {
   const withPh: T[] = [];
   const noPh: T[] = [];

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { itemStatus, shortCode, shopDays, shopFromUrl, shopSlots, takenSlots, uid, withStore } from "@/lib/store";
+import { bookableDays, itemStatus, shortCode, shopFromUrl, shopSlots, takenSlots, uid, withStore } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "日付・時間・LINE名・連絡方法・品目を確認してください" }, { status: 400 });
   try {
     const result = await withStore(shop, (s) => {
-      if (!shopDays(s).includes(day)) throw new Error("その日は選べません");
+      if (!bookableDays(s).includes(day)) throw new Error("その日は選べません");
       if (!shopSlots(s).includes(slot)) throw new Error("その時間帯は選べません");
       if (takenSlots(s, day).includes(slot)) throw new Error("その時間帯は埋まっています");
       for (const id of itemIds) {

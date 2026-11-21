@@ -1,29 +1,25 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { put, get } from "@vercel/blob";
-import { daysBetween } from "./days";
-import { CANON_LINE, CANON_PHONE, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "./sale";
+import { addDays, daysBetween, tokyoYmd } from "./days";
+import { CANON_LINE, CANON_PHONE, DEF_LEAD, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "./sale";
 export { CANON_LINE, CANON_PHONE, telHref, ytUrl } from "./sale";
 
 export type Item = {
   id: string; name: string; price: number | null; note?: string; claimId?: string | null;
-  photos?: string[]; /** Seller pause — hidden from buyer shop, not claimable. */
-  paused?: boolean;
+  photos?: string[]; paused?: boolean;
 };
 export type Claim = {
   id: string; code: string; day: string; slot: string; itemIds: string[];
-  /** Soft identity: typed LINE display name (buyer). */
   contact?: string; contactMethod?: "line" | "phone";
   status: "booked" | "picked_up" | "cancelled"; createdAt: string;
 };
 export type Store = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
   lineInviteUrl?: string; phone?: string;
-  /** Custom pickup windows; omit → PICKUP_SLOTS defaults. */
   slots?: string[];
-  /** Pickup range + final move-out (YYYY-MM-DD); omit → PICKUP_DAYS defaults. */
   pickupFrom?: string; pickupTo?: string; moveOut?: string;
-  /** Once true, admin CTA stays URLコピー (not 公開する). Elton defaults published. */
+  leadDays?: number;
   published?: boolean;
   items: Item[]; claims: Claim[];
 };
@@ -31,7 +27,6 @@ export type Store = {
 export const shopPublished = (shop: string, s: Store) =>
   !!s.published || shop === ELTON_SHOP;
 
-/** Resolved buyer contact for a shop (Elton falls back to canonical). */
 export function shopContact(shop: string, s: Store) {
   const line = (s.lineInviteUrl || "").trim();
   const phone = (s.phone || "").trim();
@@ -49,19 +44,21 @@ export { PICKUP_DAYS, PICKUP_SLOTS };
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 const asYmd = (v: unknown) => { const s = String(v || "").trim(); return YMD.test(s) ? s : ""; };
-
-/** Shop's offerable slots (custom or defaults). */
 export const shopSlots = (s: Store) => (s.slots?.length ? s.slots : [...PICKUP_SLOTS]);
 
-/** Shop pickup days (custom range or defaults). */
 export const shopDays = (s: Store) => {
   const days = daysBetween(s.pickupFrom || PICKUP_DAYS[0], s.pickupTo || PICKUP_DAYS[PICKUP_DAYS.length - 1]);
   return days.length ? days : [...PICKUP_DAYS];
 };
 
+export const shopLeadDays = (s: Store) =>
+  s.leadDays == null || !Number.isFinite(s.leadDays) ? DEF_LEAD : Math.max(0, Math.floor(Number(s.leadDays)));
+
+export const bookableDays = (s: Store) =>
+  shopDays(s).filter((d) => d >= addDays(tokyoYmd(), shopLeadDays(s)));
+
 export const shopMoveOut = (s: Store) => s.moveOut || s.pickupTo || PICKUP_DAYS[PICKUP_DAYS.length - 1];
 
-/** Normalize admin slot labels (en dash, trim, dedupe). */
 export function normalizeSlots(raw: unknown): string[] {
   if (!Array.isArray(raw)) throw new Error("時間帯が不正です");
   const out = [...new Set(
@@ -71,20 +68,22 @@ export function normalizeSlots(raw: unknown): string[] {
   return out;
 }
 
-/** Persist pickup range + move-out; returns normalized fields. */
-export function applyDates(s: Store, raw: { pickupFrom?: unknown; pickupTo?: unknown; moveOut?: unknown }) {
+export function applyDates(s: Store, raw: { pickupFrom?: unknown; pickupTo?: unknown; moveOut?: unknown; leadDays?: unknown }) {
   const from = asYmd(raw.pickupFrom) || s.pickupFrom || PICKUP_DAYS[0];
   const to = asYmd(raw.pickupTo) || s.pickupTo || PICKUP_DAYS[PICKUP_DAYS.length - 1];
   if (to < from) throw new Error("退去日は開始以降にしてください");
   if (!daysBetween(from, to).length) throw new Error("受取日が不正です");
   s.pickupFrom = from;
   s.pickupTo = to;
-  // End/departure are one field in admin; keep Blob moveOut in sync with pickupTo.
   s.moveOut = asYmd(raw.moveOut) || to;
-  return { pickupFrom: s.pickupFrom, pickupTo: s.pickupTo, moveOut: s.moveOut };
+  if ("leadDays" in raw) {
+    const n = Number(raw.leadDays);
+    if (!Number.isFinite(n) || n < 0) throw new Error("最短予約が不正です");
+    s.leadDays = Math.floor(n);
+  }
+  return { pickupFrom: s.pickupFrom, pickupTo: s.pickupTo, moveOut: s.moveOut, leadDays: shopLeadDays(s) };
 }
 
-/** Elton keeps legacy blob key; others use sayonara-store-{id}.json */
 export const ELTON_SHOP = "elton";
 export const parseShop = (raw: string | null | undefined) => {
   const s = (raw || "").trim().toLowerCase();
@@ -189,7 +188,6 @@ export async function getStore(shop: string = ELTON_SHOP): Promise<Store> {
   return structuredClone(mem.get(key)!);
 }
 
-/** Occupied by pending request or confirmed/done booking (not cancelled). */
 export function takenSlots(s: Store, day: string): string[] {
   return s.claims
     .filter((c) => c.day === day && c.status !== "cancelled" && c.slot)

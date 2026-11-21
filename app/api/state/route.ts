@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { byPrice } from "@/lib/sale";
-import { getStore, shopContact, shopDays, shopFromUrl, shopMoveOut, shopSlots, takenSlots } from "@/lib/store";
+import { bookableDays, getStore, shopContact, shopFromUrl, shopMoveOut, shopSlots, takenSlots } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const shop = shopFromUrl(req);
   const s = await getStore(shop);
-  const days = shopDays(s);
+  const days = bookableDays(s);
   const slots = shopSlots(s);
   const contact = shopContact(shop, s);
   const taken: Record<string, string[]> = {};
@@ -24,7 +24,6 @@ export async function GET(req: Request) {
     taken,
     lineInviteUrl: contact.lineInviteUrl || null,
     phone: contact.phone || null,
-    // Active listings only — paused hidden from buyer shop.
     items: [...s.items]
       .filter((i) => !i.paused)
       .sort(byPrice("asc"))

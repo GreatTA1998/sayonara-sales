@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { applyDates, getStore, hasBuyerContact, normalizeSlots, shopContact, shopDays, shopFromUrl, shopMoveOut, shopPublished, shopSlots, uid, withStore } from "@/lib/store";
+import { applyDates, getStore, hasBuyerContact, normalizeSlots, shopContact, shopDays, shopFromUrl, shopLeadDays, shopMoveOut, shopPublished, shopSlots, uid, withStore } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 const numPrice = (v: unknown) => {
@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     address: s.address, bio: s.bio || "", jimotyUrl: s.jimotyUrl || "", youtubeUrl: s.youtubeUrl || "",
     lineInviteUrl: contact.lineInviteUrl, phone: contact.phone,
     pickupFrom: days[0], pickupTo: days[days.length - 1], moveOut: shopMoveOut(s),
-    slots: shopSlots(s), published: shopPublished(shop, s),
+    leadDays: shopLeadDays(s), slots: shopSlots(s), published: shopPublished(shop, s),
     items: s.items, claims: s.claims, shop,
   });
 }
