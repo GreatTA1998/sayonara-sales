@@ -140,11 +140,18 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
 
   switch (action) {
     case "add": {
-      const id = uid("i");
+      // Stable client id → retry/replay cannot spawn a second listing.
+      const raw = typeof body.id === "string" ? body.id.trim() : "";
+      const id = /^i[a-z0-9]+$/i.test(raw) ? raw : uid("i");
+      const photos = Array.isArray(body.photos) ? body.photos.map(String).filter(Boolean) : [];
       const item: Item = { id, name: String(body.name || "").trim(), price: numPrice(body.price) };
-      if (Array.isArray(body.photos) && body.photos.length) item.photos = body.photos.map(String);
-      const items = await getDocs(collection(db, "shops", shop, "items"));
-      await setDoc(doc(db, "shops", shop, "items", id), itemFields(item, items.size));
+      if (photos.length) item.photos = photos;
+      const ref = doc(db, "shops", shop, "items", id);
+      if ((await getDoc(ref)).exists()) {
+        if (photos.length) await updateDoc(ref, { photos: arrayUnion(...photos) });
+        return item;
+      }
+      await setDoc(ref, itemFields(item, (await getDocs(collection(db, "shops", shop, "items"))).size));
       return item;
     }
     case "edit": {

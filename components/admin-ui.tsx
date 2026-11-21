@@ -10,7 +10,7 @@ import { dayLbl } from "@/lib/days";
 import { DECLINE_PRESETS, DEF_LEAD, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
 import { adminAct, listenShop } from "@/lib/live";
 import { getName, getProfile, saveProfile, subscribeAuth } from "@/lib/shop";
-import { shopMins, shopPublished, type Store } from "@/lib/store";
+import { shopMins, shopPublished, uid, type Store } from "@/lib/store";
 import { SITE_URL } from "@/lib/site";
 
 type Item = PhotoItem & { claimId?: string | null; note?: string; paused?: boolean };
@@ -36,9 +36,9 @@ const kuStem = (v: string) => v.replace(/区$/, "");
 const kuFull = (v: string) => { const s = kuStem(v).trim(); return s ? `${s}区` : ""; };
 const itemLabel = (it?: Item | null) => it?.name?.trim() || "無題";
 const isRemote = (u: string) => /^https?:\/\//i.test(u);
-const tempId = () => `tmp-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+const hasBlob = (it: Item) => (it.photos || []).some((p) => p.startsWith("blob:"));
 type PicStatus = "uploading" | "error";
-type PicJob = { file: File; itemId: string; kind: "append" | "create" };
+type PicJob = { file: File; itemId: string; kind: "append" | "create"; busy?: boolean };
 function claimItems(c: Claim, all: Item[]) {
   return c.itemIds
     .map((id) => all.find((i) => i.id === id) || { id, name: "無題", price: null as number | null })
@@ -57,6 +57,8 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [listBusy, setListBusy] = useState(false);
   const [picBusy, setPicBusy] = useState<Record<string, PicStatus>>({});
   const picJobs = useRef<Record<string, PicJob>>({});
+  /** Ids removed locally — block snap resurrection + late create writes. */
+  const gone = useRef(new Set<string>());
   const [deleting, setDeleting] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -110,7 +112,21 @@ export default function ShopAdminView({ shop, name }: Props) {
 
   const applySnap = useCallback((body: Store) => {
     setErr(null);
-    setData(body as AdminState);
+    setData((prev) => {
+      const jobs = picJobs.current, drop = gone.current, prevItems = prev?.items || [];
+      const live = (p?: string[]) => (p || []).some((u) => jobs[u]);
+      const byId = new Map(prevItems.map((i) => [i.id, i]));
+      const items = (body.items as Item[]).filter((it) => !drop.has(it.id)).map((it) => {
+        const loc = byId.get(it.id);
+        return loc && live(loc.photos) ? { ...it, photos: loc.photos } : it;
+      });
+      const seen = new Set(items.map((i) => i.id));
+      for (const loc of prevItems) {
+        if (!seen.has(loc.id) && !drop.has(loc.id) && live(loc.photos)) items.push(loc);
+      }
+      for (const id of [...drop]) if (!(body.items as Item[]).some((i) => i.id === id)) drop.delete(id);
+      return { ...(body as AdminState), items };
+    });
     addrSaved.current = body.address || "";
     if (!addrDirty.current) {
       const stem = kuStem(body.address || "");
@@ -149,8 +165,8 @@ export default function ShopAdminView({ shop, name }: Props) {
   const items = useMemo(() => {
     const all = data?.items || [];
     const cmp = byPrice(priceDir);
-    const pending = all.filter((i) => i.id.startsWith("tmp-"));
-    const rest = all.filter((i) => !i.id.startsWith("tmp-")).sort(cmp);
+    const pending = all.filter(hasBlob);
+    const rest = all.filter((i) => !hasBlob(i)).sort(cmp);
     return pending.length ? [...pending, ...rest] : [...all].sort(cmp);
   }, [data?.items, priceDir]);
   const open = useMemo(() => items.find((i) => i.id === openId) || null, [items, openId]);
@@ -168,7 +184,10 @@ export default function ShopAdminView({ shop, name }: Props) {
   function apply(action: string, payload: Record<string, unknown>, body: Record<string, unknown>) {
     setData((d) => {
       if (!d) return d;
-      if (action === "add") return { ...d, items: [...d.items, body as unknown as Item] };
+      if (action === "add") {
+        const item = body as unknown as Item;
+        return { ...d, items: [...d.items.filter((i) => i.id !== item.id), item] };
+      }
       if (action === "edit") {
         const next = body as Record<string, unknown>;
         return {
@@ -376,50 +395,50 @@ export default function ShopAdminView({ shop, name }: Props) {
     const compressed = await compressImage(ensureImageFile(file));
     const fd = new FormData();
     fd.set("file", compressed);
-    if (itemId && !itemId.startsWith("tmp-")) fd.set("itemId", itemId);
+    if (itemId) fd.set("itemId", itemId);
     const res = await fetch(`/api/admin/upload?shop=${encodeURIComponent(shop)}`, { method: "POST", body: fd });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || "アップロードに失敗しました");
     return body as { url?: string; itemId?: string };
   }
 
+  function clearPicLocal(local: string) {
+    URL.revokeObjectURL(local);
+    delete picJobs.current[local];
+    setPicStatus(local, null);
+  }
+
   async function runPicJob(local: string) {
     const job = picJobs.current[local];
-    if (!job) return;
+    if (!job || job.busy || gone.current.has(job.itemId)) {
+      if (job && gone.current.has(job.itemId)) clearPicLocal(local);
+      return;
+    }
+    job.busy = true;
     setPicStatus(local, "uploading");
     setErr(null);
     try {
-      if (job.kind === "create") {
-        const up = await postUpload(job.file);
-        const remote = String(up.url || "");
-        if (!remote) throw new Error("アップロードに失敗しました");
-        const created = await adminAct(shop, { action: "add", name: "", photos: [remote] }) as Item;
-        const item = { ...created, photos: [remote] };
-        setData((d) => {
-          if (!d) return d;
-          return { ...d, items: [...d.items.filter((i) => i.id !== job.itemId), item] };
-        });
-        if (openId === job.itemId) {
-          editIdRef.current = item.id;
-          setOpenId(item.id);
-        }
-      } else {
-        const up = await postUpload(job.file, job.itemId);
-        const remote = String(up.url || "");
-        if (!remote) throw new Error("アップロードに失敗しました");
-        patchPhotos(job.itemId, (photos) =>
-          photos.some((p) => p === local)
-            ? photos.map((p) => (p === local ? remote : p))
-            : [...photos, remote]);
-        await adminAct(shop, { action: "edit", id: job.itemId, appendPhoto: remote });
+      const up = await postUpload(job.file, job.itemId);
+      const remote = String(up.url || "");
+      if (!remote) throw new Error("アップロードに失敗しました");
+      if (gone.current.has(job.itemId)) { clearPicLocal(local); return; }
+      if (job.kind === "create") await adminAct(shop, { action: "add", id: job.itemId, name: "", photos: [remote] });
+      else await adminAct(shop, { action: "edit", id: job.itemId, appendPhoto: remote });
+      if (gone.current.has(job.itemId)) {
+        await adminAct(shop, { action: "remove", id: job.itemId }).catch(() => undefined);
+        clearPicLocal(local);
+        return;
       }
-      URL.revokeObjectURL(local);
-      delete picJobs.current[local];
-      setPicStatus(local, null);
+      patchPhotos(job.itemId, (photos) =>
+        photos.some((p) => p === local)
+          ? photos.map((p) => (p === local ? remote : p))
+          : [...photos, remote]);
+      clearPicLocal(local);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "アップロードに失敗しました";
       setErr(msg); show(msg, "err");
       setPicStatus(local, "error");
+      if (picJobs.current[local]) picJobs.current[local].busy = false;
     }
   }
 
@@ -440,7 +459,8 @@ export default function ShopAdminView({ shop, name }: Props) {
     setErr(null);
     for (const file of images) {
       const local = URL.createObjectURL(file);
-      const id = tempId();
+      const id = uid("i");
+      gone.current.delete(id);
       picJobs.current[local] = { file, itemId: id, kind: "create" };
       upsertItem({ id, name: "", price: 0, photos: [local] });
       void runPicJob(local);
@@ -448,8 +468,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   }
 
   function retryPic(local: string) {
-    if (!picJobs.current[local]) return;
-    void runPicJob(local);
+    if (picJobs.current[local] && !picJobs.current[local].busy) void runPicJob(local);
   }
 
   async function onListEnter() {
@@ -471,30 +490,30 @@ export default function ShopAdminView({ shop, name }: Props) {
   async function deleteItem(item: Item) {
     if (!confirm(`「${item.name || "無題"}」を削除しますか？`)) return;
     setDeleting(item.id); show("削除中…", "busy");
+    gone.current.add(item.id);
+    (item.photos || []).forEach((u) => {
+      if (u.startsWith("blob:")) URL.revokeObjectURL(u);
+      delete picJobs.current[u];
+      setPicStatus(u, null);
+    });
+    setData((d) => d && { ...d, items: d.items.filter((i) => i.id !== item.id) });
+    if (openId === item.id || editIdRef.current === item.id) {
+      if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
+      editIdRef.current = null;
+      editSavedRef.current = null;
+      setOpenId(null);
+    }
     try {
-      if (item.id.startsWith("tmp-")) {
-        (item.photos || []).forEach((u) => {
-          if (u.startsWith("blob:")) URL.revokeObjectURL(u);
-          delete picJobs.current[u];
-          setPicStatus(u, null);
-        });
-        setData((d) => d && { ...d, items: d.items.filter((i) => i.id !== item.id) });
-        if (openId === item.id) { editIdRef.current = null; editSavedRef.current = null; setOpenId(null); }
-        show("削除しました", "ok");
-        return;
-      }
-      const ok = await act({ action: "remove", id: item.id }, "削除しました");
-      if (ok && (openId === item.id || editIdRef.current === item.id)) {
-        if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
-        editIdRef.current = null;
-        editSavedRef.current = null;
-        setOpenId(null);
-      }
+      await adminAct(shop, { action: "remove", id: item.id });
+      show("削除しました", "ok");
+    } catch (e) {
+      gone.current.delete(item.id);
+      const msg = e instanceof Error ? e.message : "失敗しました";
+      setErr(msg); show(msg, "err");
     } finally { setDeleting(null); }
   }
 
   async function saveRemotePhotos(itemId: string, photos: string[]) {
-    if (itemId.startsWith("tmp-")) return true;
     const remotes = photos.filter(isRemote);
     try {
       await adminAct(shop, { action: "edit", id: itemId, photos: remotes });
