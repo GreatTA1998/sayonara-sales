@@ -36,7 +36,7 @@ export default function MePage() {
       <main className="wrap">
         <h1>マイページ</h1>
         <form onSubmit={(e) => { e.preventDefault(); openShop(draft); }}>
-          <p className="hint">ジモティ名だけでOK（パスワードなし）。LINE連携は任意。</p>
+          <p className="hint">ジモティ名だけでOK（パスワードなし）。</p>
           <label className="float"><span>ジモティ名</span>
             <input value={draft} onChange={(e) => setDraft(e.target.value)}
               placeholder="表示名" autoComplete="nickname" autoFocus /></label>

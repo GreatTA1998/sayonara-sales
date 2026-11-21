@@ -31,9 +31,8 @@ export const lineLoginHref = () => {
 
 export function LineLoginLink() {
   return (
-    <a className="cta line" href="/api/auth/line"
-      onClick={(e) => { e.preventDefault(); window.location.href = lineLoginHref(); }}>
-      LINEでログイン
-    </a>
+    <button type="button" className="cta line" disabled>
+      LINEログイン（近日公開）
+    </button>
   );
 }
