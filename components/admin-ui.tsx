@@ -673,6 +673,55 @@ export default function ShopAdminView({ shop, name }: Props) {
               inputMode={contactMode === "line" ? "url" : "tel"}
               autoComplete={contactMode === "line" ? "off" : "tel"} /></label>
         )}
+      </section>
+
+      <div className="add-dual">
+        <button type="button" className="cta"
+          disabled={!data || listBusy}
+          onClick={() => {
+            setListOpen((v) => {
+              if (v) { setListDraft(""); return false; }
+              setListDraft("");
+              requestAnimationFrame(() => listRef.current?.focus());
+              return true;
+            });
+          }}>リスト入力</button>
+        <button type="button" className="cta"
+          disabled={!data}
+          onClick={() => { setCamItemId(null); setCamOpen(true); }}>
+          <Icon name="camera" size={18} />写真入力
+        </button>
+        {listOpen && (
+          <div className="list-row">
+            <input ref={listRef} value={listDraft} disabled={listBusy}
+              placeholder="品名" aria-label="品名"
+              onChange={(e) => setListDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void onListEnter(); } }} />
+            <span className="list-hint" aria-hidden="true">
+              {listDraft.trim() ? "Enterで追加" : "Enterで完了"}
+            </span>
+          </div>
+        )}
+      </div>
+      <SquareCam open={camOpen} accept={IMG_ACCEPT}
+        tip={camItemId ? undefined : "1枚＝1出品。名前はあとで。"}
+        sharp={!!camItemId}
+        onClose={() => { setCamOpen(false); setCamItemId(null); }}
+        onShot={(file) => {
+          if (camItemId) queueAppend(camItemId, [file]);
+          else addFromPhotos([file]);
+        }} />
+
+      {!empty && (
+        <>
+          <ListingTools dir={priceDir} onDir={setPriceDir} dense={dense} onDense={setDense} />
+          <Listings items={items} dense={dense} onSelect={openDetail}
+            disabledFor={(it) => deleting === it.id}
+            classNameFor={(it) => (deleting === it.id || it.paused ? "dim" : "")} />
+        </>
+      )}
+
+      <section className="prof-block">
         <div className="slot-add">
           <DateField label="受取開始" value={pickupFrom} onChange={(v) => { setPickupFrom(v); void saveDates(v, pickupTo); }} />
           <span aria-hidden="true">〜</span>
@@ -748,52 +797,6 @@ export default function ShopAdminView({ shop, name }: Props) {
           </div>
         </details>
       </section>
-
-      <div className="add-dual">
-        <button type="button" className="cta"
-          disabled={!data || listBusy}
-          onClick={() => {
-            setListOpen((v) => {
-              if (v) { setListDraft(""); return false; }
-              setListDraft("");
-              requestAnimationFrame(() => listRef.current?.focus());
-              return true;
-            });
-          }}>リスト入力</button>
-        <button type="button" className="cta"
-          disabled={!data}
-          onClick={() => { setCamItemId(null); setCamOpen(true); }}>
-          <Icon name="camera" size={18} />写真入力
-        </button>
-        {listOpen && (
-          <div className="list-row">
-            <input ref={listRef} value={listDraft} disabled={listBusy}
-              placeholder="品名" aria-label="品名"
-              onChange={(e) => setListDraft(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void onListEnter(); } }} />
-            <span className="list-hint" aria-hidden="true">
-              {listDraft.trim() ? "Enterで追加" : "Enterで完了"}
-            </span>
-          </div>
-        )}
-      </div>
-      <SquareCam open={camOpen} accept={IMG_ACCEPT}
-        tip={camItemId ? undefined : "1枚＝1出品。名前はあとで。"}
-        sharp={!!camItemId}
-        onClose={() => { setCamOpen(false); setCamItemId(null); }}
-        onShot={(file) => {
-          if (camItemId) queueAppend(camItemId, [file]);
-          else addFromPhotos([file]);
-        }} />
-
-      {!empty && (
-        <>
-          <ListingTools dir={priceDir} onDir={setPriceDir} dense={dense} onDense={setDense} />
-          <Listings items={items} dense={dense} onSelect={openDetail}
-            disabledFor={(it) => deleting === it.id}
-            classNameFor={(it) => (deleting === it.id || it.paused ? "dim" : "")} />
-        </>
-      )}
 
       {(data?.claims || []).some((c) => c.status === "picked_up") && (
         <p className="hint thanks pad">ありがとう。ほかの小さなアプリも →{" "}
