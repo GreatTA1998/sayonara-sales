@@ -8,6 +8,8 @@ export type Report = {
   userAgent?: string;
   name?: string;
   shopId?: string;
+  /** Public Blob URL of pasted/uploaded screenshot for triage. */
+  screenshotUrl?: string;
   createdAt: string;
   /** Legacy; new reports omit. */
   type?: "bug" | "message";

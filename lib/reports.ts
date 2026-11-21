@@ -78,6 +78,7 @@ function kickContext(r: Report): string {
     r.href ? `URL: ${r.href}` : "",
     r.name ? `Name: ${r.name}` : "",
     r.shopId ? `Shop: ${r.shopId}` : "",
+    r.screenshotUrl ? `Screenshot: ${r.screenshotUrl}` : "",
     "",
     r.body,
   ].filter(Boolean).join("\n");
@@ -116,6 +117,7 @@ async function kickAutofix(report: Report): Promise<Pick<Report, "autofix" | "au
         href: report.href,
         name: report.name,
         shopId: report.shopId,
+        screenshotUrl: report.screenshotUrl,
         createdAt: report.createdAt,
       }),
       signal: AbortSignal.timeout(12_000),
@@ -144,7 +146,7 @@ export async function addReport(raw: Partial<Report> & { body: string }): Promis
   };
   const title = String(raw.title || "").trim() || body.slice(0, 80);
   if (title) report.title = title;
-  for (const k of ["path", "href", "userAgent", "name", "shopId"] as const) {
+  for (const k of ["path", "href", "userAgent", "name", "shopId", "screenshotUrl"] as const) {
     const v = String(raw[k] || "").trim();
     if (v) report[k] = v;
   }

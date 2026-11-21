@@ -1,11 +1,15 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useLineOAuthReturn } from "@/components/line-oauth";
+import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { adminPath, ensureShopId, getId, getName, logout, openShop, subscribeAuth } from "@/lib/shop";
 
 type Props = { top?: boolean };
+type Shot = { preview: string; url?: string; err?: string };
+
+const IMG_ACCEPT = "image/*,image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif";
 
 /** brand+投稿一覧 · ヘルプ/ログイン|name menu-pop */
 export default function AppNav({ top }: Props) {
@@ -16,8 +20,11 @@ export default function AppNav({ top }: Props) {
   const [open, setOpen] = useState<"help" | "me" | "">("");
   const [draft, setDraft] = useState("");
   const [body, setBody] = useState("");
+  const [shot, setShot] = useState<Shot | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(""); // "" | ok | "!err"
+  const shotRef = useRef<Shot | null>(null);
+  shotRef.current = shot;
 
   useEffect(() => {
     if (shopId) router.prefetch(adminPath(shopId));
@@ -32,10 +39,35 @@ export default function AppNav({ top }: Props) {
     document.addEventListener("pointerdown", close);
     return () => document.removeEventListener("pointerdown", close);
   }, [open]);
+  useEffect(() => () => {
+    const p = shotRef.current?.preview;
+    if (p?.startsWith("blob:")) URL.revokeObjectURL(p);
+  }, []);
+
+  async function takeShot(file: File) {
+    if (!isImageFile(file)) return;
+    const prev = shotRef.current?.preview;
+    if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+    const preview = URL.createObjectURL(file);
+    setShot({ preview });
+    try {
+      const compressed = await compressImage(ensureImageFile(file));
+      const fd = new FormData();
+      fd.set("file", compressed);
+      fd.set("itemId", `help-${Date.now()}`);
+      const res = await fetch("/api/admin/upload?shop=_help", { method: "POST", body: fd });
+      const data = await res.json() as { url?: string; error?: string };
+      if (!res.ok || !data.url) throw new Error("up");
+      setShot((s) => (s?.preview === preview ? { preview, url: data.url } : s));
+    } catch {
+      setShot((s) => (s?.preview === preview ? { preview, err: "画像アップロード失敗" } : s));
+    }
+  }
 
   async function sendHelp(e: { preventDefault(): void }) {
     e.preventDefault();
     if (!body.trim() || busy) return;
+    if (shot && !shot.url && !shot.err) return; // still uploading
     setBusy(true); setMsg("");
     try {
       const text = body.trim();
@@ -47,11 +79,15 @@ export default function AppNav({ top }: Props) {
           href: typeof window !== "undefined" ? window.location.href : "",
           userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
           name: getName(), shopId: getId(),
+          ...(shot?.url ? { screenshotUrl: shot.url } : {}),
         }),
       });
       const data = await res.json() as { error?: string };
       if (!res.ok) throw new Error(data.error || "送信失敗");
-      setMsg("ありがとう。開発者がすぐ確認します。急ぎのバグはAIが直してサイトに反映することも。"); setBody("");
+      setMsg("ありがとう。開発者がすぐ確認します。急ぎのバグはAIが直してサイトに反映することも。");
+      setBody("");
+      if (shot?.preview.startsWith("blob:")) URL.revokeObjectURL(shot.preview);
+      setShot(null);
     } catch (err) {
       setMsg(`!${err instanceof Error ? err.message : "送信失敗"}`);
     } finally { setBusy(false); }
@@ -62,6 +98,8 @@ export default function AppNav({ top }: Props) {
   const meOn = path === "/me" || path.startsWith("/me/");
   const pop = `menu-pop${top ? "" : " up"}`;
   const toggleMe = () => setOpen(open === "me" ? "" : "me");
+  const shotBusy = !!shot && !shot.url && !shot.err;
+  const canSend = !!body.trim() && !busy && !shotBusy;
 
   return (
     <nav className={`app-nav${top ? " top" : " bot"}`} aria-label="アプリ">
@@ -85,11 +123,43 @@ export default function AppNav({ top }: Props) {
               aria-expanded={open === "help"} aria-haspopup="dialog"
               onClick={() => { setOpen(open === "help" ? "" : "help"); setMsg(""); }}>ヘルプ</button>
             {open === "help" && (
-              <form className={`${pop} pane`} role="dialog" aria-label="ヘルプ" onSubmit={sendHelp}>
-                <textarea rows={3} value={body} onChange={(e) => setBody(e.target.value)}
-                  placeholder="バグ・要望・質問" />
+              <form className={`${pop} pane help-pane`} role="dialog" aria-label="ヘルプ" onSubmit={sendHelp}
+                onPaste={(e) => {
+                  const item = [...e.clipboardData.items].find((i) => i.type.startsWith("image/"));
+                  if (!item) return;
+                  const f = item.getAsFile();
+                  if (!f) return;
+                  e.preventDefault();
+                  void takeShot(f);
+                }}>
+                <textarea rows={4} value={body} onChange={(e) => setBody(e.target.value)}
+                  placeholder="バグ・要望・質問（スクショ貼付可）" />
+                {shot ? (
+                  <div className="help-shot">
+                    <img src={shot.preview} alt="" />
+                    <button type="button" className="help-shot-x" aria-label="画像を削除"
+                      onClick={() => {
+                        if (shot.preview.startsWith("blob:")) URL.revokeObjectURL(shot.preview);
+                        setShot(null);
+                      }}>×</button>
+                    {shotBusy ? <span className="hint">アップロード中…</span> : null}
+                    {shot.err ? <span className="sw">{shot.err}</span> : null}
+                  </div>
+                ) : (
+                  <label className="help-pic">
+                    写真を追加
+                    <input type="file" accept={IMG_ACCEPT} hidden
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        e.target.value = "";
+                        if (f) void takeShot(f);
+                      }} />
+                  </label>
+                )}
                 {msg && <p className={msg.startsWith("!") ? "sw" : "hint"}>{msg.replace(/^!/, "")}</p>}
-                <button type="submit" disabled={!body.trim() || busy}>{busy ? "送信中…" : "送信"}</button>
+                <button type="submit" className="cta" disabled={!canSend}>
+                  {busy ? "送信中…" : shotBusy ? "画像準備中…" : "送信"}
+                </button>
               </form>
             )}
           </div>
