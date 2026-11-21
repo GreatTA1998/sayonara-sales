@@ -1,8 +1,8 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { put, get } from "@vercel/blob";
-import type { Report, ReportType } from "./report-types";
-export type { Report, ReportType } from "./report-types";
+import type { Report } from "./report-types";
+export type { Report } from "./report-types";
 
 type Bag = { reports: Report[] };
 
@@ -58,17 +58,15 @@ export async function listReports(): Promise<Report[]> {
   return structuredClone(bag.reports).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-export async function addReport(raw: Partial<Report> & { type: ReportType; body: string }): Promise<Report> {
-  const type = raw.type === "bug" ? "bug" : "message";
+export async function addReport(raw: Partial<Report> & { body: string }): Promise<Report> {
   const body = String(raw.body || "").trim();
   if (!body) throw new Error("内容を入力してください");
   const report: Report = {
     id: `r${Math.random().toString(36).slice(2, 10)}`,
-    type,
     body,
     createdAt: new Date().toISOString(),
   };
-  const title = String(raw.title || "").trim() || (type === "bug" ? body.slice(0, 80) : "");
+  const title = String(raw.title || "").trim() || body.slice(0, 80);
   if (title) report.title = title;
   for (const k of ["path", "href", "userAgent", "name", "shopId"] as const) {
     const v = String(raw[k] || "").trim();
@@ -76,7 +74,7 @@ export async function addReport(raw: Partial<Report> & { type: ReportType; body:
   }
   await withBag((b) => { b.reports.push(report); });
   const hook = (process.env.REPORT_WEBHOOK_URL || "").trim();
-  if (hook && type === "bug") {
+  if (hook) {
     void fetch(hook, {
       method: "POST",
       headers: { "content-type": "application/json" },

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { addReport, listReports, type ReportType } from "@/lib/reports";
+import { addReport, listReports } from "@/lib/reports";
 
 export const dynamic = "force-dynamic";
 
@@ -10,9 +10,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const type = (body.type === "bug" ? "bug" : "message") as ReportType;
     const report = await addReport({
-      type,
       body: String(body.body || ""),
       title: body.title,
       path: body.path,
