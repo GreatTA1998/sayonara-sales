@@ -12,7 +12,7 @@
 .xcard.sold .xphoto::after{content:"予約済";position:absolute;left:6px;top:6px;z-index:1;padding:2px 7px;border-radius:4px;background:rgba(17,17,17,.72);color:#fff;font-size:var(--t-sm);font-weight:var(--fw-bold);line-height:1.3;pointer-events:none}
 .xcard.dense.sold .xphoto::after{left:3px;top:3px;padding:1px 4px;font-size:10px}
 .xcard .xphoto{position:relative;flex:0 0 auto;aspect-ratio:1/1;background:#eee;overflow:hidden}
-.xcard .xphoto img{display:block;width:100%;height:100%;object-fit:cover}
+.xcard .xphoto img{display:block;width:100%;height:100%;object-fit:contain}
 .xcard .xmeta{display:flex;flex-direction:column;gap:2px;padding:8px 10px 10px;min-height:0}
 .xcard .xprice,.xtxt .xprice{font-size:var(--t-sm);font-variant-numeric:tabular-nums;color:var(--c-muted)}
 .xcard .xname,.xtxt .xname{font-size:var(--t-base);font-weight:var(--fw);line-height:1.25;color:var(--c);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}

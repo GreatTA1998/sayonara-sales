@@ -10,9 +10,12 @@ import {
 import { ensureAuth, getDb } from "./fb";
 import {
   applyDates, bookableDays, claimFields, ELTON_SHOP, hasBuyerContact, itemFields, itemStatus,
-  normalizeSlots, parseShop, shortCode, shopFields, shopSlots, storeFromDocs, takenSlots, uid,
+  joinWait, normalizeSlots, parseShop, shortCode, shopFields, shopSlots, storeFromDocs, takenSlots, uid,
   type Claim, type Item, type Store,
 } from "./store";
+
+const asClaim = (id: string, data: Record<string, unknown>): Claim =>
+  storeFromDocs({}, [], [{ id, data }]).claims[0];
 
 type ShopSnap = {
   meta: Record<string, unknown> | null;
@@ -193,43 +196,29 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       const csnap = await getDoc(cref);
       if (!csnap.exists() || csnap.data().status !== "requested") throw new Error("No claim");
       await updateDoc(cref, { status: "booked" });
-      return storeFromDocs({}, [], [{ id: csnap.id, data: { ...csnap.data(), status: "booked" } }]).claims[0];
+      return asClaim(csnap.id, { ...csnap.data(), status: "booked" });
     }
-    case "cancel":
-    case "release": {
+    case "cancel": {
+      const id = String(body.id);
+      const cref = doc(db, "shops", shop, "claims", id);
+      const csnap = await getDoc(cref);
       const open = (st: string) => st === "booked" || st === "requested";
-      const keep = action === "release" ? String(body.keepId || "") : "";
-      const claimsSnap = await getDocs(collection(db, "shops", shop, "claims"));
-      const ids = action === "cancel"
-        ? [String(body.id)]
-        : claimsSnap.docs.filter((d) => open(String(d.data().status)) && d.id !== keep).map((d) => d.id);
-      let n = 0;
-      let last: Claim | null = null;
-      for (const id of ids) {
-        const cref = doc(db, "shops", shop, "claims", id);
-        const csnap = await getDoc(cref);
-        if (!csnap.exists() || !open(String(csnap.data().status))) {
-          if (action === "cancel") throw new Error("No claim");
-          continue;
-        }
-        const c = csnap.data();
-        await updateDoc(cref, { status: "cancelled", waiters: [] });
-        n++;
-        for (const iid of (Array.isArray(c.itemIds) ? c.itemIds.map(String) : [])) {
-          const iref = doc(db, "shops", shop, "items", iid);
-          const isnap = await getDoc(iref);
-          if (isnap.exists() && isnap.data().claimId === id) await updateDoc(iref, { claimId: null });
-        }
-        last = storeFromDocs({}, [], [{ id, data: { ...c, status: "cancelled", waiters: [] } }]).claims[0];
+      if (!csnap.exists() || !open(String(csnap.data().status))) throw new Error("No claim");
+      const c = csnap.data();
+      await updateDoc(cref, { status: "cancelled", waiters: [] });
+      for (const iid of (Array.isArray(c.itemIds) ? c.itemIds.map(String) : [])) {
+        const iref = doc(db, "shops", shop, "items", iid);
+        const isnap = await getDoc(iref);
+        if (isnap.exists() && isnap.data().claimId === id) await updateDoc(iref, { claimId: null });
       }
-      return action === "cancel" ? last : { released: n };
+      return asClaim(id, { ...c, status: "cancelled", waiters: [] });
     }
     case "picked_up": {
       const cref = doc(db, "shops", shop, "claims", String(body.id));
       const csnap = await getDoc(cref);
       if (!csnap.exists() || csnap.data().status !== "booked") throw new Error("No claim");
       await updateDoc(cref, { status: "picked_up" });
-      return storeFromDocs({}, [], [{ id: csnap.id, data: { ...csnap.data(), status: "picked_up" } }]).claims[0];
+      return asClaim(csnap.id, { ...csnap.data(), status: "picked_up" });
     }
     default:
       throw new Error("Unknown action");
@@ -248,18 +237,15 @@ export async function joinWaitLive(shopRaw: string, itemId: string, account: str
   const cref = doc(db, "shops", shop, "claims", claimId);
   const csnap = await getDoc(cref);
   if (!csnap.exists()) throw new Error("待機できません");
-  const st = String(csnap.data().status);
-  if (st !== "requested" && st !== "booked") throw new Error("待機できません");
-  const a = account.trim();
-  if (!a) throw new Error("アカウントが必要です");
-  const list = Array.isArray(csnap.data().waiters)
-    ? (csnap.data().waiters as { account?: string; at?: string }[]).map((w) => ({
-      account: String(w.account || ""), at: String(w.at || ""),
-    })).filter((w) => w.account)
-    : [];
-  if (!list.some((w) => w.account === a)) list.push({ account: a, at: new Date().toISOString() });
-  await updateDoc(cref, { waiters: list });
-  return { ok: true as const };
+  const s = storeFromDocs(
+    {},
+    [{ id: itemId, data: itemSnap.data() as Record<string, unknown> }],
+    [{ id: claimId, data: csnap.data() as Record<string, unknown> }],
+  );
+  const out = joinWait(s, itemId, account);
+  const claim = s.claims.find((c) => c.id === claimId)!;
+  await updateDoc(cref, { waiters: claim.waiters || [] });
+  return out;
 }
 
 /** Buyer book — creates requested claim; snapshot reconciles. */
@@ -279,16 +265,11 @@ export async function bookShop(shopRaw: string, body: {
     getDocs(collection(db, "shops", shop, "claims")),
   ]);
   const meta = (shopSnap.data() || {}) as Record<string, unknown>;
-  const allClaims: Claim[] = claimSnaps.docs.map((d) => {
-    const r = d.data();
-    return {
-      id: d.id, code: String(r.code || ""), day: String(r.day || ""), slot: String(r.slot || ""),
-      itemIds: Array.isArray(r.itemIds) ? r.itemIds.map(String) : [],
-      status: r.status as Claim["status"], createdAt: String(r.createdAt || ""),
-    };
-  });
-  const pre = storeFromDocs(meta, [], []);
-  pre.claims = allClaims;
+  const pre = storeFromDocs(
+    meta,
+    [],
+    claimSnaps.docs.map((d) => ({ id: d.id, data: d.data() as Record<string, unknown> })),
+  );
   if (!bookableDays(pre).includes(day)) throw new Error("その日は選べません");
   if (!shopSlots(pre).includes(slot)) throw new Error("その時間帯は選べません");
   if (takenSlots(pre, day).includes(slot)) throw new Error("その時間帯は埋まっています");

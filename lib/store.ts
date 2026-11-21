@@ -1,6 +1,5 @@
 import { addDays, daysBetween, tokyoYmd } from "./days";
 import { CANON_LINE, CANON_PHONE, DEF_LEAD, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "./sale";
-export { CANON_LINE, CANON_PHONE, telHref, ytUrl } from "./sale";
 
 export type Item = {
   id: string; name: string; price: number | null; note?: string; claimId?: string | null;
@@ -42,8 +41,6 @@ export const hasBuyerContact = (shop: string, s: Store) => {
   return !!(c.jimotyUrl || c.lineInviteUrl || c.phone);
 };
 
-export { PICKUP_DAYS, PICKUP_SLOTS };
-
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 const asYmd = (v: unknown) => { const s = String(v || "").trim(); return YMD.test(s) ? s : ""; };
 export const shopSlots = (s: Store) => (s.slots?.length ? s.slots : [...PICKUP_SLOTS]);
@@ -58,8 +55,6 @@ export const shopLeadDays = (s: Store) =>
 
 export const bookableDays = (s: Store) =>
   shopDays(s).filter((d) => d >= addDays(tokyoYmd(), shopLeadDays(s)));
-
-export const shopMoveOut = (s: Store) => s.moveOut || s.pickupTo || PICKUP_DAYS[PICKUP_DAYS.length - 1];
 
 export function normalizeSlots(raw: unknown): string[] {
   if (!Array.isArray(raw)) throw new Error("時間帯が不正です");
