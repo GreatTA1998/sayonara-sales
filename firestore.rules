@@ -1,0 +1,11 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Assumed model: shops/{shopId}, shops/{shopId}/items/{itemId}, shops/{shopId}/claims/{claimId}
+    // All client access denied — Next.js API routes use Admin SDK (bypasses rules).
+    // Path to client listeners: open published shop reads later without opening writes.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

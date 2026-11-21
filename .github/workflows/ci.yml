@@ -1,0 +1,23 @@
+name: ci
+on:
+  push:
+    branches: [main, "cursor/**"]
+  pull_request:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run test:store-race
+      - run: npx tsc --noEmit
+      - run: npm run build
+        env:
+          FIREBASE_PROJECT_ID: sayonara-sales
+          FIREBASE_CLIENT_EMAIL: ci@placeholder.iam.gserviceaccount.com
+          FIREBASE_PRIVATE_KEY: "-----BEGIN RSA PRIVATE KEY-----\nCI\n-----END RSA PRIVATE KEY-----\n"
+          BLOB_READ_WRITE_TOKEN: ci-placeholder

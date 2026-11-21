@@ -7,3 +7,9 @@ data/
 *.tsbuildinfo
 .deploy-args.json
 .qr-up.json
+.agents/
+skills-lock.json
+.firebase/
+*-debug.log
+firebase-debug.log
+.sa-*.json
