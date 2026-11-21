@@ -1,88 +1,46 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, useSyncExternalStore } from "react";
-import { LineLoginLink, useLineOAuthReturn } from "@/components/line-oauth";
-import {
-  adminPath, ensureShopId, getId, getName, openShop, subscribeAuth,
-} from "@/lib/shop";
+import { useEffect, useSyncExternalStore } from "react";
+import { useLineOAuthReturn } from "@/components/line-oauth";
+import { adminPath, ensureShopId, getId, getName, subscribeAuth } from "@/lib/shop";
 
 type Props = { top?: boolean };
 
+/** logo+サヨナラ | 投稿/投稿一覧 | ログイン/name → マイページ */
 export default function AppNav({ top }: Props) {
   const router = useRouter();
   const path = usePathname() || "";
   const name = useSyncExternalStore(subscribeAuth, getName, () => "");
   const shopId = useSyncExternalStore(subscribeAuth, getId, () => "");
-  const [loginOpen, setLoginOpen] = useState(false);
-  const [profOpen, setProfOpen] = useState(false);
-  const [draft, setDraft] = useState("");
 
   useEffect(() => {
     router.prefetch(shopId ? adminPath(shopId) : "/admin");
+    router.prefetch("/me");
   }, [shopId, router]);
   useLineOAuthReturn();
 
-  function saveLogin(e: { preventDefault(): void }) {
-    e.preventDefault();
-    if (!openShop(draft)) return;
-    setLoginOpen(false);
-  }
-
   const sellHref = shopId ? adminPath(shopId) : "/admin";
-  const logged = !!name;
   const sellOn = path === "/admin" || /\/admin\/?$/.test(path);
+  const meOn = path === "/me" || path.startsWith("/me/");
 
   return (
-    <>
-      <nav className={`app-nav${top ? " top" : " bot"}`} aria-label="アプリ">
-        <div className="app-nav-inner">
-          <Link href="/" className="brand" prefetch aria-label="サヨナラ ホーム">
-            <img className="logo" src="/sun-logo.png" alt="" width={52} height={27} decoding="async" />
-            <span>サヨナラ</span>
-          </Link>
-          <Link className={`nav-a${sellOn ? " on" : ""}`} href={sellHref} prefetch
-            aria-current={sellOn ? "page" : undefined}
-            onClick={(e) => {
-              if (shopId) return;
-              e.preventDefault();
-              const id = ensureShopId();
-              router.push(adminPath(id));
-            }}>{name ? "投稿一覧" : "投稿"}</Link>
-          {logged ? (
-            <button type="button" className="nav-a" onClick={() => setProfOpen(true)}>{name}</button>
-          ) : (
-            <button type="button" className="nav-a" onClick={() => { setDraft(getName()); setLoginOpen(true); }}>ログイン</button>
-          )}
-        </div>
-      </nav>
-
-      {loginOpen && (
-        <div className="mask" role="dialog" aria-modal="true" aria-label="ログイン"
-          onClick={() => setLoginOpen(false)}>
-          <form className="sheet" onClick={(e) => e.stopPropagation()} onSubmit={saveLogin}>
-            <h2>ログイン</h2>
-            <p className="hint">LINE名だけでOK（パスワードなし）</p>
-            <label className="float"><span>LINE名</span>
-              <input value={draft} onChange={(e) => setDraft(e.target.value)}
-                placeholder="表示名" autoComplete="nickname" autoFocus /></label>
-            <button type="submit" className="cta go" disabled={!draft.trim()}>サインイン</button>
-            <p className="hint" style={{ marginTop: 10 }}>より安全に使う場合はLINE連携</p>
-            <LineLoginLink />
-          </form>
-        </div>
-      )}
-
-      {profOpen && (
-        <div className="mask" role="dialog" aria-modal="true" aria-label="プロフィール"
-          onClick={() => setProfOpen(false)}>
-          <div className="sheet" onClick={(e) => e.stopPropagation()}>
-            <h2>{name}</h2>
-            <p className="hint">ショップメモ・Jimoty・内見動画は投稿一覧で編集</p>
-            <LineLoginLink />
-          </div>
-        </div>
-      )}
-    </>
+    <nav className={`app-nav${top ? " top" : " bot"}`} aria-label="アプリ">
+      <div className="app-nav-inner">
+        <Link href="/" className="brand" prefetch aria-label="サヨナラ ホーム">
+          <img className="logo" src="/sun-logo.png" alt="" width={52} height={27} decoding="async" />
+          <span>サヨナラ</span>
+        </Link>
+        <Link className={`nav-a${sellOn ? " on" : ""}`} href={sellHref} prefetch
+          aria-current={sellOn ? "page" : undefined}
+          onClick={(e) => {
+            if (shopId) return;
+            e.preventDefault();
+            router.push(adminPath(ensureShopId()));
+          }}>{name ? "投稿一覧" : "投稿"}</Link>
+        <Link className={`nav-a${meOn ? " on" : ""}`} href="/me" prefetch
+          aria-current={meOn ? "page" : undefined}>{name || "ログイン"}</Link>
+      </div>
+    </nav>
   );
 }
