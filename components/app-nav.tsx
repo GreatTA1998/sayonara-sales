@@ -7,18 +7,16 @@ import { adminPath, ensureShopId, getId, getName, logout, subscribeAuth } from "
 
 type Props = { top?: boolean };
 
-/** logo+サヨナラ | 投稿/投稿一覧 | ヘルプ | ログイン → /me · name → profile menu-pop */
+/** brand+投稿一覧 · ヘルプ/name menu-pop · ログイン→/me */
 export default function AppNav({ top }: Props) {
   const router = useRouter();
   const path = usePathname() || "";
   const name = useSyncExternalStore(subscribeAuth, getName, () => "");
   const shopId = useSyncExternalStore(subscribeAuth, getId, () => "");
-  const [helpOpen, setHelpOpen] = useState(false);
-  const [helpBody, setHelpBody] = useState("");
-  const [helpBusy, setHelpBusy] = useState(false);
-  const [helpErr, setHelpErr] = useState("");
-  const [helpOk, setHelpOk] = useState(false);
-  const [profOpen, setProfOpen] = useState(false);
+  const [open, setOpen] = useState<"help" | "prof" | "">("");
+  const [body, setBody] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(""); // "" | ok | "!err"
 
   useEffect(() => {
     if (shopId) router.prefetch(adminPath(shopId));
@@ -26,50 +24,47 @@ export default function AppNav({ top }: Props) {
   }, [shopId, router]);
   useLineOAuthReturn();
   useEffect(() => {
-    if (!profOpen) return;
+    if (!open) return;
     const close = (e: PointerEvent) => {
-      if (!(e.target as Element).closest(".nav-me")) setProfOpen(false);
+      if (!(e.target as Element).closest(open === "help" ? ".nav-help" : ".nav-me")) setOpen("");
     };
     document.addEventListener("pointerdown", close);
     return () => document.removeEventListener("pointerdown", close);
-  }, [profOpen]);
+  }, [open]);
 
   async function sendHelp(e: { preventDefault(): void }) {
     e.preventDefault();
-    if (!helpBody.trim() || helpBusy) return;
-    setHelpBusy(true); setHelpErr(""); setHelpOk(false);
+    if (!body.trim() || busy) return;
+    setBusy(true); setMsg("");
     try {
-      const text = helpBody.trim();
+      const text = body.trim();
       const res = await fetch("/api/reports", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          body: text,
-          title: text.slice(0, 80),
-          path,
+          body: text, title: text.slice(0, 80), path,
           href: typeof window !== "undefined" ? window.location.href : "",
           userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
-          name: getName(),
-          shopId: getId(),
+          name: getName(), shopId: getId(),
         }),
       });
       const data = await res.json() as { error?: string };
       if (!res.ok) throw new Error(data.error || "送信失敗");
-      setHelpOk(true);
-      setHelpBody("");
+      setMsg("送信しました。ありがとう。"); setBody("");
     } catch (err) {
-      setHelpErr(err instanceof Error ? err.message : "送信失敗");
-    } finally { setHelpBusy(false); }
+      setMsg(`!${err instanceof Error ? err.message : "送信失敗"}`);
+    } finally { setBusy(false); }
   }
 
   const sellHref = shopId ? adminPath(shopId) : "/";
   const sellOn = /\/s\/[^/]+\/admin\/?$/.test(path);
   const meOn = path === "/me" || path.startsWith("/me/");
+  const pop = `menu-pop${top ? "" : " up"}`;
 
   return (
-    <>
-      <nav className={`app-nav${top ? " top" : " bot"}`} aria-label="アプリ">
-        <div className="app-nav-inner">
+    <nav className={`app-nav${top ? " top" : " bot"}`} aria-label="アプリ">
+      <div className="app-nav-inner">
+        <div className="nav-start">
           <Link href="/" className="brand" prefetch aria-label="サヨナラ ホーム">
             <img className="logo" src="/sun-logo.png" alt="" width={52} height={27} decoding="async" />
             <span>サヨナラ</span>
@@ -81,19 +76,32 @@ export default function AppNav({ top }: Props) {
               e.preventDefault();
               router.push(adminPath(ensureShopId()));
             }}>{name ? "投稿一覧" : "投稿"}</Link>
-          <button type="button" className="nav-a"
-            onClick={() => { setHelpOpen(true); setHelpOk(false); setHelpErr(""); }}>ヘルプ</button>
+        </div>
+        <div className="nav-end">
+          <div className="nav-help">
+            <button type="button" className={`nav-a${open === "help" ? " on" : ""}`}
+              aria-expanded={open === "help"} aria-haspopup="dialog"
+              onClick={() => { setOpen(open === "help" ? "" : "help"); setMsg(""); }}>ヘルプ</button>
+            {open === "help" && (
+              <form className={`${pop} help`} role="dialog" aria-label="ヘルプ" onSubmit={sendHelp}>
+                <textarea rows={3} value={body} onChange={(e) => setBody(e.target.value)}
+                  placeholder="バグ・要望・質問" autoFocus />
+                {msg && <p className={msg.startsWith("!") ? "sw" : "hint"}>{msg.replace(/^!/, "")}</p>}
+                <button type="submit" disabled={!body.trim() || busy}>{busy ? "送信中…" : "送信"}</button>
+              </form>
+            )}
+          </div>
           {name ? (
-            <div className="nav-me" style={{ position: "relative" }}>
-              <button type="button" className={`nav-a${meOn || profOpen ? " on" : ""}`}
-                aria-expanded={profOpen} aria-haspopup="menu"
-                onClick={() => setProfOpen((v) => !v)}>{name}</button>
-              {profOpen && (
-                <div className={`menu-pop${top ? "" : " up"}`} role="menu">
+            <div className="nav-me">
+              <button type="button" className={`nav-a${meOn || open === "prof" ? " on" : ""}`}
+                aria-expanded={open === "prof"} aria-haspopup="menu"
+                onClick={() => setOpen(open === "prof" ? "" : "prof")}>{name}</button>
+              {open === "prof" && (
+                <div className={pop} role="menu">
                   <button type="button" role="menuitem"
-                    onClick={() => { setProfOpen(false); router.push("/me"); }}>履歴</button>
+                    onClick={() => { setOpen(""); router.push("/me"); }}>履歴</button>
                   <button type="button" className="danger" role="menuitem"
-                    onClick={() => { setProfOpen(false); void logout(); }}>ログアウト</button>
+                    onClick={() => { setOpen(""); void logout(); }}>ログアウト</button>
                 </div>
               )}
             </div>
@@ -101,26 +109,7 @@ export default function AppNav({ top }: Props) {
             <Link className="nav-a" href="/me" prefetch>ログイン</Link>
           )}
         </div>
-      </nav>
-
-      {helpOpen && (
-        <div className="mask" role="dialog" aria-modal="true" aria-label="ヘルプ"
-          onClick={() => setHelpOpen(false)}>
-          <form className="sheet" onClick={(e) => e.stopPropagation()} onSubmit={sendHelp}>
-            <h2>ヘルプ</h2>
-            <p className="hint">バグ・要望・質問を送れます。</p>
-            <label className="float"><span>メッセージ</span>
-              <textarea className="grow" rows={4} value={helpBody}
-                onChange={(e) => setHelpBody(e.target.value)}
-                placeholder="内容を入力" autoFocus /></label>
-            {helpErr && <p className="sw">{helpErr}</p>}
-            {helpOk && <p className="hint">送信しました。ありがとう。</p>}
-            <button type="submit" className="cta go" disabled={!helpBody.trim() || helpBusy}>
-              {helpBusy ? "送信中…" : "送信"}
-            </button>
-          </form>
-        </div>
-      )}
-    </>
+      </div>
+    </nav>
   );
 }
