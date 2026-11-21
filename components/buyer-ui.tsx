@@ -181,9 +181,8 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   if (receipt) {
     return (
       <main className="wrap">
-        <h1>依頼を送信しました</h1>
-        <p className="hint">{name}に送信済み（未確定）。コード {receipt.code} · {dayLbl(receipt.day)} {receipt.slot} · {money(receipt.total ?? 0)}</p>
-        <p className="hint">履歴はプロフィールメニュー。来る前に確認を待ってください。</p>
+        <h1>ありがとう。依頼を受けました</h1>
+        <p className="hint">コード {receipt.code} · {dayLbl(receipt.day)} {receipt.slot} · {money(receipt.total ?? 0)}。選んだ連絡方法で、だいたい2日以内に返事します。履歴は右上の名前から（それがアカウントです）。</p>
         <button type="button" className="dark" onClick={() => setReceipt(null)}>一覧に戻る</button>
       </main>
     );
