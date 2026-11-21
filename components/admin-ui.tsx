@@ -170,10 +170,13 @@ export default function ShopAdminView({ shop, name }: Props) {
       if (!d) return d;
       if (action === "add") return { ...d, items: [...d.items, body as unknown as Item] };
       if (action === "edit") {
-        const next = body as unknown as Item;
+        const next = body as Record<string, unknown>;
         return {
           ...d,
-          items: d.items.map((i) => (i.id === next.id ? { ...i, ...next, paused: !!next.paused } : i)),
+          items: d.items.map((i) => i.id !== next.id ? i : {
+            ...i, ...next, id: i.id,
+            paused: "paused" in next ? !!next.paused : i.paused,
+          }),
         };
       }
       if (action === "remove") return { ...d, items: d.items.filter((i) => i.id !== payload.id) };

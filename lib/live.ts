@@ -150,28 +150,23 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
     case "edit": {
       const id = String(body.id);
       const ref = doc(db, "shops", shop, "items", id);
-      const snap = await getDoc(ref);
-      if (!snap.exists()) throw new Error("Not found");
-      const cur = snap.data();
       // Atomic append — parallel multi-add must not replace the full photos array.
       if (typeof body.appendPhoto === "string" && body.appendPhoto) {
         await updateDoc(ref, { photos: arrayUnion(body.appendPhoto) });
         return { id, appendPhoto: body.appendPhoto };
       }
-      const next: Item = {
-        id,
-        name: body.name != null ? String(body.name).trim() : String(cur.name || ""),
-        price: "price" in body ? numPrice(body.price) : (cur.price == null ? null : Number(cur.price)),
-        note: "note" in body ? (body.note ? String(body.note) : undefined) : (cur.note ? String(cur.note) : undefined),
-        claimId: cur.claimId ? String(cur.claimId) : null,
-        photos: "photos" in body
-          ? (Array.isArray(body.photos) ? body.photos.map(String).filter(Boolean) : [])
-          : (Array.isArray(cur.photos) ? cur.photos.map(String) : []),
-        paused: "paused" in body ? !!body.paused : !!cur.paused,
-      };
-      if (!next.paused) delete next.paused;
-      await setDoc(ref, itemFields(next, Number(cur.pos || 0)));
-      return next;
+      // Patch only provided fields — never rewrite photos on name/price/memo/pause.
+      const patch: Record<string, unknown> = {};
+      if (body.name != null) patch.name = String(body.name).trim();
+      if ("price" in body) patch.price = numPrice(body.price);
+      if ("note" in body) patch.note = body.note ? String(body.note) : null;
+      if ("paused" in body) patch.paused = !!body.paused;
+      if ("photos" in body) {
+        patch.photos = Array.isArray(body.photos) ? body.photos.map(String).filter(Boolean) : [];
+      }
+      if (!Object.keys(patch).length) return { id };
+      await updateDoc(ref, patch);
+      return { id, ...patch };
     }
     case "remove": {
       await deleteDoc(doc(db, "shops", shop, "items", String(body.id)));
