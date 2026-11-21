@@ -86,22 +86,22 @@ const writeName = (v: string) => {
   localStorage.setItem(NAME_KEY, v); localStorage.removeItem(LEGACY_NAME_KEY);
 };
 
-/** Persist soft name → id; known sellers reclaim; else reuse guest dig5. */
+/** Soft Jimoty name. Bind shop only when reclaiming known/map or an existing guest dig5 — never invent. */
 export const openShop = (n: string) => {
   if (typeof window === "undefined") return "";
   const v = n.trim();
   if (!v) { clearNames(); notifyAuth(); return getId(); }
   const map = readMap();
   const key = norm(v);
-  let id = knownId(v) || map[key] || "";
   const cur = getId();
-  if (!isShop(id)) {
-    id = dig5(cur) ? cur : newId();
-  }
-  map[key] = id;
-  localStorage.setItem(MAP_KEY, JSON.stringify(map));
+  let id = knownId(v) || map[key] || "";
+  if (!isShop(id) && dig5(cur)) id = cur;
   writeName(v);
-  localStorage.setItem(ID_KEY, id);
+  if (isShop(id)) {
+    map[key] = id;
+    localStorage.setItem(MAP_KEY, JSON.stringify(map));
+    localStorage.setItem(ID_KEY, id);
+  }
   notifyAuth();
   return id;
 };
