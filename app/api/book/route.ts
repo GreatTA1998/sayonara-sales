@@ -8,11 +8,11 @@ export async function POST(req: Request) {
   const body = await req.json();
   const day = String(body.day || "");
   const slot = String(body.slot || "");
-  const contactMethod = body.contactMethod === "phone" ? "phone" as const : body.contactMethod === "line" ? "line" as const : undefined;
+  const contactMethod = (["jimoty", "line", "phone"] as const).find((x) => x === body.contactMethod);
   const contact = String(body.contact || "").trim();
   const itemIds: string[] = Array.isArray(body.itemIds) ? body.itemIds.map(String) : [];
   if (!day || !slot || !itemIds.length || !contactMethod || !contact)
-    return NextResponse.json({ error: "日付・時間・LINE名・連絡方法・品目を確認してください" }, { status: 400 });
+    return NextResponse.json({ error: "日付・時間・連絡先・連絡方法・品目を確認してください" }, { status: 400 });
   try {
     const result = await withStore(shop, (s) => {
       if (!bookableDays(s).includes(day)) throw new Error("その日は選べません");
