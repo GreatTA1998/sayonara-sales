@@ -17,15 +17,14 @@
 .xcard .xprice,.xtxt .xprice{font-size:var(--t-sm);font-variant-numeric:tabular-nums;color:var(--c-muted)}
 .xcard .xname,.xtxt .xname{font-size:var(--t-base);font-weight:var(--fw);line-height:1.25;color:var(--c);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .xcard .xname.empty,.xtxt .xname.empty{font-weight:var(--fw);color:var(--c-muted)}
-.xgrid.text{gap:6px}.xgrid.text.dense{display:block;column-width:144px;column-gap:6px}
+.xgrid.text{gap:6px}.xgrid.text.dense{display:block;column-width:144px;column-gap:10px}
 .xgrid.dense:not(.text){gap:3px;grid-template-columns:repeat(auto-fill,minmax(min(100%,72px),1fr))}
 .xtxt{position:relative;display:flex;flex-direction:column;gap:2px;padding:8px 10px;border:1px solid #e5e5e5;border-radius:16px;background:#fff;text-align:left;cursor:pointer;font:inherit;color:inherit;min-height:44px;box-sizing:border-box}
-.xtxt.dense{width:100%;margin:0 0 3px;padding:6px 8px;border-radius:6px;font-size:var(--t-sm);break-inside:avoid}
+.xtxt.dense{display:block;width:100%;margin:0;padding:2px 0;border:0;border-radius:0;background:0;min-height:0;font-size:var(--t-sm);break-inside:avoid}
 .xtxt.on{border-color:#ff9900;background:#fff8ee}
-.xtxt.sold{background:#f3f3f3}
-.xtxt.sold::after{content:"予約済";position:absolute;right:8px;top:8px;padding:1px 6px;border-radius:4px;background:rgba(17,17,17,.72);color:#fff;font-size:var(--t-sm);font-weight:var(--fw-bold);line-height:1.3;pointer-events:none}
-.xtxt.dense.sold::after{right:4px;top:4px;padding:0 4px;font-size:10px}
-.xtxt .xname{word-break:break-word}
+.xtxt.sold:not(.dense){background:#f3f3f3}.xtxt.dense.sold{opacity:.55}
+.xtxt.sold:not(.dense)::after{content:"予約済";position:absolute;right:8px;top:8px;padding:1px 6px;border-radius:4px;background:rgba(17,17,17,.72);color:#fff;font-size:var(--t-sm);font-weight:var(--fw-bold);line-height:1.3;pointer-events:none}
+.xtxt .xname{word-break:break-word}.xtxt.dense .xname{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;word-break:normal}
 .admin-bar{justify-content:flex-start}
 .admin-bar .shop{flex:0 0 auto;font-size:var(--t-base);font-weight:var(--fw);color:var(--c);padding:0 4px;white-space:nowrap;max-width:40%;overflow:hidden;text-overflow:ellipsis}
 .admin-bar .area-float{flex:0 0 auto;width:auto;max-width:min(12em,calc(100% - 5.5rem));display:inline-flex;flex-direction:row;align-items:center;gap:2px;margin:0;padding:0 8px;height:36px;border:1px solid #ccc;border-radius:8px;background:#fff;box-sizing:border-box}
