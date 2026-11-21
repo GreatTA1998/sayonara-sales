@@ -37,14 +37,14 @@ const emptySeed = (id: string): Store =>
     ? { address: "目黒区", lineInviteUrl: "", phone: "", items: [], claims: [], published: true }
     : { address: "目黒区", items: [], claims: [] };
 
-/** Claim shops/{id}.ownerUid when missing. Throws if another uid already owns. */
+/** Claim ownerUid for non-elton shops. Elton: soft Jimoty era — no UID gate (rules). */
 async function claimShopOwner(shop: string, uid: string) {
+  if (shop === ELTON_SHOP) return;
   const ref = doc(getDb(), "shops", shop);
   const snap = await getDoc(ref);
   if (!snap.exists()) {
     const seed = emptySeed(shop);
     seed.ownerUid = uid;
-    if (shop === ELTON_SHOP) seed.published = true;
     await setDoc(ref, { ...shopFields(seed), ownerUid: uid, updatedAt: new Date().toISOString() });
     return;
   }
@@ -71,7 +71,7 @@ export function listenShop(
   const emit = () => { if (itemsReady) onData(assemble(state)); };
   const fail = (e: unknown) => onErr?.(e instanceof Error ? e : new Error(String(e)));
 
-  if (opts?.claimOwner) {
+  if (opts?.claimOwner && shop !== ELTON_SHOP) {
     void ensureAuth().then((u) => claimShopOwner(shop, u.uid)).catch(fail);
   }
 
@@ -132,8 +132,8 @@ async function setClaimStatus(shop: string, id: string, from: string, to: string
 export async function adminAct(shopRaw: string, body: Record<string, unknown>): Promise<unknown> {
   const shop = parseShop(shopRaw);
   const user = await ensureAuth();
-  // Await ownership before writes — listenShop claimOwner is fire-and-forget.
-  await claimShopOwner(shop, user.uid);
+  // Non-elton: await ownership. Elton soft-auth: signedIn only (no ownerUid race).
+  if (shop !== ELTON_SHOP) await claimShopOwner(shop, user.uid);
   const db = getDb();
   const shopRef = doc(db, "shops", shop);
   const action = String(body.action || "");
