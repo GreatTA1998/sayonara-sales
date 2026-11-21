@@ -4,13 +4,13 @@
  * Optimistic local writes reconcile when onSnapshot fires.
  */
 import {
-  arrayUnion, collection, doc, getDoc, getDocs, onSnapshot, runTransaction, setDoc, updateDoc, deleteDoc,
+  arrayRemove, arrayUnion, collection, doc, getDoc, getDocs, onSnapshot, runTransaction, setDoc, updateDoc, deleteDoc,
   type Unsubscribe,
 } from "firebase/firestore";
 import { ensureAuth, getDb } from "./fb";
 import {
   applyDates, applyMins, bookableDays, cartMeets, cartRule, claimFields, ELTON_SHOP, hasBuyerContact,
-  itemFields, itemStatus, joinWait, normalizeSlots, parseShop, shortCode, shopFields, shopSlots,
+  itemFields, itemStatus, normalizeSlots, parseShop, shortCode, shopFields, shopSlots,
   storeFromDocs, takenSlots, uid, type Claim, type Item, type Store,
 } from "./store";
 
@@ -150,12 +150,15 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
     case "edit": {
       const id = String(body.id);
       const ref = doc(db, "shops", shop, "items", id);
-      // Atomic append — parallel multi-add must not replace the full photos array.
+      // Atomic photo field ops (append/remove); full `photos` only for reorder.
       if (typeof body.appendPhoto === "string" && body.appendPhoto) {
         await updateDoc(ref, { photos: arrayUnion(body.appendPhoto) });
         return { id, appendPhoto: body.appendPhoto };
       }
-      // Patch only provided fields — never rewrite photos on name/price/memo/pause.
+      if (typeof body.removePhoto === "string" && body.removePhoto) {
+        await updateDoc(ref, { photos: arrayRemove(body.removePhoto) });
+        return { id, removePhoto: body.removePhoto };
+      }
       const patch: Record<string, unknown> = {};
       if (body.name != null) patch.name = String(body.name).trim();
       if ("price" in body) patch.price = numPrice(body.price);
@@ -244,27 +247,27 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
   }
 }
 
-/** Buyer waitlist — append account to claim.waiters. */
+/** Buyer waitlist — transactional append (no stale waiters RMW). */
 export async function joinWaitLive(shopRaw: string, itemId: string, account: string) {
   const shop = parseShop(shopRaw);
+  const a = account.trim();
+  if (!a) throw new Error("アカウントが必要です");
   await ensureAuth();
   const db = getDb();
-  const itemSnap = await getDoc(doc(db, "shops", shop, "items", itemId));
-  if (!itemSnap.exists()) throw new Error("品目が見つかりません");
-  const claimId = itemSnap.data().claimId ? String(itemSnap.data().claimId) : "";
-  if (!claimId) throw new Error("待機できません");
-  const cref = doc(db, "shops", shop, "claims", claimId);
-  const csnap = await getDoc(cref);
-  if (!csnap.exists()) throw new Error("待機できません");
-  const s = storeFromDocs(
-    {},
-    [{ id: itemId, data: itemSnap.data() as Record<string, unknown> }],
-    [{ id: claimId, data: csnap.data() as Record<string, unknown> }],
-  );
-  const out = joinWait(s, itemId, account);
-  const claim = s.claims.find((c) => c.id === claimId)!;
-  await updateDoc(cref, { waiters: claim.waiters || [] });
-  return out;
+  return runTransaction(db, async (tx) => {
+    const itemSnap = await tx.get(doc(db, "shops", shop, "items", itemId));
+    if (!itemSnap.exists()) throw new Error("品目が見つかりません");
+    const claimId = itemSnap.data().claimId ? String(itemSnap.data().claimId) : "";
+    if (!claimId) throw new Error("待機できません");
+    const cref = doc(db, "shops", shop, "claims", claimId);
+    const csnap = await tx.get(cref);
+    const st = csnap.exists() ? String(csnap.data()!.status || "") : "";
+    if (st !== "requested" && st !== "booked") throw new Error("待機できません");
+    const prev = Array.isArray(csnap.data()!.waiters) ? csnap.data()!.waiters as { account?: string; at?: string }[] : [];
+    if (prev.some((w) => w.account === a)) return { ok: true as const };
+    tx.update(cref, { waiters: [...prev, { account: a, at: new Date().toISOString() }] });
+    return { ok: true as const };
+  });
 }
 
 /** Buyer book — creates requested claim; snapshot reconciles. */
