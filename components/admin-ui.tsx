@@ -50,6 +50,13 @@ const claimSummary = (c: Claim, all: Item[]) => {
 };
 const claimWhen = (c: Claim) => [c.contact && c.contact !== "LINE" && c.contact !== "ジモティー" ? c.contact : "", `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}`].filter(Boolean).join(" · ");
 
+/** Editable Muse seed — Sayonara→Jimoty copy-paste helper (no auto-post). */
+function musePrompt(bio: string, items: { name?: string; price?: number | null }[]) {
+  const list = items.slice(0, 40).map((it) =>
+    `- ${(it.name || "").trim() || "無題"}${it.price != null ? ` ¥${Number(it.price).toLocaleString("ja-JP")}` : ""}`).join("\n");
+  return `次をジモティの出品文に整えて（簡潔・日本語）：\n\n【ショップメモ】\n${bio.trim() || "（なし）"}\n\n【出品一覧】\n${list || "（なし）"}\n`;
+}
+
 export default function ShopAdminView({ shop, name }: Props) {
   const router = useRouter();
   const [data, setData] = useState<AdminState | null>(null);
@@ -96,6 +103,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [listDraft, setListDraft] = useState("");
   const [jmDraft, setJmDraft] = useState("");
   const [jmBusy, setJmBusy] = useState(false);
+  const [museDraft, setMuseDraft] = useState("");
   const listRef = useRef<HTMLInputElement | null>(null);
   const dragRef = useRef<{ from: number; over: number; x: number; y: number; moved: boolean } | null>(null);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
@@ -730,6 +738,24 @@ export default function ShopAdminView({ shop, name }: Props) {
           </div>
         )}
       </div>
+
+      {!empty && (
+        <section className="prof-block">
+          <p className="hint">Sayonara→ジモティは Muse（無料）で整えてコピペ。自動投稿なし。</p>
+          <label className="float"><span>ジモティ用プロンプト</span>
+            <textarea className="grow" rows={4}
+              value={museDraft || musePrompt(bio, items)}
+              onChange={(e) => setMuseDraft(e.target.value)} /></label>
+          <div className="list-row" style={{ marginTop: 6 }}>
+            <button type="button" className="share"
+              onClick={() => {
+                void navigator.clipboard?.writeText(museDraft || musePrompt(bio, items)).catch(() => undefined);
+                show("コピーしました", "ok");
+              }}>コピー</button>
+            <button type="button" className="share" onClick={() => setMuseDraft(musePrompt(bio, items))}>下書きを入れ直す</button>
+          </div>
+        </section>
+      )}
       <SquareCam open={camOpen} accept={IMG_ACCEPT}
         tip={camItemId ? undefined : "1枚＝1出品。名前はあとで。"}
         sharp={!!camItemId}

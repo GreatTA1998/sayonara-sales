@@ -8,6 +8,7 @@ import {
   writeBatch, type Unsubscribe,
 } from "firebase/firestore";
 import { ensureAuth, getDb } from "./fb";
+import { tokyoYmd } from "./days";
 import {
   applyDates, applyMins, bookableDays, cartMeets, cartRule, claimFields, ELTON_SHOP, hasBuyerContact,
   itemFields, normalizeSlots, parseShop, shortCode, shopFields, shopSlots,
@@ -185,8 +186,13 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       return item;
     }
     case "import": {
+      // Deterministic scrape dump only — hard ≤50 items, 2×/Tokyo-day per shop.
       const rows = Array.isArray(body.items) ? body.items.slice(0, 50) : [];
       if (!rows.length) throw new Error("取り込む出品がありません");
+      const meta = (await getDoc(shopRef)).data() || {};
+      const day = tokyoYmd();
+      const used = String(meta.jimotyImportDay || "") === day ? Number(meta.jimotyImportCount || 0) : 0;
+      if (used >= 2) throw new Error("ジモティ取込は1日2回までです");
       const base = (await getDocs(collection(db, "shops", shop, "items"))).size;
       const batch = writeBatch(db);
       rows.forEach((row, i) => {
@@ -201,8 +207,12 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       });
       await batch.commit();
       const jurl = typeof body.jimotyUrl === "string" ? body.jimotyUrl.trim() : "";
-      if (jurl) await updateDoc(shopRef, { jimotyUrl: jurl, updatedAt: new Date().toISOString() });
-      return { ok: true, count: rows.length };
+      await updateDoc(shopRef, {
+        jimotyImportDay: day, jimotyImportCount: used + 1,
+        updatedAt: new Date().toISOString(),
+        ...(jurl ? { jimotyUrl: jurl } : {}),
+      });
+      return { ok: true, count: rows.length, left: 1 - used };
     }
     case "edit": {
       const id = String(body.id);
