@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-const CLOSED = /受付終了|取引完了|削除/;
+/** List cards mark closed listings with sold overlay (`img_sold`); detail copy as fallback. */
+const CLOSED = /img_sold|受付終了|取引完了|削除/;
 const yen = (s: string) => (!s || /無料|相談/.test(s) ? 0 : Number((s.replace(/,/g, "").match(/\d+/) || [0])[0]) || 0);
 const hdr = { "user-agent": UA, "accept-language": "ja" };
 
@@ -20,21 +21,24 @@ async function html(url: string) {
   return res.text();
 }
 
+/** Parse one profile page. Returns how many article cards were seen (sold+active). */
 function parseItems(page: string, seen: Set<string>, items: Item[], cap: number) {
-  let grew = 0;
+  let cards = 0;
   const re = /<a class="[^"]*portal_list_link[^"]*" href="([^"]+)">([\s\S]*?)<\/a>/g;
   for (let m; (m = re.exec(page)); ) {
     const href = m[1], body = m[2];
-    if (!/article-/.test(href) || CLOSED.test((body.match(/class=['"]bace['"][^>]*>\s*([^<]+)/) || [])[1] || "")) continue;
+    if (!/article-/.test(href)) continue;
+    cards++;
+    if (CLOSED.test(body)) continue;
     const title = (body.match(/portal_list_title[^>]*>\s*([^<]+)/) || [])[1]?.trim();
     if (!title) continue;
     const abs = href.startsWith("http") ? href : `https://jmty.jp${href.startsWith("/") ? "" : "/"}${href}`;
     if (seen.has(abs) || items.length >= cap) continue;
-    seen.add(abs); grew++;
+    seen.add(abs);
     const photo = (body.match(/src="(https:\/\/cdn\.jmty\.jp\/articles\/[^"]+)"/) || [])[1];
     items.push({ name: title, price: yen((body.match(/<b>\s*([^<]+)/) || [])[1] || ""), url: abs, ...(photo ? { photo } : {}) });
   }
-  return grew;
+  return cards;
 }
 
 async function scrapeProfile(id: string, cap = 50, maxPages = 20) {
@@ -89,19 +93,18 @@ export async function GET(req: Request) {
         const candidates = [];
         for (const cand of ids.slice(0, 4)) {
           const s = await scrapeProfile(cand, 4, 1);
-          candidates.push({ id: s.id, name: s.name || rawName, url: s.url, count: s.items.length, samples: s.items });
+          candidates.push({ id: s.id, name: s.name || rawName, url: s.url, samples: s.items });
         }
         return NextResponse.json({ candidates });
       }
       id = ids[0];
     }
 
-    const data = await scrapeProfile(id, preview ? 6 : 50, preview ? 1 : 20);
-    if (!data.items.length) throw new Error("公開中の出品が見つかりません");
+    const data = await scrapeProfile(id, preview ? 4 : 50, preview ? 3 : 20);
+    if (!data.items.length) throw new Error("受付中の出品が見つかりません");
     if (preview) {
       return NextResponse.json({
-        id: data.id, name: data.name, url: data.url,
-        count: data.items.length, samples: data.items.slice(0, 4),
+        id: data.id, name: data.name, url: data.url, samples: data.items.slice(0, 4),
       });
     }
     return NextResponse.json(data);

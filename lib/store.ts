@@ -4,6 +4,8 @@ import { CANON_LINE, CANON_PHONE, DEF_LEAD, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } f
 export type Item = {
   id: string; name: string; price: number | null; note?: string; claimId?: string | null;
   photos?: string[]; paused?: boolean;
+  /** Set on Jimoty magic-import rows — wipeImport deletes these only. */
+  jimoty?: boolean;
 };
 export type PickupSpot = { id: string; name: string; mapsUrl: string };
 export type Claim = {
@@ -191,6 +193,7 @@ export function itemFields(it: Item, pos: number): Record<string, unknown> {
   return {
     name: it.name, price: it.price, note: it.note || null, claimId: it.claimId || null,
     photos: it.photos || [], paused: !!it.paused, pos,
+    ...(it.jimoty ? { jimoty: true } : {}),
   };
 }
 
@@ -219,6 +222,7 @@ export function storeFromDocs(
       if (r.claimId) it.claimId = String(r.claimId);
       if (Array.isArray(r.photos) && r.photos.length) it.photos = r.photos.map(String);
       if (r.paused) it.paused = true;
+      if (r.jimoty) it.jimoty = true;
       return it;
     }),
     claims: [...claims]

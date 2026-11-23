@@ -13,7 +13,7 @@ import { getName, getProfile, openShop, saveProfile, subscribeAuth } from "@/lib
 import { bookableDays, ELTON_SHOP, shopMins, shopPublished, uid, type PickupSpot, type Store } from "@/lib/store";
 import { SITE_URL } from "@/lib/site";
 
-type Item = PhotoItem & { claimId?: string | null; note?: string; paused?: boolean };
+type Item = PhotoItem & { claimId?: string | null; note?: string; paused?: boolean; jimoty?: boolean };
 type Claim = {
   id: string; code: string; day: string; slot?: string; contact?: string; contactMethod?: string;
   itemIds: string[]; status: string; spotName?: string; spotMapsUrl?: string;
@@ -51,7 +51,7 @@ const claimSummary = (c: Claim, all: Item[]) => {
 const claimWhen = (c: Claim) => [c.contact && c.contact !== "LINE" && c.contact !== "ジモティー" ? c.contact : "", `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}`].filter(Boolean).join(" · ");
 
 const MUSE_URL = "https://muse.oriz.in";
-/** Editable Muse seed — Sayonara→Jimoty copy-paste helper (no auto-post). */
+/** Muse seed — Sayonara→Jimoty listing sync via copy-paste. */
 function musePrompt(shop: string, bio: string, items: { name?: string; price?: number | null }[]) {
   const invite = `${SITE_URL}/s/${shop}`;
   const list = items.slice(0, 40).map((it) =>
@@ -59,7 +59,7 @@ function musePrompt(shop: string, bio: string, items: { name?: string; price?: n
   const memo = bio.trim()
     ? `${bio.trim()}\n\nまとめて予約・受け渡し → ${invite}`
     : `まとめて予約・受け渡しは Sayonara → ${invite}`;
-  return `次をジモティの出品文に整えて（簡潔・日本語・コピペ用）：\n\n【招待】\n${memo}\n\n【出品一覧】\n${list || "（なし）"}\n`;
+  return `Sayonaraの出品をジモティ向けに整えて（簡潔・日本語・コピペ用）。約24時間ごとにSayonaraを見なおしてジモティへ同期して：\n\n【招待】\n${memo}\n\n【出品一覧】\n${list || "（なし）"}\n`;
 }
 
 export default function ShopAdminView({ shop, name }: Props) {
@@ -109,10 +109,10 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [listDraft, setListDraft] = useState("");
   const [jmDraft, setJmDraft] = useState("");
   const [jmBusy, setJmBusy] = useState(false);
-  type JmPrev = { id: string; name: string; url: string; count: number; samples: { name: string; price: number; photo?: string; url?: string }[] };
+  type JmPrev = { id: string; name: string; url: string; samples: { name: string; price: number; photo?: string; url?: string }[] };
   const [jmPrev, setJmPrev] = useState<JmPrev | null>(null);
   const [jmCands, setJmCands] = useState<JmPrev[]>([]);
-  const [museDraft, setMuseDraft] = useState("");
+  const [jmWipeBusy, setJmWipeBusy] = useState(false);
   const listRef = useRef<HTMLInputElement | null>(null);
   const dragRef = useRef<{ from: number; over: number; x: number; y: number; moved: boolean } | null>(null);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
@@ -486,15 +486,14 @@ export default function ShopAdminView({ shop, name }: Props) {
       const res = await fetch(`/api/jimoty?name=${encodeURIComponent(name)}&preview=1`);
       const data = await res.json() as {
         error?: string; candidates?: JmPrev[];
-        id?: string; name?: string; url?: string; count?: number;
+        id?: string; name?: string; url?: string;
         samples?: JmPrev["samples"];
       };
       if (!res.ok) throw new Error(data.error || "失敗しました");
       if (data.candidates?.length) { setJmCands(data.candidates); return; }
       if (!data.id || !data.url) throw new Error("見つかりません");
       setJmPrev({
-        id: data.id, name: data.name || name, url: data.url,
-        count: data.count || data.samples?.length || 0, samples: data.samples || [],
+        id: data.id, name: data.name || name, url: data.url, samples: data.samples || [],
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "失敗しました";
@@ -525,6 +524,25 @@ export default function ShopAdminView({ shop, name }: Props) {
       const msg = e instanceof Error ? e.message : "失敗しました";
       setErr(msg); show(msg, "err");
     } finally { setJmBusy(false); }
+  }
+
+  async function wipeJimotyImport() {
+    const tagged = items.filter((i) => i.jimoty).length;
+    const n = tagged || items.length;
+    if (!n) { show("削除する出品がありません", "err"); return; }
+    const msg = tagged
+      ? `取り込み分 ${tagged}件を削除しますか？（手入力はそのまま）`
+      : `タグなしのため全出品 ${n}件を削除しますか？`;
+    if (!confirm(msg)) return;
+    if (jmWipeBusy) return;
+    setJmWipeBusy(true); show("削除中…", "busy");
+    try {
+      const body = await adminAct(shop, { action: "wipeImport" }) as { count?: number };
+      show(`${body.count || n}件削除しました`, "ok");
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : "失敗しました";
+      setErr(errMsg); show(errMsg, "err");
+    } finally { setJmWipeBusy(false); }
   }
 
   async function deleteItem(item: Item) {
@@ -773,7 +791,8 @@ export default function ShopAdminView({ shop, name }: Props) {
           )}
           {jmPrev && (
             <div className="jm-prev">
-              <p className="jm-who"><b>{jmPrev.name}さん</b>の公開出品（例）</p>
+              <p className="jm-who"><b>{jmPrev.name}さん</b> — 本人確認用のサンプル</p>
+              <p className="hint">これは全件ではありません。確認後に受付中の出品をまとめて取り込みます。</p>
               <ul className="jm-samples">
                 {jmPrev.samples.map((s) => (
                   <li key={s.url || s.name}>
@@ -822,21 +841,19 @@ export default function ShopAdminView({ shop, name }: Props) {
       </div>
 
       {!empty && (
-        <section className="prof-block">
-          <p className="hint">Sayonara→ジモティは無料の <a href={MUSE_URL} target="_blank" rel="noopener noreferrer">Muse</a> で整えてコピペ。自動投稿なし。</p>
-          <label className="float"><span>ジモティ用プロンプト</span>
-            <textarea className="grow" rows={4}
-              value={museDraft || musePrompt(shop, bio, items)}
-              onChange={(e) => setMuseDraft(e.target.value)} /></label>
-          <div className="list-row" style={{ marginTop: 6 }}>
-            <button type="button" className="share"
-              onClick={() => {
-                void navigator.clipboard?.writeText(museDraft || musePrompt(shop, bio, items)).catch(() => undefined);
-                show("コピーしました", "ok");
-              }}>コピー</button>
-            <button type="button" className="share" onClick={() => setMuseDraft(musePrompt(shop, bio, items))}>下書きを入れ直す</button>
-          </div>
-        </section>
+        <p className="hint jm-muse">
+          Sayonara→ジモティは
+          <a href={MUSE_URL} target="_blank" rel="noopener noreferrer">Muse</a>
+          用プロンプトをコピーして整える。
+          <button type="button" className="share" onClick={() => {
+            void navigator.clipboard?.writeText(musePrompt(shop, bio, items)).catch(() => undefined);
+            show("コピーしました", "ok");
+          }}>コピー</button>
+          <button type="button" className="share" disabled={jmWipeBusy || !data}
+            onClick={() => void wipeJimotyImport()}>
+            {jmWipeBusy ? "削除中…" : "取り込んだ出品を削除"}
+          </button>
+        </p>
       )}
       <SquareCam open={camOpen} accept={IMG_ACCEPT}
         tip={camItemId ? undefined : "1枚＝1出品。名前はあとで。"}
