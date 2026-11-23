@@ -1,6 +1,6 @@
-/** Soft Jimoty username → shop id. Legacy `ss-line-name` read fallback. */
-const NAME_KEY = "ss-jimoty-name";
-const LEGACY_NAME_KEY = "ss-line-name";
+/** Soft Jimoty and/or LINE name → one shop. Hard login = LINE OAuth (ss-line-uid). */
+const JIMOTY_KEY = "ss-jimoty-name";
+const LINE_KEY = "ss-line-name";
 const ID_KEY = "ss-shop-id";
 const MAP_KEY = "ss-shop-map";
 const UID_KEY = "ss-line-uid";
@@ -35,37 +35,35 @@ const readMap = (): Record<string, string> => {
 };
 
 const clearNames = () => {
-  localStorage.removeItem(NAME_KEY); localStorage.removeItem(LEGACY_NAME_KEY);
-};
-const writeName = (v: string) => {
-  localStorage.setItem(NAME_KEY, v); localStorage.removeItem(LEGACY_NAME_KEY);
+  localStorage.removeItem(JIMOTY_KEY); localStorage.removeItem(LINE_KEY);
 };
 
-/** Once: ss-line-name→jimoty; reclaim id↔name so shops aren’t orphaned after key move. */
+/** Reclaim id↔names so shops aren’t orphaned across Jimoty/LINE soft keys. */
 let ready = false;
 const hydrate = () => {
   if (ready || typeof window === "undefined") return;
   ready = true;
-  let name = (localStorage.getItem(NAME_KEY) || localStorage.getItem(LEGACY_NAME_KEY) || "").trim();
-  let id = (localStorage.getItem(ID_KEY) || "").trim();
+  let j = stored(JIMOTY_KEY), l = stored(LINE_KEY), id = stored(ID_KEY);
   const map = readMap();
-  if (!name && isShop(id)) {
-    name = id === ELTON_ID ? ELTON_LABEL
-      : (Object.entries(map).find(([, v]) => v === id)?.[0] || "");
+  if (!j && !l && isShop(id)) {
+    j = id === ELTON_ID ? ELTON_LABEL : (Object.entries(map).find(([, v]) => v === id)?.[0] || "");
+    if (j) localStorage.setItem(JIMOTY_KEY, j);
   }
-  if (name && !isShop(id)) id = knownId(name) || map[norm(name)] || "";
-  if (!name) return;
-  writeName(name);
-  if (!isShop(id)) return;
-  map[norm(name)] = id;
+  const name = j || l;
+  if (name && !isShop(id)) id = knownId(j) || knownId(l) || (j && map[norm(j)]) || (l && map[norm(l)]) || "";
+  if (!name || !isShop(id)) return;
+  if (j) map[norm(j)] = id;
+  if (l) map[norm(l)] = id;
   localStorage.setItem(MAP_KEY, JSON.stringify(map));
   localStorage.setItem(ID_KEY, id);
 };
 
+const stored = (k: string) => (localStorage.getItem(k) || "").trim();
+/** Display identity: Jimoty first, else soft LINE name. */
 export const getName = () =>
-  typeof window === "undefined" ? "" : (hydrate(), (localStorage.getItem(NAME_KEY) || "").trim());
+  typeof window === "undefined" ? "" : (hydrate(), stored(JIMOTY_KEY) || stored(LINE_KEY));
 export const getId = () =>
-  typeof window === "undefined" ? "" : (hydrate(), (localStorage.getItem(ID_KEY) || "").trim());
+  typeof window === "undefined" ? "" : (hydrate(), stored(ID_KEY));
 export const adminPath = (id: string) => `/s/${id}/admin`;
 export const notifyAuth = () => { if (typeof window !== "undefined") window.dispatchEvent(new Event(AUTH_EVT)); };
 /** For useSyncExternalStore — identity known on first client paint (no useEffect flash). */
@@ -108,19 +106,20 @@ const readUidMap = (): Record<string, string> => {
   catch { return {}; }
 };
 
-/** Soft Jimoty name. Bind shop only when reclaiming known/map or an existing guest shop — never invent. */
-export const openShop = (n: string) => {
+/** Soft login: Jimoty and/or LINE → one account. Empty both clears soft names. */
+export const softLogin = (jimoty: string, line: string) => {
   if (typeof window === "undefined") return "";
-  const v = n.trim();
-  if (!v) { clearNames(); notifyAuth(); return getId(); }
+  const j = jimoty.trim(), l = line.trim();
+  if (!j && !l) { clearNames(); notifyAuth(); return getId(); }
   const map = readMap();
-  const key = norm(v);
   const cur = getId();
-  let id = knownId(v) || map[key] || "";
+  let id = knownId(j) || knownId(l) || (j && map[norm(j)]) || (l && map[norm(l)]) || "";
   if (!isShop(id) && isShop(cur)) id = cur;
-  writeName(v);
+  if (j) localStorage.setItem(JIMOTY_KEY, j);
+  if (l) localStorage.setItem(LINE_KEY, l);
   if (isShop(id)) {
-    map[key] = id;
+    if (j) map[norm(j)] = id;
+    if (l) map[norm(l)] = id;
     localStorage.setItem(MAP_KEY, JSON.stringify(map));
     localStorage.setItem(ID_KEY, id);
   }
@@ -128,19 +127,23 @@ export const openShop = (n: string) => {
   return id;
 };
 
-/** Bind LINE userId → current/guest shop; soft-upgrade display name. */
+/** Single-name soft bind (checkout / legacy). kind=line writes LINE soft name. */
+export const openShop = (n: string, kind: "jimoty" | "line" = "jimoty") =>
+  softLogin(kind === "jimoty" ? n : "", kind === "line" ? n : "");
+
+/** Bind LINE OAuth userId → shop; soft-upgrade LINE display name (keeps Jimoty if set). */
 export const bindLineUser = (uid: string, displayName: string) => {
   if (typeof window === "undefined" || !uid.trim()) return "";
   const umap = readUidMap();
   const cur = getId();
   let id = umap[uid] || (isShop(cur) ? cur : "");
   const name = displayName.trim();
-  if (!isShop(id)) id = openShop(name || "Jimoty") || ensureShopId();
+  if (!isShop(id)) id = softLogin("", name || "LINE") || ensureShopId();
   else if (name) {
     const map = readMap();
     map[norm(name)] = id;
     localStorage.setItem(MAP_KEY, JSON.stringify(map));
-    writeName(name);
+    localStorage.setItem(LINE_KEY, name);
     localStorage.setItem(ID_KEY, id);
     notifyAuth();
   }
@@ -161,7 +164,7 @@ export const applyLineSession = async () => {
   return body;
 };
 
-/** Clear soft name + shop pointer + optional LINE session (map/known reclaim on next sign-in). */
+/** Clear soft names + shop pointer + optional LINE session (map/known reclaim on next sign-in). */
 export async function logout() {
   if (typeof window === "undefined") return;
   clearNames(); localStorage.removeItem(UID_KEY); localStorage.removeItem(ID_KEY); notifyAuth();

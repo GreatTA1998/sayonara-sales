@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useLineOAuthReturn } from "@/components/line-oauth";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
-import { adminPath, ensureShopId, getId, getName, logout, openShop, subscribeAuth } from "@/lib/shop";
+import { adminPath, ensureShopId, getId, getName, logout, softLogin, subscribeAuth } from "@/lib/shop";
 
 type Props = { top?: boolean };
 type Shot = { preview: string; url?: string; err?: string };
@@ -18,7 +18,8 @@ export default function AppNav({ top }: Props) {
   const name = useSyncExternalStore(subscribeAuth, getName, () => "");
   const shopId = useSyncExternalStore(subscribeAuth, getId, () => "");
   const [open, setOpen] = useState<"help" | "me" | "">("");
-  const [draft, setDraft] = useState("");
+  const [jimoty, setJimoty] = useState("");
+  const [line, setLine] = useState("");
   const [body, setBody] = useState("");
   const [shot, setShot] = useState<Shot | null>(null);
   const [busy, setBusy] = useState(false);
@@ -178,12 +179,14 @@ export default function AppNav({ top }: Props) {
               <form className={`${pop} pane`} role="dialog" aria-label="ログイン"
                 onSubmit={(e) => {
                   e.preventDefault();
-                  if (!draft.trim()) return;
-                  openShop(draft); setDraft(""); setOpen("");
+                  if (!jimoty.trim() && !line.trim()) return;
+                  softLogin(jimoty, line); setJimoty(""); setLine(""); setOpen("");
                 }}>
-                <input value={draft} onChange={(e) => setDraft(e.target.value)}
+                <input value={jimoty} onChange={(e) => setJimoty(e.target.value)}
                   placeholder="ジモティ名" autoComplete="nickname" autoFocus />
-                <button type="submit" disabled={!draft.trim()}>サインイン</button>
+                <input value={line} onChange={(e) => setLine(e.target.value)}
+                  placeholder="LINE名" autoComplete="nickname" />
+                <button type="submit" disabled={!jimoty.trim() && !line.trim()}>サインイン</button>
               </form>
             ))}
           </div>

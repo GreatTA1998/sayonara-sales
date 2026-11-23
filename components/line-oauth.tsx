@@ -29,10 +29,7 @@ export const lineLoginHref = () => {
   return `/api/auth/line?return=${encodeURIComponent(window.location.pathname + window.location.search || "/")}`;
 };
 
+/** Hard login. Needs LINE_CHANNEL_ID/SECRET on Vercel; else ?line_err=config. */
 export function LineLoginLink() {
-  return (
-    <button type="button" className="cta line" disabled>
-      LINEログイン（近日公開）
-    </button>
-  );
+  return <a className="cta line" href={lineLoginHref()}>LINEでログイン</a>;
 }

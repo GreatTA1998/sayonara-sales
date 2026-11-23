@@ -4,7 +4,7 @@ import { SESS_COOKIE, cookieOpts, lineConfigured, readSess } from "@/lib/line";
 
 export const dynamic = "force-dynamic";
 
-/** Current optional LINE OAuth session (for soft-upgrade of ss-line-name / shop). */
+/** Hard LINE OAuth session (soft-upgrade LINE name + uid→shop). */
 export async function GET() {
   const jar = await cookies();
   const sess = readSess(jar.get(SESS_COOKIE)?.value);

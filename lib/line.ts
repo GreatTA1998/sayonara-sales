@@ -1,4 +1,4 @@
-/** LINE Login (OAuth) — optional; soft LINE名 stays default. */
+/** Hard LINE Login (OAuth). Soft Jimoty/LINE names work without channel secrets. */
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { SITE_URL } from "./site";
 
