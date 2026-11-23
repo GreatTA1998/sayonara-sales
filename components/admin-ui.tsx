@@ -1070,11 +1070,6 @@ export default function ShopAdminView({ shop, name }: Props) {
         </details>
       </section>
 
-      {(data?.claims || []).some((c) => c.status === "picked_up") && (
-        <p className="hint thanks pad">ありがとう。ほかの小さなアプリも →{" "}
-          <a className="linelink" href="https://linelton.dev" target="_blank" rel="noopener noreferrer">linelton.dev</a></p>
-      )}
-
       {claimOpen && (
         <div className="mask" role="dialog" aria-modal="true" aria-label="予約詳細"
           onClick={closeClaim}>
@@ -1154,7 +1149,8 @@ export default function ShopAdminView({ shop, name }: Props) {
                       onClick={() => claimAct({ action: "cancel", id: claimOpen.id }, "キャンセルしました")}>キャンセル</button>
                     <button type="button" onClick={() => openResched(claimOpen)}>日程変更</button>
                     <button type="button"
-                      onClick={() => claimAct({ action: "picked_up", id: claimOpen.id, itemIds: keep }, "受取済み")}>受取済み</button>
+                      onClick={() => claimAct({ action: "picked_up", id: claimOpen.id, itemIds: keep },
+                        "ありがとう。よい体験だったらうれしいです。\nお友だちにそっと教えてもらえると、ジモティーがエルトンを雇ってくれるかも。")}>受取済み</button>
                   </>
                 ) : null}
               </div>
