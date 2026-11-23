@@ -11,9 +11,9 @@
 .xcard.dense{border-radius:6px}
 .xcard.on{border-color:#ff9900;background:#fff8ee}
 .xcard.dim,.xtxt.dim{opacity:.45}
-.xcard.sold .xphoto{filter:brightness(.92)}
-.xcard:is(.sold,.req) .xphoto::after,.xtxt:is(.sold,.req):not(.dense)::after{content:"依頼中";position:absolute;z-index:1;border-radius:4px;background:rgba(17,17,17,.72);color:#fff;font-size:var(--t-sm);font-weight:var(--fw-bold);line-height:1.3;pointer-events:none}
-.xcard:is(.sold,.req) .xphoto::after{left:6px;top:6px;padding:2px 7px}.xcard.dense:is(.sold,.req) .xphoto::after{left:3px;top:3px;padding:1px 4px;font-size:10px}.xtxt:is(.sold,.req):not(.dense)::after{right:8px;top:8px;padding:1px 6px}.xcard.sold .xphoto::after,.xtxt.sold:not(.dense)::after{content:"予約済"}
+.xcard:is(.sold,.booked) .xphoto{filter:brightness(.92)}
+.xcard:is(.sold,.booked,.req) .xphoto::after,.xtxt:is(.sold,.booked,.req):not(.dense)::after{content:"依頼中";position:absolute;z-index:1;border-radius:4px;background:rgba(17,17,17,.72);color:#fff;font-size:var(--t-sm);font-weight:var(--fw-bold);line-height:1.3;pointer-events:none}
+.xcard:is(.sold,.booked,.req) .xphoto::after{left:6px;top:6px;padding:2px 7px}.xcard.dense:is(.sold,.booked,.req) .xphoto::after{left:3px;top:3px;padding:1px 4px;font-size:10px}.xtxt:is(.sold,.booked,.req):not(.dense)::after{right:8px;top:8px;padding:1px 6px}.xcard.booked .xphoto::after,.xtxt.booked:not(.dense)::after{content:"予約済"}.xcard.sold .xphoto::after,.xtxt.sold:not(.dense)::after{content:"受付終了"}
 .xcard .xphoto{position:relative;flex:0 0 auto;aspect-ratio:1/1;background:#eee;overflow:hidden}
 .xcard .xphoto img{display:block;width:100%;height:100%;object-fit:contain}
 .xcard .xmeta{display:flex;flex-direction:column;gap:2px;padding:8px 10px 10px;min-height:0}
@@ -25,7 +25,7 @@
 .xtxt{position:relative;display:flex;flex-direction:column;gap:2px;padding:8px 10px;border:1px solid #e5e5e5;border-radius:16px;background:#fff;text-align:left;cursor:pointer;font:inherit;color:inherit;min-height:44px;box-sizing:border-box}
 .xtxt.dense{display:block;width:100%;margin:0;padding:2px 0;border:0;border-radius:0;background:0;min-height:0;break-inside:avoid}
 .xtxt.on{border-color:#ff9900;background:#fff8ee}
-.xtxt.sold:not(.dense){background:#f3f3f3}.xtxt.dense.sold{opacity:.55}
+.xtxt:is(.sold,.booked):not(.dense){background:#f3f3f3}.xtxt.dense:is(.sold,.booked){opacity:.55}
 .xtxt .xname{word-break:break-word}.xtxt.dense .xname{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;word-break:normal;font-size:var(--t-xs)}
 .admin-bar{justify-content:flex-start}
 .admin-bar .shop{flex:0 0 auto;font-size:var(--t-base);font-weight:var(--fw);color:var(--c);padding:0 4px;white-space:nowrap;max-width:40%;overflow:hidden;text-overflow:ellipsis}

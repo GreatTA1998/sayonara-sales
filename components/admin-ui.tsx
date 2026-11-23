@@ -933,7 +933,10 @@ export default function ShopAdminView({ shop, name }: Props) {
             showSold={showSold} onShowSold={setShowSold} />
           <Listings items={listItems} dense={dense} onSelect={openDetail}
             disabledFor={(it) => deleting === it.id}
-            classNameFor={(it) => `${deleting === it.id || it.paused ? "dim" : ""}${data && itemFlags(data as Store, it).taken ? " sold" : ""}`.trim()} />
+            classNameFor={(it) => {
+              const f = data ? itemFlags(data as Store, it) : null;
+              return `${deleting === it.id || it.paused ? "dim" : ""}${f?.sold ? " sold" : f?.taken ? " booked" : ""}`.trim();
+            }} />
         </>
       )}
 

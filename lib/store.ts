@@ -15,7 +15,7 @@ export type Claim = {
   spotId?: string; spotName?: string; spotMapsUrl?: string;
   /** Optional buyer offer ¥ (may be below/above 現金合計). */
   offer?: number;
-  /** requested = pending; booked = confirmed 予約済. */
+  /** requested = pending; booked = 予約済; picked_up = 受付終了 (sold). */
   status: "requested" | "booked" | "picked_up" | "cancelled"; createdAt: string;
   waiters?: { account: string; at: string }[];
   buyerUid?: string;
@@ -173,14 +173,15 @@ function claimOf(s: Store, item: Item) {
   return item.claimId ? s.claims.find((c) => c.id === item.claimId) : undefined;
 }
 
-/** taken = 予約済; when = claim day+slot; reqN = pending 依頼 (still 依頼可). */
+/** taken = locked; sold = 受付終了; booked → when + 予約済; reqN = pending 依頼. */
 export function itemFlags(s: Store, item: Item) {
   const c = claimOf(s, item);
-  const taken = c?.status === "booked" || c?.status === "picked_up";
+  const sold = c?.status === "picked_up";
+  const taken = c?.status === "booked" || sold;
   return {
-    taken,
+    taken, sold,
     reqN: taken ? 0 : s.claims.reduce((n, x) => n + (x.status === "requested" && x.itemIds.includes(item.id) ? 1 : 0), 0),
-    ...(taken && c?.day ? { when: `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}` } : {}),
+    ...(c?.status === "booked" && c.day ? { when: `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}` } : {}),
   };
 }
 
