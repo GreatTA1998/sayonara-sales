@@ -14,7 +14,7 @@ import { telHref, ytUrl } from "@/lib/sale";
 
 type Item = {
   id: string; name: string; price: number | null; note?: string;
-  taken: boolean; reqN?: number; when?: string; photos?: string[];
+  taken: boolean; sold?: boolean; reqN?: number; when?: string; photos?: string[];
 };
 type State = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
@@ -210,7 +210,8 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     );
   }
 
-  const takenOpen = !!open?.taken;
+  const soldOpen = !!open?.sold;
+  const takenOpen = !!open?.taken && !soldOpen;
   const onOpen = open ? picked.has(open.id) : false;
   const waiting = !!(open && state?.waiting?.includes(open.id));
   const openPics = open?.photos || [];
@@ -257,7 +258,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
           showSold={showSold} onShowSold={setShowSold} />
       )}
       <Listings items={listItems} dense={dense} onSelect={(it) => { setErr(null); setOpen(it); }}
-        classNameFor={(item) => `${picked.has(item.id) ? "on" : ""}${item.taken ? " sold" : item.reqN ? " req" : ""}`.trim()} />
+        classNameFor={(item) => `${picked.has(item.id) ? "on" : ""}${item.sold ? " sold" : item.taken ? " booked" : item.reqN ? " req" : ""}`.trim()} />
       {!state && <p className="text-sm text-muted pad">読み込み中…</p>}
       {open && !checkout && (
         <div className="mask drawer" role="dialog" aria-modal="true" aria-label={open.name} {...detailMask}>
@@ -266,7 +267,9 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             <div className="sp">{money(open.price)}</div>
             <h2>{open.name}</h2>
             {open.note ? <p className="sn">{open.note}</p> : null}
-            {takenOpen ? (
+            {soldOpen ? (
+              <p className="sw sold">受付終了</p>
+            ) : takenOpen ? (
               <>
                 <p className="sw sold">予約済{open.when ? ` — ${open.when}` : ""}</p>
                 {needWlName && (
