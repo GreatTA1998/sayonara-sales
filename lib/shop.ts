@@ -152,29 +152,25 @@ export const getLineUid = () =>
 
 /**
  * Bind LINE OAuth userId → shop; soft-upgrade LINE display name (keeps Jimoty if set).
- * Prefer active soft shop (or OAuth shop hint) over a stale uid→shop map so soft→hard links.
+ * Soft shop / OAuth hint always win (soft-owner reclaim); name mismatch never spawns a 2nd shop.
  */
 export const bindLineUser = (uid: string, displayName: string, shopHint = "") => {
   if (typeof window === "undefined" || !uid.trim()) return "";
   const umap = readUidMap();
   const cur = getId();
   const hint = isShop(shopHint) ? shopHint : "";
-  const free = (id: string) => { const b = uidBoundTo(id); return !b || b === uid; };
-  let id =
-    (isShop(cur) && free(cur) ? cur : "") ||
-    (hint && free(hint) ? hint : "") ||
-    umap[uid] ||
-    "";
   const name = displayName.trim();
+  let id = (isShop(cur) ? cur : "") || hint || umap[uid] || knownId(name) || "";
   localStorage.setItem(UID_KEY, uid);
-  if (!isShop(id)) id = softLogin("", name || "LINE") || ensureShopId();
-  else if (name) {
+  if (!isShop(id)) id = ensureShopId();
+  if (name) {
     const map = readMap();
     map[norm(name)] = id;
     localStorage.setItem(MAP_KEY, JSON.stringify(map));
     localStorage.setItem(LINE_KEY, name);
-    localStorage.setItem(ID_KEY, id);
   }
+  localStorage.setItem(ID_KEY, id);
+  for (const [k, v] of Object.entries(umap)) if (v === id && k !== uid) delete umap[k];
   umap[uid] = id;
   localStorage.setItem(UID_MAP, JSON.stringify(umap));
   notifyAuth();
