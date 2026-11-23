@@ -10,7 +10,7 @@ import { dayLbl } from "@/lib/days";
 import { DECLINE_PRESETS, DEF_LEAD, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
 import { adminAct, listenShop } from "@/lib/live";
 import { getName, getProfile, saveProfile, subscribeAuth } from "@/lib/shop";
-import { shopMins, shopPublished, uid, type Store } from "@/lib/store";
+import { bookableDays, shopMins, shopPublished, uid, type Store } from "@/lib/store";
 import { SITE_URL } from "@/lib/site";
 
 type Item = PhotoItem & { claimId?: string | null; note?: string; paused?: boolean };
@@ -67,7 +67,11 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [itemMenu, setItemMenu] = useState(false);
   const [viewPic, setViewPic] = useState<string | null>(null);
   const [claimId, setClaimId] = useState<string | null>(null);
-  const [decline, setDecline] = useState(false);
+  /** Claim sheet subpane: polite decline presets or 日程変更 stub. */
+  const [pane, setPane] = useState<null | "decline" | "resched">(null);
+  const [rsDay, setRsDay] = useState("");
+  const [rsSlot, setRsSlot] = useState<string | null>(null);
+  const [rsOk, setRsOk] = useState(false);
   const softName = useSyncExternalStore(subscribeAuth, getName, () => "");
   const logged = !!softName;
   const label = softName || (/^\d{5}$/.test(name) ? "" : name);
@@ -170,6 +174,8 @@ export default function ShopAdminView({ shop, name }: Props) {
     () => (claimOpen && data ? claimItems(claimOpen, data.items) : []),
     [claimOpen, data],
   );
+  const rsDays = data ? bookableDays(data as Store) : [];
+  const rsOpts = rsDay && !rsDays.includes(rsDay) ? [rsDay, ...rsDays] : rsDays;
 
   async function act(payload: Record<string, unknown>, okMsg?: string) {
     setErr(null);
@@ -574,14 +580,19 @@ export default function ShopAdminView({ shop, name }: Props) {
     setMinItems(Number(body.minItems) || 0);
     setMinTotal(Number(body.minTotal) || 0);
   }
-  function openClaim(id: string) { setDecline(false); setClaimId(id); }
-  function closeClaim() { setDecline(false); setClaimId(null); }
-  /** Like publish / photo-delete: dismiss + snack first; local status then snap. */
+  function openClaim(id: string) { setPane(null); setRsOk(false); setClaimId(id); }
+  function closeClaim() { setPane(null); setRsOk(false); setClaimId(null); }
+  /** Like publish / photo-delete: dismiss + snack first; local patch then snap. */
   function claimAct(payload: Record<string, unknown>, okMsg: string) {
     const id = String(payload.id || "");
-    const st = payload.action === "confirm" ? "booked" : payload.action === "picked_up" ? "picked_up" : "cancelled";
     const prev = data;
-    setData((d) => d && { ...d, claims: d.claims.map((c) => (c.id === id ? { ...c, status: st } : c)) });
+    if (payload.action === "reschedule") {
+      const day = String(payload.day || ""), slot = String(payload.slot || "");
+      setData((d) => d && { ...d, claims: d.claims.map((c) => (c.id === id ? { ...c, day, slot } : c)) });
+    } else {
+      const st = payload.action === "confirm" ? "booked" : payload.action === "picked_up" ? "picked_up" : "cancelled";
+      setData((d) => d && { ...d, claims: d.claims.map((c) => (c.id === id ? { ...c, status: st } : c)) });
+    }
     closeClaim(); show(okMsg, "ok");
     void adminAct(shop, payload).catch((e) => {
       const msg = e instanceof Error ? e.message : "失敗しました";
@@ -794,20 +805,45 @@ export default function ShopAdminView({ shop, name }: Props) {
                 </li>
               ))}
             </ul>
-            {claimOpen.status === "requested" && decline ? (
+            {claimOpen.status === "requested" && pane === "decline" ? (
               <div className="decline-list" role="group" aria-label="お断り理由">
                 <p className="hint">丁寧なお断り文を選んでください</p>
                 {DECLINE_PRESETS.map((t) => (
                   <button key={t} type="button" className="decline-opt"
                     onClick={() => claimAct({ action: "cancel", id: claimOpen.id, reason: t }, "お断りしました")}>{t}</button>
                 ))}
-                <button type="button" className="decline-back" onClick={() => setDecline(false)}>戻る</button>
+                <button type="button" className="decline-back" onClick={() => setPane(null)}>戻る</button>
+              </div>
+            ) : claimOpen.status === "requested" && pane === "resched" ? (
+              <div className="decline-list" role="group" aria-label="日程変更">
+                <div className="when">
+                  <span className="date-ctl"><select value={rsDay} aria-label="日付"
+                    onChange={(e) => { setRsDay(e.target.value); setRsSlot(null); }}>
+                    {rsOpts.map((d) => <option key={d} value={d}>{dayLbl(d)}</option>)}
+                  </select></span>
+                  <div className="slots trio" role="group" aria-label="時間帯">
+                    {slots.map((s) => (
+                      <button key={s} type="button" aria-pressed={rsSlot === s}
+                        className={rsSlot === s ? "slot on" : "slot"} onClick={() => setRsSlot(s)}>{s}</button>
+                    ))}
+                  </div>
+                </div>
+                <label className="late-check"><input type="checkbox" checked={rsOk}
+                  onChange={(e) => setRsOk(e.target.checked)} />チャットで合意済み</label>
+                <button type="button" className={`cta${rsOk && rsDay && rsSlot ? " go" : ""}`}
+                  disabled={!rsOk || !rsDay || !rsSlot}
+                  onClick={() => claimAct({ action: "reschedule", id: claimOpen.id, day: rsDay, slot: rsSlot, agreed: true }, "日程を変更しました")}>変更する</button>
+                <button type="button" className="decline-back" onClick={() => setPane(null)}>戻る</button>
               </div>
             ) : (
               <div className="claim-acts">
                 {claimOpen.status === "requested" ? (
                   <>
-                    <button type="button" onClick={() => setDecline(true)}>お断り</button>
+                    <button type="button" onClick={() => setPane("decline")}>お断り</button>
+                    <button type="button" onClick={() => {
+                      setRsDay(claimOpen.day || rsDays[0] || "");
+                      setRsSlot(claimOpen.slot || null); setRsOk(false); setPane("resched");
+                    }}>日程変更</button>
                     <button type="button"
                       onClick={() => claimAct({ action: "confirm", id: claimOpen.id }, "確認しました")}>確認する</button>
                   </>
