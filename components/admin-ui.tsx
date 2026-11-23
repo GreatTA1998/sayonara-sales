@@ -52,13 +52,15 @@ const claimWho = (c: Claim) => (c.contact && c.contact !== "LINE" && c.contact !
 function ClaimRow({ c, items, onOpen }: { c: Claim; items: Item[]; onOpen: (id: string) => void }) {
   const its = claimItems(c, items), n = daysBetween(tokyoYmd(), c.day).length - 1;
   const soon = n === 0 ? "今日" : n === 1 ? "明日" : n > 0 && n <= 3 ? `あと${n}日` : "";
+  const who = claimWho(c);
+  const text = its.filter((it) => !it.photos?.[0]).map(itemLabel).join("、");
   return (
     <li>
       <button type="button" className="tl-r" onClick={() => onOpen(c.id)}>
-        <span className="tl-when">{dayLbl(c.day)} {c.slot || "—"}{c.status === "picked_up" ? " · 引取済" : c.status === "cancelled" ? " · キャンセル" : ""}
+        <span className="tl-when">{dayLbl(c.day)} {c.slot || "—"}{who ? ` · ${who}` : ""}{c.status === "picked_up" ? " · 引取済" : c.status === "cancelled" ? " · キャンセル" : ""}
           {soon ? <span className="tl-soon">{soon}</span> : null}</span>
         <span className="tl-goods">{its.flatMap((it) => it.photos?.[0] ? [<img key={it.id} src={it.photos[0]} alt="" />] : []).slice(0, 4)}
-          <span className="tl-sum">{[claimWho(c), its.filter((it) => !it.photos?.[0]).map(itemLabel).join("、")].filter(Boolean).join(" · ")}</span></span>
+          {text ? <span className="tl-sum">{text}</span> : null}</span>
       </button>
     </li>
   );
