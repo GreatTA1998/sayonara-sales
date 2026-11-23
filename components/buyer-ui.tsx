@@ -12,7 +12,7 @@ import { telHref, ytUrl } from "@/lib/sale";
 
 type Item = {
   id: string; name: string; price: number | null; note?: string;
-  taken: boolean; requested?: boolean; photos?: string[];
+  taken: boolean; reqN?: number; photos?: string[];
 };
 type State = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
@@ -86,6 +86,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     const unsub = listenShop(shop, (s) => {
       const next = toBuyerState(shop, s, getId());
       setState(next);
+      setOpen((o) => (o ? next.items.find((i) => i.id === o.id) || o : null));
       setDay((d) => (d && next.days?.includes(d) ? d : (next.days?.[0] || "")));
     }, (e) => setErr(e.message || "読み込みに失敗しました"));
     const n = getName();
@@ -151,7 +152,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     setBusy(true); setErr(null);
     setState((prev) => prev && {
       ...prev,
-      items: prev.items.map((it) => itemIds.includes(it.id) ? { ...it, requested: true } : it),
+      items: prev.items.map((it) => itemIds.includes(it.id) ? { ...it, reqN: (it.reqN || 0) + 1 } : it),
       taken: { ...prev.taken, [day]: [...new Set([...(prev.taken[day] || []), slot])] },
     });
     try {
@@ -226,7 +227,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         <ListingTools dir={priceDir} onDir={setPriceDir} dense={dense} onDense={setDense} />
       )}
       <Listings items={gridItems} dense={dense} onSelect={(it) => { setErr(null); setOpen(it); }}
-        classNameFor={(item) => `${picked.has(item.id) ? "on" : ""}${item.taken ? " sold" : ""}`.trim()} />
+        classNameFor={(item) => `${picked.has(item.id) ? "on" : ""}${item.taken ? " sold" : item.reqN ? " req" : ""}`.trim()} />
       {!state && <p className="text-sm text-muted pad">読み込み中…</p>}
       {open && !checkout && (
         <div className="mask drawer" role="dialog" aria-modal="true" aria-label={open.name} {...detailMask}>
@@ -251,11 +252,11 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
               </>
             ) : (
               <>
-                {open.requested ? (
-                  <p className="sw">他の方が先に依頼中です（まだ確定していません）</p>
-                ) : null}
+                {open.reqN ? <p className="sw">{open.reqN}人依頼中</p> : null}
                 <button type="button" className={`cta${onOpen ? " soft" : " go"}`}
-                  onClick={() => { toggle(open.id); closeDetail(); }}>{onOpen ? "外す" : "追加"}</button>
+                  onClick={() => { toggle(open.id); closeDetail(); }}>
+                  {onOpen ? "外す" : open.reqN ? "次に並ぶ" : "追加"}
+                </button>
               </>
             )}
           </div>
