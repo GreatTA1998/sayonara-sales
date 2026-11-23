@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { LineLoginLink } from "@/components/line-oauth";
 import { dayLbl } from "@/lib/days";
-import { adminPath, getName, listBuys, softLogin, subscribeAuth, type BuyRow } from "@/lib/shop";
+import { adminPath, getLineUid, getName, listBuys, logout, softLogin, subscribeAuth, type BuyRow } from "@/lib/shop";
 
 const when = (day: string, slot?: string, who?: string) => [who, `${dayLbl(day)}${slot ? ` ${slot}` : ""}`].filter(Boolean).join(" · ");
 const pts = (names: (string | undefined | null)[]) => { const n = names.map((x) => x?.trim() || "無題"); return n.length <= 1 ? `1点 · ${n[0] || "無題"}` : `${n.length}点 · ${n[0]}…`; };
@@ -12,6 +12,7 @@ const pts = (names: (string | undefined | null)[]) => { const n = names.map((x) 
 export default function MePage() {
   const router = useRouter();
   const name = useSyncExternalStore(subscribeAuth, getName, () => "");
+  const hard = useSyncExternalStore(subscribeAuth, getLineUid, () => "");
   const [jimoty, setJimoty] = useState("");
   const [line, setLine] = useState("");
   const [buys, setBuys] = useState<BuyRow[]>([]);
@@ -42,7 +43,8 @@ export default function MePage() {
           <button type="submit" className="cta go" disabled={!jimoty.trim() && !line.trim()}>サインイン</button>
         </form>
       )}
-      <LineLoginLink />
+      {name ? <button type="button" className="cta soft" onClick={() => { void logout(); }}>ログアウト</button> : null}
+      {!hard && <LineLoginLink />}
       <section className="claims">
         <div className="claims-h">買う · 引き取り履歴</div>
         {buys.length ? <ul className="timeline">{buys.map((b) => (

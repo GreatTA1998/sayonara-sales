@@ -11,15 +11,15 @@ function cleanUrl() {
   if (dirty) window.history.replaceState({}, "", u.pathname + u.search + u.hash);
 }
 
-/** Soft-upgrade after LINE OAuth (?line_ok=1). AppNav mounts this app-wide. */
+/** Soft+hard hydrate from LINE cookie; clean ?line_ok/?line_err. AppNav mounts app-wide. */
 export function useLineOAuthReturn(onDone?: () => void) {
   useEffect(() => {
     const u = new URL(window.location.href);
-    if (u.searchParams.get("line_ok") !== "1") {
-      if (u.searchParams.has("line_err")) cleanUrl();
-      return;
-    }
-    void applyLineSession().then(() => { cleanUrl(); onDone?.(); });
+    const dirty = u.searchParams.has("line_ok") || u.searchParams.has("line_err");
+    void applyLineSession().finally(() => {
+      if (dirty) cleanUrl();
+      onDone?.();
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 }
