@@ -196,7 +196,12 @@ export function storeFromDocs(
       return it;
     }),
     claims: [...claims]
-      .sort((a, b) => String(b.data.createdAt || "").localeCompare(String(a.data.createdAt || "")))
+      .sort((a, b) => {
+        const k = (d: Record<string, unknown>) => `${d.day || ""}${String(d.slot || "99:99").slice(0, 5)}`;
+        const now = `${tokyoYmd()}${new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", hour12: false })}`;
+        const ka = k(a.data), kb = k(b.data);
+        return +(ka < now) - +(kb < now) || (ka < kb ? -1 : +(ka > kb));
+      })
       .map(({ id, data: r }) => {
         const c: Claim = {
           id, code: String(r.code || ""), day: String(r.day || ""), slot: String(r.slot || ""),
