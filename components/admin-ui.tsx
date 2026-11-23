@@ -1064,7 +1064,7 @@ export default function ShopAdminView({ shop, name }: Props) {
                     onChange={(e) => { setRsDay(e.target.value); setRsSlot(null); }}>
                     {rsOpts.map((d) => <option key={d} value={d}>{dayLbl(d)}</option>)}
                   </select></span>
-                  <div className="slots trio" role="group" aria-label="時間帯">
+                  <div className="slots" role="group" aria-label="時間帯">
                     {slots.map((s) => (
                       <button key={s} type="button" aria-pressed={rsSlot === s}
                         className={rsSlot === s ? "slot on" : "slot"} onClick={() => setRsSlot(s)}>{s}</button>

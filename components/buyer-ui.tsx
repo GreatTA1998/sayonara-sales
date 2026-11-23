@@ -294,7 +294,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
               <span className="date-ctl"><select value={day} aria-label="日付" onChange={(e) => { setDay(e.target.value); setSlot(null); }}>
                 {(state?.days || []).map((d) => <option key={d} value={d}>{dayLbl(d)}</option>)}
               </select></span>
-              <div className="slots trio" role="group" aria-label="時間帯">
+              <div className="slots" role="group" aria-label="時間帯">
                 {freeSlots.map((s) => (
                   <button key={s} type="button" aria-pressed={slot === s}
                     className={slot === s ? "slot on" : "slot"}
@@ -308,9 +308,14 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
               <div className="field"><span>受取場所</span>
                 <div className="slots" role="radiogroup" aria-label="受取場所">
                   {spots.map((sp) => (
-                    <button key={sp.id} type="button" role="radio" aria-checked={spotId === sp.id}
-                      className={spotId === sp.id ? "slot on" : "slot"}
-                      onClick={() => setSpotId(sp.id)}>{sp.name}</button>
+                    <div key={sp.id} className="spot-opt">
+                      <button type="button" role="radio" aria-checked={spotId === sp.id}
+                        className={spotId === sp.id ? "slot on" : "slot"}
+                        onClick={() => setSpotId(sp.id)}>{sp.name}</button>
+                      {sp.mapsUrl ? (
+                        <a className="maps" href={sp.mapsUrl} target="_blank" rel="noopener noreferrer">Maps</a>
+                      ) : null}
+                    </div>
                   ))}
                 </div>
               </div>
