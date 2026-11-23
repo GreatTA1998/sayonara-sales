@@ -25,7 +25,7 @@ type ShopSnap = {
 };
 
 function assemble(s: ShopSnap): Store {
-  const meta = s.meta || { address: "目黒区" };
+  const meta = s.meta || { address: "" };
   return storeFromDocs(
     meta,
     [...s.items.entries()].map(([id, data]) => ({ id, data })),
@@ -36,7 +36,7 @@ function assemble(s: ShopSnap): Store {
 const emptySeed = (id: string): Store =>
   id === ELTON_SHOP
     ? { address: "目黒区", lineInviteUrl: "", phone: "", items: [], claims: [], published: true }
-    : { address: "目黒区", items: [], claims: [] };
+    : { address: "", items: [], claims: [] };
 
 const denied = (e: unknown) => String((e as { code?: string })?.code || "").endsWith("permission-denied");
 const NO_EDIT = "このショップの編集権限がありません";
@@ -104,7 +104,7 @@ export function listenShop(
   const start = () => {
     if (dead) return;
     stopShop = onSnapshot(doc(db, "shops", shop), (snap) => {
-      state.meta = snap.exists() ? (snap.data() as Record<string, unknown>) : { address: "目黒区" };
+      state.meta = snap.exists() ? (snap.data() as Record<string, unknown>) : { address: "" };
       emit();
     }, fail);
     stopItems = onSnapshot(collection(db, "shops", shop, "items"), (snap) => {

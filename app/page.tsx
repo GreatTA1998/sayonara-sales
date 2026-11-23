@@ -5,7 +5,7 @@ import ShopBuyerView from "@/components/buyer-ui";
 import { Snack, useSnack } from "@/components/snack";
 import { peekShop } from "@/lib/live";
 import {
-  AUTH_EVT, DEFAULT_WARD, ELTON_ID, ELTON_LABEL, adminPath, ensureShopId, listSales, type SaleRow,
+  AUTH_EVT, ELTON_ID, ELTON_LABEL, adminPath, ensureShopId, listSales, type SaleRow,
 } from "@/lib/shop";
 import { SITE_URL } from "@/lib/site";
 
@@ -26,7 +26,7 @@ export default function HomePage() {
         if (r.id !== ELTON_ID && !d.published) return null;
         return {
           ...r,
-          ward: (d.address || "").trim() || r.ward || DEFAULT_WARD,
+          ward: (d.address || "").trim() || r.ward,
           count: d.count,
         } as Card;
       } catch {
