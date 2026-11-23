@@ -20,6 +20,7 @@ type State = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
   days: string[]; slots: string[]; spots: PickupSpot[]; taken: Record<string, string[]>;
   waiting?: string[];
+  moveOut?: string;
   lineInviteUrl?: string | null; phone?: string | null; items: Item[];
   minItems?: number; minTotal?: number; rule?: string | null;
 };
@@ -46,6 +47,7 @@ function toBuyerState(shop: string, s: Store, account: string): State {
   return {
     address: s.address, bio: s.bio || "", jimotyUrl: s.jimotyUrl || "", youtubeUrl: s.youtubeUrl || "",
     days, slots, spots: shopSpots(s), taken, waiting,
+    moveOut: s.moveOut || s.pickupTo || "",
     lineInviteUrl: contact.lineInviteUrl || null, phone: contact.phone || null,
     minItems: s.minItems, minTotal: s.minTotal, rule: cartRule(s),
     items: s.items.filter((i) => !i.paused).map((it) => {
@@ -78,7 +80,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const lineUrl = (state?.lineInviteUrl || "").trim();
   const phoneDisp = (state?.phone || "").trim();
   const canJimoty = !!jimotyUrl, canLine = !!lineUrl, canPhone = !!phoneDisp;
-  const barMove = moveOutLeft(state?.days || []);
+  const barMove = moveOutLeft(state?.moveOut ? [state.moveOut] : []);
   const loggedIn = !!knownName;
   const contactVal = (method === "jimoty" && loggedIn ? knownName : lineName).trim();
 

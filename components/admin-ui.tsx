@@ -7,7 +7,7 @@ import SquareCam from "@/components/square-cam";
 import { Snack, useBodyScrollLock, useMaskDismiss, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { dayLbl, daysBetween, tokyoYmd } from "@/lib/days";
-import { DECLINE_PRESETS, DEF_LEAD, ELTON_SPOTS, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
+import { DECLINE_PRESETS, DEF_LEAD, ELTON_SPOTS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
 import { adminAct, listenShop } from "@/lib/live";
 import { forgetShop, getName, getProfile, openShop, saveProfile, subscribeAuth } from "@/lib/shop";
 import { ELTON_SHOP, itemFlags, pickupDays, shopMins, shopPublished, uid, type PickupSpot, type Store } from "@/lib/store";
@@ -27,8 +27,6 @@ type AdminState = {
 };
 type Props = { shop: string; name: string };
 const fmtSlot = (a: string, b: string) => `${a}–${b}`;
-const DEF_FROM = PICKUP_DAYS[0];
-const DEF_TO = PICKUP_DAYS[PICKUP_DAYS.length - 1];
 const IMG_ACCEPT = "image/*,image/jpeg,image/jpg,image/png,image/heic,image/heif,image/webp,image/gif,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif";
 type ContactMode = "jimoty" | "line" | "phone";
 const methodJa = (m?: string) => (m === "jimoty" ? "ジモティー" : m === "phone" ? "電話" : m === "line" ? "LINE" : m || "");
@@ -112,8 +110,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [slotA, setSlotA] = useState("11:00");
   const [slotB, setSlotB] = useState("11:15");
   const [slotOpen, setSlotOpen] = useState(false);
-  const [pickupFrom, setPickupFrom] = useState(DEF_FROM);
-  const [pickupTo, setPickupTo] = useState(DEF_TO);
+  const [pickupTo, setPickupTo] = useState("");
   const [leadDays, setLeadDays] = useState(DEF_LEAD);
   const [minItems, setMinItems] = useState(0);
   const [minTotal, setMinTotal] = useState(0);
@@ -170,8 +167,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     setContactMode((j.trim() && "jimoty") || (l.trim() && "line") || (p.trim() && "phone") || "jimoty");
     setSlots(body.slots?.length ? body.slots : [...PICKUP_SLOTS]);
     setSpots(body.pickupSpots || []);
-    setPickupFrom(body.pickupFrom || DEF_FROM);
-    setPickupTo(body.pickupTo || body.moveOut || DEF_TO);
+    setPickupTo(body.pickupTo || body.moveOut || "");
     setLeadDays(body.leadDays ?? DEF_LEAD);
     const m = shopMins(body);
     setMinItems(m.minItems); setMinTotal(m.minTotal);
@@ -694,11 +690,12 @@ export default function ShopAdminView({ shop, name }: Props) {
     else if (body) setSpots(next);
   }
 
-  async function saveDates(from: string, to: string, lead = leadDays) {
-    const body = await act({ action: "dates", pickupFrom: from, pickupTo: to, moveOut: to, leadDays: lead }, "保存しました");
+  async function saveDates(to: string, lead = leadDays) {
+    const body = await act({
+      action: "dates", pickupFrom: tokyoYmd(), pickupTo: to, moveOut: to, leadDays: lead,
+    }, "保存しました");
     if (!body) return;
-    setPickupFrom(String(body.pickupFrom || from));
-    setPickupTo(String(body.pickupTo || body.moveOut || to));
+    setPickupTo(String(body.pickupTo || body.moveOut || ""));
     if (body.leadDays != null) setLeadDays(Number(body.leadDays));
   }
   async function saveMins(n = minItems, y = minTotal) {
@@ -982,19 +979,17 @@ export default function ShopAdminView({ shop, name }: Props) {
       {forms && (
       <section className="prof-block">
         <div className="slot-add">
-          <DateField label="受取開始" value={pickupFrom} onChange={(v) => { setPickupFrom(v); void saveDates(v, pickupTo); }} />
-          <span aria-hidden="true">〜</span>
-          <DateField label="退去日" value={pickupTo} onChange={(v) => { setPickupTo(v); void saveDates(pickupFrom, v); }} />
+          <DateField label="退去日" value={pickupTo} onChange={(v) => { setPickupTo(v); void saveDates(v); }} />
+          <label className="float lead"><span>最短予約</span>
+            <span className="lead-row">
+              <input type="number" min={0} inputMode="numeric" aria-label="最短予約（日前）"
+                value={leadDays}
+                onChange={(e) => setLeadDays(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+                onBlur={() => void saveDates(pickupTo, leadDays)} />
+              <span aria-hidden="true">日前</span>
+            </span>
+          </label>
         </div>
-        <label className="float lead"><span>最短予約</span>
-          <span className="lead-row">
-            <input type="number" min={0} inputMode="numeric" aria-label="最短予約（日前）"
-              value={leadDays}
-              onChange={(e) => setLeadDays(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-              onBlur={() => void saveDates(pickupFrom, pickupTo, leadDays)} />
-            <span aria-hidden="true">日前</span>
-          </span>
-        </label>
         <div className="slot-edit" role="list" aria-label="受取時間">
           {slots.map((s) => (
             <button key={s} type="button" className="slot" role="listitem"

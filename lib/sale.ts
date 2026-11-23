@@ -1,7 +1,3 @@
-export const PICKUP_DAYS = [
-  "2026-11-01", "2026-11-02", "2026-11-03", "2026-11-04",
-  "2026-11-05", "2026-11-06", "2026-11-07", "2026-11-08",
-];
 export const PICKUP_SLOTS = ["10:00–10:15", "14:00–14:15", "20:00–20:15"];
 export const DEF_LEAD = 2;
 /** Elton shop suggestions only — not auto-seeded. */

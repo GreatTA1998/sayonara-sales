@@ -1,5 +1,5 @@
 import { addDays, dayLbl, daysBetween, tokyoYmd } from "./days";
-import { CANON_LINE, CANON_PHONE, DEF_LEAD, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "./sale";
+import { CANON_LINE, CANON_PHONE, DEF_LEAD, PICKUP_SLOTS, ytUrl } from "./sale";
 
 export type Item = {
   id: string; name: string; price: number | null; note?: string; claimId?: string | null;
@@ -54,10 +54,12 @@ const YMD = /^\d{4}-\d{2}-\d{2}$/;
 const asYmd = (v: unknown) => { const s = String(v || "").trim(); return YMD.test(s) ? s : ""; };
 export const shopSlots = (s: Store) => (s.slots?.length ? s.slots : [...PICKUP_SLOTS]);
 
-/** Shop pickup window (no lead) — seller 日程変更. */
+/** Shop pickup window (no lead) — seller 日程変更. Open ~30d when 退去日 unset. */
 export const pickupDays = (s: Store) => {
-  const days = daysBetween(s.pickupFrom || PICKUP_DAYS[0], s.pickupTo || PICKUP_DAYS[PICKUP_DAYS.length - 1]);
-  return days.length ? days : [...PICKUP_DAYS];
+  const from = s.pickupFrom || tokyoYmd();
+  const to = s.pickupTo || addDays(from, 29);
+  const days = daysBetween(from, to);
+  return days.length ? days : daysBetween(tokyoYmd(), addDays(tokyoYmd(), 29));
 };
 
 const shopLeadDays = (s: Store) =>
@@ -86,13 +88,13 @@ export function normalizeSlots(raw: unknown): string[] {
 export const shopSpots = (s: Store) => s.pickupSpots || [];
 
 export function applyDates(s: Store, raw: { pickupFrom?: unknown; pickupTo?: unknown; moveOut?: unknown; leadDays?: unknown }) {
-  const from = asYmd(raw.pickupFrom) || s.pickupFrom || PICKUP_DAYS[0];
-  const to = asYmd(raw.pickupTo) || s.pickupTo || PICKUP_DAYS[PICKUP_DAYS.length - 1];
-  if (to < from) throw new Error("退去日は開始以降にしてください");
-  if (!daysBetween(from, to).length) throw new Error("受取日が不正です");
+  const from = tokyoYmd();
+  const to = asYmd(raw.pickupTo) || asYmd(raw.moveOut);
+  if (to && to < from) throw new Error("退去日は今日以降にしてください");
+  if (to && !daysBetween(from, to).length) throw new Error("受取日が不正です");
   s.pickupFrom = from;
   s.pickupTo = to;
-  s.moveOut = asYmd(raw.moveOut) || to;
+  s.moveOut = to;
   if ("leadDays" in raw) {
     const n = Number(raw.leadDays);
     if (!Number.isFinite(n) || n < 0) throw new Error("最短予約が不正です");
