@@ -239,10 +239,10 @@ export const listSales = (): SaleRow[] => {
   for (const [name, id] of Object.entries(map)) {
     if (!dig5(id) || seen.has(id)) continue;
     seen.add(id);
-    rows.push({ id, name, ward: DEFAULT_WARD, href: `/s/${id}`, mine: id === mine });
+    rows.push({ id, name, ward: "", href: `/s/${id}`, mine: id === mine });
   }
   if (dig5(mine) && !seen.has(mine)) {
-    rows.push({ id: mine, name: mineName || mine, ward: DEFAULT_WARD, href: `/s/${mine}`, mine: true });
+    rows.push({ id: mine, name: mineName || mine, ward: "", href: `/s/${mine}`, mine: true });
   }
   return rows;
 };
