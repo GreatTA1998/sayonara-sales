@@ -16,7 +16,7 @@ import { SITE_URL } from "@/lib/site";
 type Item = PhotoItem & { claimId?: string | null; note?: string; paused?: boolean; jimoty?: boolean };
 type Claim = {
   id: string; code: string; day: string; slot?: string; contact?: string; contactMethod?: string;
-  itemIds: string[]; status: string; spotName?: string; spotMapsUrl?: string; offer?: number;
+  itemIds: string[]; status: string; spotName?: string; spotMapsUrl?: string;
 };
 type AdminState = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
@@ -54,8 +54,7 @@ function ClaimRow({ c, items, onOpen }: { c: Claim; items: Item[]; onOpen: (id: 
         <span className="tl-when">{dayLbl(c.day)} {c.slot || "—"}{c.status === "picked_up" ? " · 完了" : ""}
           {soon ? <span className="tl-soon">{soon}</span> : null}</span>
         <span className="tl-goods">{its.flatMap((it) => it.photos?.[0] ? [<img key={it.id} src={it.photos[0]} alt="" />] : []).slice(0, 4)}
-          <span className="tl-sum">{[claimWho(c), its.map(itemLabel).join("、"),
-            c.offer != null ? `希望¥${c.offer.toLocaleString("ja-JP")}` : ""].filter(Boolean).join(" · ")}</span></span>
+          <span className="tl-sum">{[claimWho(c), its.map(itemLabel).join("、")].filter(Boolean).join(" · ")}</span></span>
       </button>
     </li>
   );
@@ -1097,9 +1096,6 @@ export default function ShopAdminView({ shop, name }: Props) {
                 </li>
               ))}
             </ul>
-            {claimOpen.offer != null ? (
-              <p className="total">希望額 ¥{claimOpen.offer.toLocaleString("ja-JP")}</p>
-            ) : null}
             {claimOpen.status === "requested" && pane === "decline" ? (
               <div className="decline-list" role="group" aria-label="お断り理由">
                 <p className="hint">丁寧なお断り文を選んでください</p>
