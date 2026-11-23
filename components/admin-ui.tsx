@@ -50,8 +50,7 @@ const claimSummary = (c: Claim, all: Item[]) => {
 };
 const claimWhen = (c: Claim) => [c.contact && c.contact !== "LINE" && c.contact !== "ジモティー" ? c.contact : "", `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}`, c.status === "picked_up" ? "完了" : ""].filter(Boolean).join(" · ");
 
-const MUSE_URL = "https://muse.oriz.in";
-/** Muse seed — Sayonara→Jimoty listing sync via copy-paste. */
+/** Muse AI seed — Sayonara→Jimoty listing sync via copy-paste. */
 function musePrompt(shop: string, bio: string, items: { name?: string; price?: number | null }[]) {
   const invite = `${SITE_URL}/s/${shop}`;
   const list = items.slice(0, 40).map((it) =>
@@ -851,7 +850,7 @@ export default function ShopAdminView({ shop, name }: Props) {
 
       {!empty && (
         <p className="hint jm-muse">
-          <a href={MUSE_URL} target="_blank" rel="noopener noreferrer">Muse</a>
+          <a href="https://muse.ai" target="_blank" rel="noopener noreferrer">Muse AI</a>
           なら、ここの出品をジモティへ自動掲載・定期同期・メッセージ返信もできます。開始プロンプトをコピーして貼り付けて。
           <button type="button" className="share" onClick={() => {
             void navigator.clipboard?.writeText(musePrompt(shop, bio, items)).catch(() => undefined);
