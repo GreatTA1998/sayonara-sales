@@ -10,7 +10,7 @@ import { dayLbl } from "@/lib/days";
 import { DECLINE_PRESETS, DEF_LEAD, ELTON_SPOTS, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
 import { adminAct, listenShop } from "@/lib/live";
 import { getName, getProfile, openShop, saveProfile, subscribeAuth } from "@/lib/shop";
-import { bookableDays, ELTON_SHOP, shopMins, shopPublished, uid, type PickupSpot, type Store } from "@/lib/store";
+import { ELTON_SHOP, pickupDays, shopMins, shopPublished, uid, type PickupSpot, type Store } from "@/lib/store";
 import { SITE_URL } from "@/lib/site";
 
 type Item = PhotoItem & { claimId?: string | null; note?: string; paused?: boolean; jimoty?: boolean };
@@ -48,7 +48,7 @@ const claimSummary = (c: Claim, all: Item[]) => {
   const list = claimItems(c, all);
   return list.length <= 1 ? `1点 · ${itemLabel(list[0])}` : `${list.length}点 · ${itemLabel(list[0])}…`;
 };
-const claimWhen = (c: Claim) => [c.contact && c.contact !== "LINE" && c.contact !== "ジモティー" ? c.contact : "", `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}`].filter(Boolean).join(" · ");
+const claimWhen = (c: Claim) => [c.contact && c.contact !== "LINE" && c.contact !== "ジモティー" ? c.contact : "", `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}`, c.status === "picked_up" ? "完了" : ""].filter(Boolean).join(" · ");
 
 const MUSE_URL = "https://muse.oriz.in";
 /** Muse seed — Sayonara→Jimoty listing sync via copy-paste. */
@@ -84,6 +84,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [rsDay, setRsDay] = useState("");
   const [rsSlot, setRsSlot] = useState<string | null>(null);
   const [rsOk, setRsOk] = useState(false);
+  const [showDone, setShowDone] = useState(false);
   const softName = useSyncExternalStore(subscribeAuth, getName, () => "");
   const logged = !!softName;
   const label = softName || (/^\d{5}$/.test(name) ? "" : name);
@@ -183,18 +184,16 @@ export default function ShopAdminView({ shop, name }: Props) {
     const locals = localPics[open.id] || [];
     return locals.length ? [...remotes, ...locals.filter((u) => !remotes.includes(u))] : remotes;
   }, [open, localPics]);
-  const active = useMemo(
-    () => (data?.claims || []).filter((c) => c.status === "requested" || c.status === "booked"),
-    [data?.claims],
-  );
-  const claimOpen = useMemo(() => active.find((c) => c.id === claimId) || null, [active, claimId]);
-  const requests = active.filter((c) => c.status === "requested");
-  const pending = active.filter((c) => c.status === "booked");
+  const claims = data?.claims || [];
+  const claimOpen = useMemo(() => claims.find((c) => c.id === claimId) || null, [claims, claimId]);
+  const requests = claims.filter((c) => c.status === "requested");
+  const pending = claims.filter((c) => c.status === "booked" || (showDone && c.status === "picked_up"));
+  const hasDone = claims.some((c) => c.status === "picked_up");
   const claimList = useMemo(
     () => (claimOpen && data ? claimItems(claimOpen, data.items) : []),
     [claimOpen, data],
   );
-  const rsDays = data ? bookableDays(data as Store) : [];
+  const rsDays = data ? pickupDays(data as Store) : [];
   const rsOpts = rsDay && !rsDays.includes(rsDay) ? [rsDay, ...rsDays] : rsDays;
 
   async function act(payload: Record<string, unknown>, okMsg?: string) {
@@ -725,19 +724,25 @@ export default function ShopAdminView({ shop, name }: Props) {
       {err && <div className="err">{err}</div>}
       {!data && !err && <p className="text-sm text-muted pad">読み込み中…</p>}
 
-      {([["依頼", requests], ["引き取り予定", pending]] as const).map(([title, list]) => list.length > 0 && (
+      {([["依頼", requests], ["引き取り予定", pending]] as const).map(([title, list]) => (list.length > 0 || (title === "引き取り予定" && hasDone)) && (
         <section key={title} className="claims">
           <div className="claims-h">{title}</div>
-          <ol className="timeline">
-            {list.map((c) => (
-              <li key={c.id}>
-                <button type="button" className="tl-card" onClick={() => openClaim(c.id)}>
-                  <b className="tl-when">{claimWhen(c)}</b>
-                  <span className="tl-sum">{claimSummary(c, data?.items || [])}</span>
-                </button>
-              </li>
-            ))}
-          </ol>
+          {title === "引き取り予定" && hasDone && (
+            <label className="late-check"><input type="checkbox" checked={showDone}
+              onChange={(e) => setShowDone(e.target.checked)} />完了済みを表示</label>
+          )}
+          {list.length > 0 && (
+            <ol className="timeline">
+              {list.map((c) => (
+                <li key={c.id}>
+                  <button type="button" className="tl-card" onClick={() => openClaim(c.id)}>
+                    <b className="tl-when">{claimWhen(c)}</b>
+                    <span className="tl-sum">{claimSummary(c, data?.items || [])}</span>
+                  </button>
+                </li>
+              ))}
+            </ol>
+          )}
         </section>
       ))}
 
@@ -1047,14 +1052,14 @@ export default function ShopAdminView({ shop, name }: Props) {
                     <button type="button"
                       onClick={() => claimAct({ action: "confirm", id: claimOpen.id }, "確認しました")}>確認する</button>
                   </>
-                ) : (
+                ) : claimOpen.status === "booked" ? (
                   <>
                     <button type="button"
                       onClick={() => claimAct({ action: "cancel", id: claimOpen.id }, "キャンセルしました")}>キャンセル</button>
                     <button type="button"
                       onClick={() => claimAct({ action: "picked_up", id: claimOpen.id }, "受取済み")}>受取済み</button>
                   </>
-                )}
+                ) : null}
               </div>
             )}
           </div>

@@ -54,7 +54,8 @@ const YMD = /^\d{4}-\d{2}-\d{2}$/;
 const asYmd = (v: unknown) => { const s = String(v || "").trim(); return YMD.test(s) ? s : ""; };
 export const shopSlots = (s: Store) => (s.slots?.length ? s.slots : [...PICKUP_SLOTS]);
 
-const shopDays = (s: Store) => {
+/** Shop pickup window (no lead) — seller 日程変更. */
+export const pickupDays = (s: Store) => {
   const days = daysBetween(s.pickupFrom || PICKUP_DAYS[0], s.pickupTo || PICKUP_DAYS[PICKUP_DAYS.length - 1]);
   return days.length ? days : [...PICKUP_DAYS];
 };
@@ -62,8 +63,16 @@ const shopDays = (s: Store) => {
 const shopLeadDays = (s: Store) =>
   s.leadDays == null || !Number.isFinite(s.leadDays) ? DEF_LEAD : Math.max(0, Math.floor(Number(s.leadDays)));
 
+/** Buyer bookable — shop leadDays from today. */
 export const bookableDays = (s: Store) =>
-  shopDays(s).filter((d) => d >= addDays(tokyoYmd(), shopLeadDays(s)));
+  pickupDays(s).filter((d) => d >= addDays(tokyoYmd(), shopLeadDays(s)));
+
+/** Soonest day+slot first (no past-bucket / not by name). */
+export const byClaimWhen = (a: { day?: unknown; slot?: unknown }, b: { day?: unknown; slot?: unknown }) => {
+  const k = (c: { day?: unknown; slot?: unknown }) => `${c.day || ""}${String(c.slot || "99:99").slice(0, 5)}`;
+  const ka = k(a), kb = k(b);
+  return ka < kb ? -1 : +(ka > kb);
+};
 
 export function normalizeSlots(raw: unknown): string[] {
   if (!Array.isArray(raw)) throw new Error("時間帯が不正です");
@@ -226,12 +235,7 @@ export function storeFromDocs(
       return it;
     }),
     claims: [...claims]
-      .sort((a, b) => {
-        const k = (d: Record<string, unknown>) => `${d.day || ""}${String(d.slot || "99:99").slice(0, 5)}`;
-        const now = `${tokyoYmd()}${new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", hour12: false })}`;
-        const ka = k(a.data), kb = k(b.data);
-        return +(ka < now) - +(kb < now) || (ka < kb ? -1 : +(ka > kb));
-      })
+      .sort((a, b) => byClaimWhen(a.data, b.data))
       .map(({ id, data: r }) => {
         const c: Claim = {
           id, code: String(r.code || ""), day: String(r.day || ""), slot: String(r.slot || ""),
