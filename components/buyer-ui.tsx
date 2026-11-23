@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { Icon } from "@/components/icons";
 import { byPrice, Listings, ListingTools, money, Seg, useDense, usePriceDir, useShowSold } from "@/components/photo-listing";
 import { useBodyScrollLock, useMaskDismiss } from "@/components/snack";
 import { dayLbl, moveOutLeft } from "@/lib/days";
@@ -232,7 +233,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
       {bioShow ? <p className="hint bio">{bioShow}</p> : null}
       {rule ? <p className="hint rule">{rule}</p> : null}
       <p className="ext-links">
-        <span className="hint">{name}</span>
+        <span className="ext-link"><Icon name="person" size={16} />{name}</span>
         {state?.jimotyUrl && (
           <a className="ext-link" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">
             <img className="ext-ico" src="/jimoty.png" alt="" />Jimoty profile
