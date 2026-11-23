@@ -327,7 +327,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
                 </div>
               </div>
             )}
-            <p className="total">現金合計 {money(cartTotal)}
+            <p className="total"><span>現金合計 {money(cartTotal)}</span>
               <label className="offer">希望額
                 <input inputMode="numeric" pattern="[0-9]*" value={offer}
                   onChange={(e) => setOffer(e.target.value.replace(/[^\d]/g, ""))}
@@ -339,7 +339,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
               <li key={i.id}><span>{i.name?.trim() || "無題"} · キャンセル待ち</span><span>{money(i.price)}</span></li>
             )))}</ul>
             {rule ? <p className={minsOk ? "hint" : "sw"}>{rule}{minsOk ? "" : " — まだ足りません"}</p> : null}
-            <div className="field"><span>連絡方法</span>
+            <div className="field contact"><span>連絡方法</span>
               {(canJimoty || canLine || canPhone) ? (
                 <Seg label="連絡方法" value={method || ""} onPick={(v) => { setMethod(v as Method); setChanOk(false); }}
                   opts={([["jimoty", canJimoty], ["line", canLine], ["phone", canPhone]] as const)
