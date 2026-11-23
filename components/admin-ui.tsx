@@ -144,7 +144,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     setBio(bioVal);
     const j = body.jimotyUrl || local.jimotyUrl || "";
     const l = body.lineInviteUrl || "", p = body.phone || "";
-    setJimoty(j); setLineInvite(l); setPhone(p);
+    setJimoty(j); setJmDraft((d) => d || j); setLineInvite(l); setPhone(p);
     setYoutube(body.youtubeUrl || ytUrl(bioVal) || local.youtubeUrl || "");
     setContactMode((j.trim() && "jimoty") || (l.trim() && "line") || (p.trim() && "phone") || "jimoty");
     setSlots(body.slots?.length ? body.slots : [...PICKUP_SLOTS]);
@@ -712,17 +712,20 @@ export default function ShopAdminView({ shop, name }: Props) {
         )}
       </section>
 
+      {empty && (
+        <div className="jm-hero">
+          <input value={jmDraft} disabled={jmBusy || !data}
+            placeholder={jimoty || "ジモティプロフィールURL"} aria-label="ジモティプロフィールURL"
+            onChange={(e) => setJmDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void importJimoty(); } }}
+            inputMode="url" autoComplete="url" />
+          <button type="button" className="cta go" disabled={jmBusy || !data}
+            onClick={() => void importJimoty()}>
+            {jmBusy ? "取込中…" : "ジモティーから取り込む"}
+          </button>
+        </div>
+      )}
       <div className="add-dual">
-        {empty && (
-          <div className="list-row">
-            <input value={jmDraft} disabled={jmBusy || !data}
-              placeholder="ジモティプロフィールURL" aria-label="ジモティプロフィールURL"
-              onChange={(e) => setJmDraft(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void importJimoty(); } }} />
-            <button type="button" className="share" disabled={jmBusy || !data}
-              onClick={() => void importJimoty()}>{jmBusy ? "取込中…" : "取り込む"}</button>
-          </div>
-        )}
         <button type="button" className="cta"
           disabled={!data || listBusy}
           onClick={() => {
