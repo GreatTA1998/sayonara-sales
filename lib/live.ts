@@ -217,7 +217,7 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
           : Array.isArray(r.photos) ? r.photos.map(String).filter(Boolean) : [];
         batch.set(doc(db, "shops", shop, "items", id), itemFields({
           id, name: String(r.name || "").trim(), price: numPrice(r.price),
-          ...(photos.length ? { photos } : {}),
+          jimoty: true, ...(photos.length ? { photos } : {}),
         }, base + i));
       });
       await batch.commit();
@@ -228,6 +228,19 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
         ...(jurl ? { jimotyUrl: jurl } : {}),
       });
       return { ok: true, count: rows.length, left: 1 - used };
+    }
+    case "wipeImport": {
+      // Tagged Jimoty rows only; if none tagged (pre-fix import), wipe all for recovery.
+      const snap = await getDocs(collection(db, "shops", shop, "items"));
+      const tagged = snap.docs.filter((d) => !!(d.data() as { jimoty?: boolean }).jimoty);
+      const targets = tagged.length ? tagged : snap.docs;
+      if (!targets.length) throw new Error("削除する出品がありません");
+      for (let i = 0; i < targets.length; i += 400) {
+        const b = writeBatch(db);
+        targets.slice(i, i + 400).forEach((d) => b.delete(d.ref));
+        await b.commit();
+      }
+      return { ok: true, count: targets.length, tagged: !!tagged.length };
     }
     case "edit": {
       const id = String(body.id);
