@@ -7,6 +7,7 @@ function youbi(d: string) {
 }
 
 export function dayLbl(d: string) {
+  if (!YMD.test(d || "")) return d || "";
   const [, m, day] = d.split("-").map(Number);
   return `${m}月${day}日（${youbi(d)}）`;
 }
