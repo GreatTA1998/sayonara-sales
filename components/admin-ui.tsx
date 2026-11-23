@@ -54,7 +54,7 @@ function ClaimRow({ c, items, onOpen }: { c: Claim; items: Item[]; onOpen: (id: 
         <span className="tl-when">{dayLbl(c.day)} {c.slot || "—"}{c.status === "picked_up" ? " · 引取済み" : ""}
           {soon ? <span className="tl-soon">{soon}</span> : null}</span>
         <span className="tl-goods">{its.flatMap((it) => it.photos?.[0] ? [<img key={it.id} src={it.photos[0]} alt="" />] : []).slice(0, 4)}
-          <span className="tl-sum">{[claimWho(c), its.map(itemLabel).join("、")].filter(Boolean).join(" · ")}</span></span>
+          <span className="tl-sum">{[claimWho(c), its.filter((it) => !it.photos?.[0]).map(itemLabel).join("、")].filter(Boolean).join(" · ")}</span></span>
       </button>
     </li>
   );
