@@ -25,7 +25,7 @@ type State = {
 type Receipt = { code: string; day: string; slot: string; total?: number; spotName?: string; spotMapsUrl?: string };
 type Method = "jimoty" | "line" | "phone";
 type Props = { shop: string; name: string; /** Flatten padding when embedded on home. */ embed?: boolean };
-const CH = { jimoty: ["ジモティー", "メッセージ済み", "ジモティ名（依頼の識別）"], line: ["LINE", "LINEで友だち追加しました", "LINE名"], phone: ["電話", "電話しました", "電話番号"] } as const;
+const CH = { jimoty: ["ジモティー", "メッセージ済み", "ジモティ名（依頼の識別）"], line: ["LINE", "友だち追加してメッセージ済み", "LINE名"], phone: ["電話", "メッセージ済み", "電話番号"] } as const;
 
 /** Confirmed only — pending is disclaimer + still 依頼可. */
 const locked = (i: Item) => i.taken;
