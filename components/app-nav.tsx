@@ -9,13 +9,12 @@ import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { listenPendingRequests } from "@/lib/live";
 import { adminPath, ensureShopId, getId, getName, logout, subscribeAuth } from "@/lib/shop";
 
-type Props = { top?: boolean };
 type Shot = { preview: string; url?: string; err?: string };
 
 const IMG_ACCEPT = "image/*,image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif";
 
-/** brand+投稿一覧 · ヘルプ/ログイン|name menu-pop */
-export default function AppNav({ top }: Props) {
+/** brand+投稿一覧 · ヘルプ/ログイン|name menu-pop — always bottom fixed */
+export default function AppNav() {
   const router = useRouter();
   const path = usePathname() || "";
   const name = useSyncExternalStore(subscribeAuth, getName, () => "");
@@ -103,13 +102,12 @@ export default function AppNav({ top }: Props) {
   const sellHref = shopId ? adminPath(shopId) : "/";
   const sellOn = /\/s\/[^/]+\/admin\/?$/.test(path);
   const meOn = path === "/me" || path.startsWith("/me/");
-  const pop = `menu-pop${top ? "" : " up"}`;
   const toggleMe = () => setOpen(open === "me" ? "" : "me");
   const shotBusy = !!shot && !shot.url && !shot.err;
   const canSend = !!body.trim() && !busy && !shotBusy;
 
   return (
-    <nav className={`app-nav${top ? " top" : " bot"}`} aria-label="アプリ">
+    <nav className="app-nav bot" aria-label="アプリ">
       <div className="app-nav-inner">
         <div className="nav-start">
           <Link href="/" className="brand" prefetch aria-label="サヨナラ ホーム">
@@ -130,7 +128,7 @@ export default function AppNav({ top }: Props) {
               aria-expanded={open === "help"} aria-haspopup="dialog"
               onClick={() => { setOpen(open === "help" ? "" : "help"); setMsg(""); }}>ヘルプ</button>
             {open === "help" && (
-              <form className={`${pop} pane help-pane`} role="dialog" aria-label="ヘルプ" onSubmit={sendHelp}
+              <form className="menu-pop up pane help-pane" role="dialog" aria-label="ヘルプ" onSubmit={sendHelp}
                 onPaste={(e) => {
                   const item = [...e.clipboardData.items].find((i) => i.type.startsWith("image/"));
                   if (!item) return;
@@ -176,14 +174,14 @@ export default function AppNav({ top }: Props) {
               aria-expanded={open === "me"} aria-haspopup={name ? "menu" : "dialog"}
               onClick={toggleMe}>{name || "ログイン"}</button>
             {open === "me" && (name ? (
-              <div className={pop} role="menu">
+              <div className="menu-pop up" role="menu">
                 <button type="button" role="menuitem"
                   onClick={() => { setOpen(""); router.push("/me"); }}>履歴</button>
                 <button type="button" className="danger" role="menuitem"
                   onClick={() => { setOpen(""); void logout(); }}>ログアウト</button>
               </div>
             ) : (
-              <SoftLoginForm className={`${pop} pane soft-login`} autoFocus
+              <SoftLoginForm className="menu-pop up pane soft-login" autoFocus
                 onDone={() => setOpen("")} />
             ))}
           </div>
