@@ -138,8 +138,8 @@ export function listenPendingRequests(shopRaw: string, onN: (n: number) => void)
   return () => { dead = true; stop?.(); };
 }
 
-/** Home tabs — public shop+items. */
-export async function peekShop(shopRaw: string): Promise<{ address: string; count: number }> {
+/** Home tabs — public shop+items. Unpublished drafts stay private. */
+export async function peekShop(shopRaw: string): Promise<{ address: string; count: number; published: boolean }> {
   const shop = parseShop(shopRaw);
   const db = getDb();
   const [meta, items] = await Promise.all([
@@ -149,6 +149,7 @@ export async function peekShop(shopRaw: string): Promise<{ address: string; coun
   return {
     address: String(meta.data()?.address || ""),
     count: items.docs.filter((d) => !d.data().paused).length,
+    published: shop === ELTON_SHOP || !!meta.data()?.published,
   };
 }
 
