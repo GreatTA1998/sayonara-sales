@@ -70,7 +70,7 @@ export function useSnack() {
   }, []);
   useEffect(() => {
     if (!snack || snack.kind === "busy") return;
-    const t = setTimeout(() => setSnack(null), snack.action ? 4500 : 2200);
+    const t = setTimeout(() => setSnack(null), snack.action ? 4500 : snack.msg.includes("\n") ? 5500 : 2200);
     return () => clearTimeout(t);
   }, [snack]);
   return { snack, show };
