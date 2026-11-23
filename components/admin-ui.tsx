@@ -760,7 +760,7 @@ export default function ShopAdminView({ shop, name }: Props) {
         {logged && pub === "on" && <button type="button" className="share" onClick={copyUrl}>URLコピー</button>}
         <button type="button" className="req"
           onClick={!logged ? () => router.push("/me") : pub === "on" ? () => router.push(`/s/${shop}`) : publish}>
-          {!logged ? "ログインして保存" : pub === "on" ? "見る" : "公開する"}
+          {!logged ? "ログインして保存" : pub === "on" ? "店舗を見る" : "公開する"}
         </button>
       </header>
 
