@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import {
   STATE_COOKIE, RET_COOKIE, SESS_COOKIE, callbackUrl, cookieOpts,
-  exchangeCode, fetchProfile, safeReturn, signSess,
+  exchangeCode, fetchProfile, requestOrigin, safeReturn, signSess,
 } from "@/lib/line";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +17,7 @@ function bounce(origin: string, ret: string, err?: string) {
 /** LINE Login callback → session cookie → soft-upgrade on client. */
 export async function GET(req: Request) {
   const url = new URL(req.url);
+  const origin = requestOrigin(req);
   const jar = await cookies();
   const ret = safeReturn(jar.get(RET_COOKIE)?.value);
   const clear = (res: NextResponse) => {
@@ -26,20 +27,19 @@ export async function GET(req: Request) {
   };
 
   if (url.searchParams.get("error")) {
-    return clear(NextResponse.redirect(bounce(url.origin, ret, "denied")));
+    return clear(NextResponse.redirect(bounce(origin, ret, "denied")));
   }
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   const expect = jar.get(STATE_COOKIE)?.value;
   if (!code || !state || !expect || state !== expect) {
-    return clear(NextResponse.redirect(bounce(url.origin, ret, "state")));
+    return clear(NextResponse.redirect(bounce(origin, ret, "state")));
   }
 
   try {
-    const redirectUri = callbackUrl(req);
-    const { access_token } = await exchangeCode(code, redirectUri);
+    const { access_token } = await exchangeCode(code, callbackUrl(req));
     const profile = await fetchProfile(access_token);
-    const res = clear(NextResponse.redirect(bounce(url.origin, ret)));
+    const res = clear(NextResponse.redirect(bounce(origin, ret)));
     res.cookies.set(SESS_COOKIE, signSess({
       uid: profile.userId,
       name: profile.displayName,
@@ -47,6 +47,6 @@ export async function GET(req: Request) {
     }), cookieOpts(30 * 24 * 3600));
     return res;
   } catch {
-    return clear(NextResponse.redirect(bounce(url.origin, ret, "token")));
+    return clear(NextResponse.redirect(bounce(origin, ret, "token")));
   }
 }
