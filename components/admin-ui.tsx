@@ -32,8 +32,9 @@ type Props = { shop: string; name: string };
 const fmtSlot = (a: string, b: string) => `${a}–${b}`;
 const IMG_ACCEPT = "image/*,image/jpeg,image/jpg,image/png,image/heic,image/heif,image/webp,image/gif,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif";
 type ContactMode = "jimoty" | "line" | "phone";
-const CONTACT_OPTS = ([["jimoty", "ジモティー"], ["line", "LINE"], ["phone", "電話"]] as const)
-  .filter(([id]) => id === "jimoty" || ALLOW_LINE_PHONE_CONTACT);
+const CONTACT_OPTS: [string, string][] = ([["jimoty", "ジモティー"], ["line", "LINE"], ["phone", "電話"]] as const)
+  .filter(([id]) => id === "jimoty" || ALLOW_LINE_PHONE_CONTACT)
+  .map(([id, label]) => [id, label]);
 const methodJa = (m?: string) => (m === "jimoty" ? "ジモティー" : m === "phone" ? "電話" : m === "line" ? "LINE" : m || "");
 const kuStem = (v: string) => v.replace(/区$/, "");
 const kuFull = (v: string) => { const s = kuStem(v).trim(); return s ? `${s}区` : ""; };
@@ -812,7 +813,7 @@ export default function ShopAdminView({ shop, name }: Props) {
               placeholder="動作確認・値引き・引越し・車・まとめ買い優先など" /></label>
           {CONTACT_OPTS.length > 1 && (
             <Seg label="買い手連絡" value={contactMode} onPick={(v) => setContactMode(v as ContactMode)}
-              opts={[...CONTACT_OPTS]} />
+              opts={CONTACT_OPTS} />
           )}
           {ALLOW_LINE_PHONE_CONTACT && contactMode !== "jimoty" && (
             <label className="float"><span>{contactMode === "line" ? "LINE招待リンク" : "電話番号"}</span>
