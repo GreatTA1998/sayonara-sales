@@ -239,14 +239,10 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         <span className="ext-link"><Icon name="person" size={16} />{name}</span>
         {state?.jimotyUrl && (
           <a className="ext-link" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">
-            <img className="ext-ico" src="/jimoty.png" alt="" />ジモティ
+            {name}のジモティプロフィール
           </a>
         )}
-        {yt && (
-          <a className="ext-link" href={yt} target="_blank" rel="noopener noreferrer">
-            <img className="ext-ico" src="/youtube.svg" alt="" />内見動画
-          </a>
-        )}
+        {/* 内見動画 temporarily hidden (SS-315); admin youtubeUrl kept. */}
       </p>
       {err && !checkout && !open && <div className="err">{err}</div>}
       {gridItems.length > 0 && (
