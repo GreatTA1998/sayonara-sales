@@ -1,7 +1,8 @@
 "use client";
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import {
-  getFirestore, initializeFirestore, persistentLocalCache, type Firestore,
+  getFirestore, initializeFirestore, memoryLocalCache, persistentLocalCache,
+  persistentMultipleTabManager, type Firestore,
 } from "firebase/firestore";
 import type { User } from "firebase/auth";
 
@@ -24,14 +25,17 @@ function appOrThrow(): FirebaseApp {
   return app;
 }
 
-/** IndexedDB cache when possible — warm revisits paint from disk; memory fallback. */
+/** Multi-tab IndexedDB when possible; memory if persistence can't start. */
 export function getDb(): Firestore {
   if (db) return db;
   const a = appOrThrow();
   try {
-    db = initializeFirestore(a, { localCache: persistentLocalCache() });
+    db = initializeFirestore(a, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    });
   } catch {
-    db = getFirestore(a);
+    try { db = initializeFirestore(a, { localCache: memoryLocalCache() }); }
+    catch { db = getFirestore(a); }
   }
   return db;
 }
