@@ -8,6 +8,8 @@ export { byPrice, type PriceDir };
 
 const PRICE_DIR_KEY = "ss-price-dir";
 const DENSE_KEY = "ss-dense";
+/** Jimoty closed listing status — hide by default. */
+const SHOW_SOLD_KEY = "ss-show-sold";
 
 function useLS(key: string, init: string) {
   const [v, setV] = useState(init);
@@ -22,6 +24,11 @@ export function usePriceDir(): [PriceDir, (d: PriceDir) => void] {
 
 export function useDense(): [boolean, (on: boolean) => void] {
   const [v, set] = useLS(DENSE_KEY, "0");
+  return [v === "1", (on) => set(on ? "1" : "0")];
+}
+
+export function useShowSold(): [boolean, (on: boolean) => void] {
+  const [v, set] = useLS(SHOW_SOLD_KEY, "0");
   return [v === "1", (on) => set(on ? "1" : "0")];
 }
 
@@ -59,10 +66,11 @@ export function Seg({ label, opts, value, onPick }: {
 }
 
 export function ListingTools({
-  dir, onDir, dense, onDense,
+  dir, onDir, dense, onDense, showSold, onShowSold,
 }: {
   dir: PriceDir; onDir: (d: PriceDir) => void;
   dense: boolean; onDense: (on: boolean) => void;
+  showSold: boolean; onShowSold: (on: boolean) => void;
 }) {
   return (
     <div className="psort-row">
@@ -70,6 +78,10 @@ export function ListingTools({
         opts={[["0", <DensIco />, "通常"], ["1", <DensIco list />, "密集"]]} />
       <Seg label="価格順" value={dir} onPick={(v) => onDir(v as PriceDir)}
         opts={[["asc", "安い順"], ["desc", "高い順"]]} />
+      <label className="sold-tog">
+        <input type="checkbox" checked={showSold} onChange={(e) => onShowSold(e.target.checked)} />
+        受付終了
+      </label>
     </div>
   );
 }
