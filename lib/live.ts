@@ -325,13 +325,14 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
     case "picked_up":
       return setClaimStatus(shop, String(body.id), "booked", "picked_up");
     case "reschedule": {
-      // Stub: day+slot + agreed checkbox; clash checks later.
+      // day+slot + agreed checkbox; no buyer lead; pending or confirmed.
       if (!body.agreed) throw new Error("チャットで合意が必要です");
       const id = String(body.id), day = String(body.day || ""), slot = String(body.slot || "").trim();
       if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !slot) throw new Error("日付と時間を選んでください");
       const cref = doc(db, "shops", shop, "claims", id);
       const csnap = await getDoc(cref);
-      if (!csnap.exists() || String(csnap.data().status) !== "requested") throw new Error("No claim");
+      const st = csnap.exists() ? String(csnap.data().status) : "";
+      if (st !== "requested" && st !== "booked") throw new Error("No claim");
       await updateDoc(cref, { day, slot });
       return asClaim(id, { ...csnap.data(), day, slot });
     }
