@@ -236,7 +236,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         <span className="ext-link"><Icon name="person" size={16} />{name}</span>
         {state?.jimotyUrl && (
           <a className="ext-link" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">
-            <img className="ext-ico" src="/jimoty.png" alt="" />Jimoty profile
+            <img className="ext-ico" src="/jimoty.png" alt="" />ジモティ
           </a>
         )}
         {yt && (
