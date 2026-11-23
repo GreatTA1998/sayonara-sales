@@ -121,6 +121,8 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [listDraft, setListDraft] = useState("");
   const [jmDraft, setJmDraft] = useState("");
   const [jmBusy, setJmBusy] = useState(false);
+  /** Empty-shop create: one-click Jimoty import vs full manual forms. */
+  const [setup, setSetup] = useState<"one" | "manual">("one");
   type JmPrev = { id: string; name: string; url: string; samples: { name: string; price: number; photo?: string; url?: string }[] };
   const [jmPrev, setJmPrev] = useState<JmPrev | null>(null);
   const [jmCands, setJmCands] = useState<JmPrev[]>([]);
@@ -752,6 +754,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   useBodyScrollLock(!!openId || !!claimId);
   const editMask = useMaskDismiss(closeEdit, busyOpen);
   const empty = !!data && !items.length;
+  const forms = !empty || setup === "manual";
   const areaN = Math.max(2, Array.from(addrDraft || "目黒").length);
 
   return (
@@ -791,31 +794,42 @@ export default function ShopAdminView({ shop, name }: Props) {
         </section>
       ))}
 
-      <section className="prof-block">
-        <label className="float"><span>ショップメモ</span>
-          <textarea className="grow" value={bio} rows={1}
-            onChange={(e) => setBio(e.target.value)}
-            onBlur={() => void persistProfile(bio, jimoty, youtube)}
-            placeholder="動作確認・値引き・引越し・車・まとめ買い優先など" /></label>
-        <Seg label="買い手連絡" value={contactMode} onPick={(v) => setContactMode(v as ContactMode)}
-          opts={[["jimoty", "ジモティー"], ["line", "LINE"], ["phone", "電話"]]} />
-        {contactMode !== "jimoty" && (
-          <label className="float"><span>{contactMode === "line" ? "LINE招待リンク" : "電話番号"}</span>
-            <input value={contactMode === "line" ? lineInvite : phone}
-              onChange={(e) => (contactMode === "line" ? setLineInvite : setPhone)(e.target.value)}
-              onBlur={() => void persistProfile(bio, jimoty, youtube, lineInvite, phone)}
-              placeholder={contactMode === "line" ? "https://line.me/ti/p/…" : "080-0000-0000"}
-              inputMode={contactMode === "line" ? "url" : "tel"}
-              autoComplete={contactMode === "line" ? "off" : "tel"} /></label>
-        )}
-      </section>
+      {empty && (
+        <div className="prof-block">
+          <Seg label="設定" value={setup} onPick={(v) => setSetup(v as "one" | "manual")}
+            opts={[["one", "ワンクリック設定"], ["manual", "手動設定"]]} />
+        </div>
+      )}
+      {forms && (
+        <section className="prof-block">
+          <label className="float"><span>ショップメモ</span>
+            <textarea className="grow" value={bio} rows={1}
+              onChange={(e) => setBio(e.target.value)}
+              onBlur={() => void persistProfile(bio, jimoty, youtube)}
+              placeholder="動作確認・値引き・引越し・車・まとめ買い優先など" /></label>
+          <Seg label="買い手連絡" value={contactMode} onPick={(v) => setContactMode(v as ContactMode)}
+            opts={[["jimoty", "ジモティー"], ["line", "LINE"], ["phone", "電話"]]} />
+          {contactMode !== "jimoty" && (
+            <label className="float"><span>{contactMode === "line" ? "LINE招待リンク" : "電話番号"}</span>
+              <input value={contactMode === "line" ? lineInvite : phone}
+                onChange={(e) => (contactMode === "line" ? setLineInvite : setPhone)(e.target.value)}
+                onBlur={() => void persistProfile(bio, jimoty, youtube, lineInvite, phone)}
+                placeholder={contactMode === "line" ? "https://line.me/ti/p/…" : "080-0000-0000"}
+                inputMode={contactMode === "line" ? "url" : "tel"}
+                autoComplete={contactMode === "line" ? "off" : "tel"} /></label>
+          )}
+        </section>
+      )}
 
-      {empty && contactMode === "jimoty" && (
+      {empty && (setup === "one" || contactMode === "jimoty") && (
         <div className="jm-hero">
           {!jmPrev && !jmCands.length && (
             <>
+              {setup === "one" && (
+                <p className="jm-who">ジモティー名を入力すると、ボットが出品を自動で取り込みます</p>
+              )}
               <input value={jmDraft} disabled={jmBusy || !data}
-                placeholder="ジモティ名" aria-label="ジモティ名"
+                placeholder="ジモティー名" aria-label="ジモティー名"
                 onChange={(e) => setJmDraft(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void lookupJimoty(); } }}
                 autoComplete="nickname" />
@@ -861,34 +875,36 @@ export default function ShopAdminView({ shop, name }: Props) {
           )}
         </div>
       )}
-      <div className="add-dual">
-        <button type="button" className="cta"
-          disabled={!data || listBusy}
-          onClick={() => {
-            setListOpen((v) => {
-              if (v) { setListDraft(""); return false; }
-              setListDraft("");
-              requestAnimationFrame(() => listRef.current?.focus());
-              return true;
-            });
-          }}>リスト入力</button>
-        <button type="button" className="cta"
-          disabled={!data}
-          onClick={() => { setCamItemId(null); setCamOpen(true); }}>
-          <Icon name="camera" size={18} />写真入力
-        </button>
-        {listOpen && (
-          <div className="list-row">
-            <input ref={listRef} value={listDraft} disabled={listBusy}
-              placeholder="品名" aria-label="品名"
-              onChange={(e) => setListDraft(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void onListEnter(); } }} />
-            <span className="list-hint" aria-hidden="true">
-              {listDraft.trim() ? "Enterで追加" : "Enterで完了"}
-            </span>
-          </div>
-        )}
-      </div>
+      {forms && (
+        <div className="add-dual">
+          <button type="button" className="cta"
+            disabled={!data || listBusy}
+            onClick={() => {
+              setListOpen((v) => {
+                if (v) { setListDraft(""); return false; }
+                setListDraft("");
+                requestAnimationFrame(() => listRef.current?.focus());
+                return true;
+              });
+            }}>リスト入力</button>
+          <button type="button" className="cta"
+            disabled={!data}
+            onClick={() => { setCamItemId(null); setCamOpen(true); }}>
+            <Icon name="camera" size={18} />写真入力
+          </button>
+          {listOpen && (
+            <div className="list-row">
+              <input ref={listRef} value={listDraft} disabled={listBusy}
+                placeholder="品名" aria-label="品名"
+                onChange={(e) => setListDraft(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void onListEnter(); } }} />
+              <span className="list-hint" aria-hidden="true">
+                {listDraft.trim() ? "Enterで追加" : "Enterで完了"}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {empty && shop !== ELTON_SHOP && data && (
         <p className="hint">
@@ -963,6 +979,7 @@ export default function ShopAdminView({ shop, name }: Props) {
         </>
       )}
 
+      {forms && (
       <section className="prof-block">
         <div className="slot-add">
           <DateField label="受取開始" value={pickupFrom} onChange={(v) => { setPickupFrom(v); void saveDates(v, pickupTo); }} />
@@ -1068,6 +1085,7 @@ export default function ShopAdminView({ shop, name }: Props) {
           </div>
         </details>
       </section>
+      )}
 
       {claimOpen && (
         <div className="mask" role="dialog" aria-modal="true" aria-label="予約詳細"
