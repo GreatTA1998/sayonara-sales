@@ -55,7 +55,7 @@ function ClaimRow({ c, items, onOpen }: { c: Claim; items: Item[]; onOpen: (id: 
   return (
     <li>
       <button type="button" className="tl-r" onClick={() => onOpen(c.id)}>
-        <span className="tl-when">{dayLbl(c.day)} {c.slot || "—"}{c.status === "picked_up" ? " · 引取済" : ""}
+        <span className="tl-when">{dayLbl(c.day)} {c.slot || "—"}{c.status === "picked_up" ? " · 引取済" : c.status === "cancelled" ? " · キャンセル" : ""}
           {soon ? <span className="tl-soon">{soon}</span> : null}</span>
         <span className="tl-goods">{its.flatMap((it) => it.photos?.[0] ? [<img key={it.id} src={it.photos[0]} alt="" />] : []).slice(0, 4)}
           <span className="tl-sum">{[claimWho(c), its.filter((it) => !it.photos?.[0]).map(itemLabel).join("、")].filter(Boolean).join(" · ")}</span></span>
@@ -100,6 +100,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   /** Checked line-items that stay on the 依頼; unchecked leave + become available. */
   const [keep, setKeep] = useState<string[]>([]);
   const [showDone, setShowDone] = useState(false);
+  const [showCancelled, setShowCancelled] = useState(false);
   const softName = useSyncExternalStore(subscribeAuth, getName, () => "");
   const logged = !!softName;
   const label = softName || (/^\d{5}$/.test(name) ? "" : name);
@@ -208,8 +209,12 @@ export default function ShopAdminView({ shop, name }: Props) {
   const claims = data?.claims || [];
   const claimOpen = useMemo(() => claims.find((c) => c.id === claimId) || null, [claims, claimId]);
   const requests = claims.filter((c) => c.status === "requested");
-  const pending = claims.filter((c) => c.status === "booked" || (showDone && c.status === "picked_up"));
+  const pending = claims.filter((c) =>
+    c.status === "booked"
+    || (showDone && c.status === "picked_up")
+    || (showCancelled && c.status === "cancelled"));
   const hasDone = claims.some((c) => c.status === "picked_up");
+  const hasCancelled = claims.some((c) => c.status === "cancelled");
   const claimList = useMemo(
     () => (claimOpen && data ? claimItems(claimOpen, data.items) : []),
     [claimOpen, data],
@@ -783,12 +788,16 @@ export default function ShopAdminView({ shop, name }: Props) {
       {err && <div className="err">{err}</div>}
       {!data && !err && <p className="text-sm text-muted pad">読み込み中…</p>}
 
-      {([["依頼", requests], ["引き取り予定", pending]] as const).map(([title, list]) => (list.length > 0 || (title === "引き取り予定" && hasDone)) && (
+      {([["依頼", requests], ["引き取り予定", pending]] as const).map(([title, list]) => (list.length > 0 || (title === "引き取り予定" && (hasDone || hasCancelled))) && (
         <section key={title} className="claims">
           <div className="claims-h">{title}</div>
           {title === "引き取り予定" && hasDone && (
             <label className="late-check"><input type="checkbox" checked={showDone}
               onChange={(e) => setShowDone(e.target.checked)} />引取済を表示</label>
+          )}
+          {title === "引き取り予定" && hasCancelled && (
+            <label className="late-check"><input type="checkbox" checked={showCancelled}
+              onChange={(e) => setShowCancelled(e.target.checked)} />キャンセルを表示</label>
           )}
           {list.length > 0 && (
             <ol className="timeline">
@@ -1098,7 +1107,7 @@ export default function ShopAdminView({ shop, name }: Props) {
         <div className="mask" role="dialog" aria-modal="true" aria-label="予約詳細"
           onClick={closeClaim}>
           <div className="sheet claim-sheet" onClick={(e) => e.stopPropagation()}>
-            <p className="tl-when">{dayLbl(claimOpen.day)} {claimOpen.slot || "—"}{claimOpen.status === "picked_up" ? " · 引取済" : ""}</p>
+            <p className="tl-when">{dayLbl(claimOpen.day)} {claimOpen.slot || "—"}{claimOpen.status === "picked_up" ? " · 引取済" : claimOpen.status === "cancelled" ? " · キャンセル" : ""}</p>
             {claimWho(claimOpen) ? <p className="hint">{claimWho(claimOpen)}</p> : null}
             {claimOpen.contactMethod ? <div className="text-sm text-muted" style={{ marginBottom: 8 }}>{methodJa(claimOpen.contactMethod)}</div> : null}
             {claimOpen.spotName ? (
