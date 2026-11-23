@@ -4,7 +4,9 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { LineLoginLink } from "@/components/line-oauth";
 import { SoftLoginForm } from "@/components/soft-login";
 import { dayLbl } from "@/lib/days";
-import { getLineUid, getName, listBuys, logout, subscribeAuth, type BuyRow } from "@/lib/shop";
+import {
+  getJimotyName, getLineName, getLineUid, getName, listBuys, logout, subscribeAuth, type BuyRow,
+} from "@/lib/shop";
 
 const when = (day: string, slot?: string, who?: string) => [who, `${dayLbl(day)}${slot ? ` ${slot}` : ""}`].filter(Boolean).join(" · ");
 const pts = (names: (string | undefined | null)[]) => {
@@ -22,6 +24,8 @@ export function AccountView({
 }) {
   const name = useSyncExternalStore(subscribeAuth, getName, () => "");
   const hard = useSyncExternalStore(subscribeAuth, getLineUid, () => "");
+  const jimoty = useSyncExternalStore(subscribeAuth, getJimotyName, () => "");
+  const line = useSyncExternalStore(subscribeAuth, getLineName, () => "");
   const [buys, setBuys] = useState<BuyRow[]>([]);
   useEffect(() => {
     const sync = () => setBuys(listBuys());
@@ -36,7 +40,15 @@ export function AccountView({
         <SoftLoginForm className="soft-login" onDone={(id) => onLoginDone?.(id)} />
       ) : (
         <>
-          {!hard && (
+          {hard ? (
+            <>
+              <p className="hint">LINEでセキュアにログイン中</p>
+              <dl className="id-view">
+                <div><dt>LINE名</dt><dd>{line || "—"}</dd></div>
+                <div><dt>ジモティ名</dt><dd>{jimoty || "—"}</dd></div>
+              </dl>
+            </>
+          ) : (
             <>
               <p className="hint">任意：あとでLINEでアカウントを保護できます</p>
               <LineLoginLink />

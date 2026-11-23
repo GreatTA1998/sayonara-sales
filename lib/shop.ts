@@ -62,6 +62,10 @@ const stored = (k: string) => (localStorage.getItem(k) || "").trim();
 /** Display identity: Jimoty first, else soft LINE name. */
 export const getName = () =>
   typeof window === "undefined" ? "" : (hydrate(), stored(JIMOTY_KEY) || stored(LINE_KEY));
+export const getJimotyName = () =>
+  typeof window === "undefined" ? "" : (hydrate(), stored(JIMOTY_KEY));
+export const getLineName = () =>
+  typeof window === "undefined" ? "" : (hydrate(), stored(LINE_KEY));
 export const getId = () =>
   typeof window === "undefined" ? "" : (hydrate(), stored(ID_KEY));
 export const adminPath = (id: string) => `/s/${id}/admin`;
