@@ -6,7 +6,7 @@ import { byPrice, Listings, ListingTools, Seg, useDense, usePriceDir, useShowSol
 import SquareCam from "@/components/square-cam";
 import { Snack, useBodyScrollLock, useMaskDismiss, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
-import { dayLbl } from "@/lib/days";
+import { dayLbl, daysBetween, tokyoYmd } from "@/lib/days";
 import { DECLINE_PRESETS, DEF_LEAD, ELTON_SPOTS, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
 import { adminAct, listenShop } from "@/lib/live";
 import { forgetShop, getName, getProfile, openShop, saveProfile, subscribeAuth } from "@/lib/shop";
@@ -44,12 +44,22 @@ function claimItems(c: Claim, all: Item[]) {
     .map((id) => all.find((i) => i.id === id) || { id, name: "無題", price: null as number | null })
     .sort(byPrice("desc"));
 }
-const claimSummary = (c: Claim, all: Item[]) => {
-  const list = claimItems(c, all);
-  const base = list.length <= 1 ? `1点 · ${itemLabel(list[0])}` : `${list.length}点 · ${itemLabel(list[0])}…`;
-  return c.offer != null ? `${base} · 希望¥${c.offer.toLocaleString("ja-JP")}` : base;
-};
 const claimWho = (c: Claim) => (c.contact && c.contact !== "LINE" && c.contact !== "ジモティー" ? c.contact : "");
+function ClaimRow({ c, items, onOpen }: { c: Claim; items: Item[]; onOpen: (id: string) => void }) {
+  const its = claimItems(c, items), n = daysBetween(tokyoYmd(), c.day).length - 1;
+  const soon = n === 0 ? "今日" : n === 1 ? "明日" : n > 0 && n <= 3 ? `あと${n}日` : "";
+  return (
+    <li>
+      <button type="button" className="tl-r" onClick={() => onOpen(c.id)}>
+        <span className="tl-when">{dayLbl(c.day)} {c.slot || "—"}{c.status === "picked_up" ? " · 完了" : ""}
+          {soon ? <span className="tl-soon">{soon}</span> : null}</span>
+        <span className="tl-goods">{its.flatMap((it) => it.photos?.[0] ? [<img key={it.id} src={it.photos[0]} alt="" />] : []).slice(0, 4)}
+          <span className="tl-sum">{[claimWho(c), its.map(itemLabel).join("、"),
+            c.offer != null ? `希望¥${c.offer.toLocaleString("ja-JP")}` : ""].filter(Boolean).join(" · ")}</span></span>
+      </button>
+    </li>
+  );
+}
 
 /** Muse AI seed — Sayonara→Jimoty listing sync via copy-paste. */
 function musePrompt(shop: string, bio: string, items: { name?: string; price?: number | null }[]) {
@@ -776,17 +786,7 @@ export default function ShopAdminView({ shop, name }: Props) {
           )}
           {list.length > 0 && (
             <ol className="timeline">
-              {list.map((c) => (
-                <li key={c.id}>
-                  <button type="button" className="tl-card bk" onClick={() => openClaim(c.id)}>
-                    <span className="tl-row">
-                      <b className="tl-slot">{c.slot || "—"}</b>
-                      <span className="tl-day">{dayLbl(c.day)}{c.status === "picked_up" ? " · 完了" : ""}</span>
-                    </span>
-                    <span className="tl-sum">{[claimWho(c), claimSummary(c, data?.items || [])].filter(Boolean).join(" · ")}</span>
-                  </button>
-                </li>
-              ))}
+              {list.map((c) => <ClaimRow key={c.id} c={c} items={data?.items || []} onOpen={openClaim} />)}
             </ol>
           )}
         </section>
@@ -1074,11 +1074,8 @@ export default function ShopAdminView({ shop, name }: Props) {
         <div className="mask" role="dialog" aria-modal="true" aria-label="予約詳細"
           onClick={closeClaim}>
           <div className="sheet claim-sheet" onClick={(e) => e.stopPropagation()}>
-            <span className="tl-row">
-              <b className="tl-slot">{claimOpen.slot || "—"}</b>
-              <span className="tl-day">{dayLbl(claimOpen.day)}{claimOpen.status === "picked_up" ? " · 完了" : ""}</span>
-            </span>
-            {claimWho(claimOpen) ? <div className="tl-who">{claimWho(claimOpen)}</div> : null}
+            <p className="tl-when">{dayLbl(claimOpen.day)} {claimOpen.slot || "—"}{claimOpen.status === "picked_up" ? " · 完了" : ""}</p>
+            {claimWho(claimOpen) ? <p className="hint">{claimWho(claimOpen)}</p> : null}
             {claimOpen.contactMethod ? <div className="text-sm text-muted" style={{ marginBottom: 8 }}>{methodJa(claimOpen.contactMethod)}</div> : null}
             {claimOpen.spotName ? (
               <p className="hint" style={{ marginBottom: 8 }}>
