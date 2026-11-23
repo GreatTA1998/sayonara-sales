@@ -50,11 +50,16 @@ const claimSummary = (c: Claim, all: Item[]) => {
 };
 const claimWhen = (c: Claim) => [c.contact && c.contact !== "LINE" && c.contact !== "ジモティー" ? c.contact : "", `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}`].filter(Boolean).join(" · ");
 
+const MUSE_URL = "https://muse.oriz.in";
 /** Editable Muse seed — Sayonara→Jimoty copy-paste helper (no auto-post). */
-function musePrompt(bio: string, items: { name?: string; price?: number | null }[]) {
+function musePrompt(shop: string, bio: string, items: { name?: string; price?: number | null }[]) {
+  const invite = `${SITE_URL}/s/${shop}`;
   const list = items.slice(0, 40).map((it) =>
     `- ${(it.name || "").trim() || "無題"}${it.price != null ? ` ¥${Number(it.price).toLocaleString("ja-JP")}` : ""}`).join("\n");
-  return `次をジモティの出品文に整えて（簡潔・日本語）：\n\n【ショップメモ】\n${bio.trim() || "（なし）"}\n\n【出品一覧】\n${list || "（なし）"}\n`;
+  const memo = bio.trim()
+    ? `${bio.trim()}\n\nまとめて予約・受け渡し → ${invite}`
+    : `まとめて予約・受け渡しは Sayonara → ${invite}`;
+  return `次をジモティの出品文に整えて（簡潔・日本語・コピペ用）：\n\n【招待】\n${memo}\n\n【出品一覧】\n${list || "（なし）"}\n`;
 }
 
 export default function ShopAdminView({ shop, name }: Props) {
@@ -741,18 +746,18 @@ export default function ShopAdminView({ shop, name }: Props) {
 
       {!empty && (
         <section className="prof-block">
-          <p className="hint">Sayonara→ジモティは Muse（無料）で整えてコピペ。自動投稿なし。</p>
+          <p className="hint">Sayonara→ジモティは無料の <a href={MUSE_URL} target="_blank" rel="noopener noreferrer">Muse</a> で整えてコピペ。自動投稿なし。</p>
           <label className="float"><span>ジモティ用プロンプト</span>
             <textarea className="grow" rows={4}
-              value={museDraft || musePrompt(bio, items)}
+              value={museDraft || musePrompt(shop, bio, items)}
               onChange={(e) => setMuseDraft(e.target.value)} /></label>
           <div className="list-row" style={{ marginTop: 6 }}>
             <button type="button" className="share"
               onClick={() => {
-                void navigator.clipboard?.writeText(museDraft || musePrompt(bio, items)).catch(() => undefined);
+                void navigator.clipboard?.writeText(museDraft || musePrompt(shop, bio, items)).catch(() => undefined);
                 show("コピーしました", "ok");
               }}>コピー</button>
-            <button type="button" className="share" onClick={() => setMuseDraft(musePrompt(bio, items))}>下書きを入れ直す</button>
+            <button type="button" className="share" onClick={() => setMuseDraft(musePrompt(shop, bio, items))}>下書きを入れ直す</button>
           </div>
         </section>
       )}
