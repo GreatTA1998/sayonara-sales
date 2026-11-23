@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 
-export type IconName = "plus" | "more" | "trash" | "camera" | "person";
+export type IconName = "plus" | "more" | "trash" | "camera";
 
 const paths: Record<IconName, ReactNode> = {
   plus: <path d="M12 5v14M5 12h14" />,
@@ -23,7 +23,6 @@ const paths: Record<IconName, ReactNode> = {
       <circle cx="12" cy="13" r="3.2" />
     </>
   ),
-  person: <><circle cx="12" cy="8" r="3.5" /><path d="M5 20c1.5-4 4.5-6 7-6s5.5 2 7 6" /></>,
 };
 
 export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {

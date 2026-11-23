@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { Icon } from "@/components/icons";
 import { byPrice, Listings, ListingTools, money, Seg, useDense, usePriceDir, useShowSold } from "@/components/photo-listing";
 import { useBodyScrollLock, useMaskDismiss } from "@/components/snack";
 import { dayLbl, moveOutLeft } from "@/lib/days";
@@ -239,15 +238,14 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
       </header>
       {bioShow ? <p className="hint bio">{bioShow}</p> : null}
       {rule ? <p className="hint rule">{rule}</p> : null}
-      <p className="ext-links">
-        <span className="ext-link"><Icon name="person" size={16} />{name}</span>
-        {state?.jimotyUrl && (
+      {state?.jimotyUrl ? (
+        <p className="ext-links">
           <a className="ext-link" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">
-            {name}のジモティプロフィール
+            {name}のジモティープロフィール
           </a>
-        )}
-        {/* 内見動画 temporarily hidden (SS-315); admin youtubeUrl kept. */}
-      </p>
+          {/* 内見動画 temporarily hidden (SS-315); admin youtubeUrl kept. */}
+        </p>
+      ) : null}
       {err && !checkout && !open && <div className="err">{err}</div>}
       {gridItems.length > 0 && (
         <ListingTools dir={priceDir} onDir={setPriceDir} dense={dense} onDense={setDense}
