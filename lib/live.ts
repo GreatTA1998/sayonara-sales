@@ -385,12 +385,14 @@ export async function joinWaitLive(shopRaw: string, itemId: string, account: str
 /** Buyer book — creates requested claim; snapshot reconciles. */
 export async function bookShop(shopRaw: string, body: {
   day: string; slot: string; itemIds: string[]; contact: string; contactMethod: "jimoty" | "line" | "phone";
-  spotId?: string;
+  spotId?: string; offer?: number;
 }): Promise<{ code: string; day: string; slot: string; address: string; contact: string; contactMethod: string; total: number; items: string[]; spotName?: string; spotMapsUrl?: string }> {
   const shop = parseShop(shopRaw);
   const user = await ensureAuth();
   const db = getDb();
   const { day, slot, itemIds, contact, contactMethod, spotId } = body;
+  const offer = body.offer != null && Number.isFinite(body.offer) && body.offer >= 0
+    ? Math.floor(body.offer) : undefined;
   if (!day || !slot || !itemIds.length || !contactMethod || !contact.trim()) {
     throw new Error("日付・時間・連絡先・連絡方法・品目を確認してください");
   }
@@ -447,6 +449,7 @@ export async function bookShop(shopRaw: string, body: {
       contactMethod, contact: contact.trim(),
       status: "requested", createdAt: new Date().toISOString(), buyerUid: user.uid, waiters: [],
       ...(spot ? { spotId: spot.id, spotName: spot.name, spotMapsUrl: spot.mapsUrl } : {}),
+      ...(offer != null ? { offer } : {}),
     };
     tx.set(doc(db, "shops", shop, "claims", claimId), claimFields(claim));
     // Only bind free items. Pending/orphan keep pointer; confirm() rebinds on 予約済.

@@ -13,6 +13,8 @@ export type Claim = {
   contact?: string; contactMethod?: "jimoty" | "line" | "phone";
   /** Snapshot at book — survives admin spot edits/deletes. */
   spotId?: string; spotName?: string; spotMapsUrl?: string;
+  /** Optional buyer offer ¥ (may be below/above 現金合計). */
+  offer?: number;
   /** requested = pending; booked = confirmed 予約済. */
   status: "requested" | "booked" | "picked_up" | "cancelled"; createdAt: string;
   waiters?: { account: string; at: string }[];
@@ -217,6 +219,7 @@ export function claimFields(c: Claim): Record<string, unknown> {
     status: c.status, createdAt: c.createdAt,
     waiters: c.waiters || [],
     ...(c.spotId ? { spotId: c.spotId, spotName: c.spotName || null, spotMapsUrl: c.spotMapsUrl || null } : {}),
+    ...(c.offer != null ? { offer: c.offer } : {}),
     ...(c.buyerUid ? { buyerUid: c.buyerUid } : {}),
     ...(c.declineReason ? { declineReason: c.declineReason } : {}),
   };
@@ -251,6 +254,7 @@ export function storeFromDocs(
         if (r.spotId) c.spotId = String(r.spotId);
         if (r.spotName) c.spotName = String(r.spotName);
         if (r.spotMapsUrl) c.spotMapsUrl = String(r.spotMapsUrl);
+        if (r.offer != null && Number.isFinite(Number(r.offer))) c.offer = Math.floor(Number(r.offer));
         if (r.buyerUid) c.buyerUid = String(r.buyerUid);
         if (r.declineReason) c.declineReason = String(r.declineReason);
         if (Array.isArray(r.waiters)) {
