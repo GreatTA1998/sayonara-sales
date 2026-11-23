@@ -914,8 +914,9 @@ export default function ShopAdminView({ shop, name }: Props) {
 
       {!empty && (
         <p className="hint jm-muse">
+          無料だから、僕は
           <a href="https://muse.ai" target="_blank" rel="noopener noreferrer">Muse AI</a>
-          なら、ここの出品をジモティへ自動掲載・定期同期・メッセージ返信もできます。開始プロンプトをコピーして貼り付けて。
+          をおすすめ。ジモティへ自動掲載・定期同期・メッセージ返信もできるよ。開始プロンプトをコピーして貼り付けて。
           <button type="button" className="share" onClick={() => {
             void navigator.clipboard?.writeText(musePrompt(shop, bio, items)).catch(() => undefined);
             show("コピーしました", "ok");
