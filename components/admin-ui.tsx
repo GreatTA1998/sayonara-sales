@@ -16,7 +16,7 @@ import { SITE_URL } from "@/lib/site";
 type Item = PhotoItem & { claimId?: string | null; note?: string; paused?: boolean; jimoty?: boolean };
 type Claim = {
   id: string; code: string; day: string; slot?: string; contact?: string; contactMethod?: string;
-  itemIds: string[]; status: string; spotName?: string; spotMapsUrl?: string;
+  itemIds: string[]; status: string; spotName?: string; spotMapsUrl?: string; offer?: number;
 };
 type AdminState = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
@@ -46,7 +46,8 @@ function claimItems(c: Claim, all: Item[]) {
 }
 const claimSummary = (c: Claim, all: Item[]) => {
   const list = claimItems(c, all);
-  return list.length <= 1 ? `1点 · ${itemLabel(list[0])}` : `${list.length}点 · ${itemLabel(list[0])}…`;
+  const base = list.length <= 1 ? `1点 · ${itemLabel(list[0])}` : `${list.length}点 · ${itemLabel(list[0])}…`;
+  return c.offer != null ? `${base} · 希望¥${c.offer.toLocaleString("ja-JP")}` : base;
 };
 const claimWho = (c: Claim) => (c.contact && c.contact !== "LINE" && c.contact !== "ジモティー" ? c.contact : "");
 
@@ -1077,6 +1078,9 @@ export default function ShopAdminView({ shop, name }: Props) {
                 </li>
               ))}
             </ul>
+            {claimOpen.offer != null ? (
+              <p className="total">希望額 ¥{claimOpen.offer.toLocaleString("ja-JP")}</p>
+            ) : null}
             {claimOpen.status === "requested" && pane === "decline" ? (
               <div className="decline-list" role="group" aria-label="お断り理由">
                 <p className="hint">丁寧なお断り文を選んでください</p>
