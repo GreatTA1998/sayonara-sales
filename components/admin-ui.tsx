@@ -796,7 +796,7 @@ export default function ShopAdminView({ shop, name }: Props) {
         )}
       </section>
 
-      {empty && (
+      {empty && contactMode === "jimoty" && (
         <div className="jm-hero">
           {!jmPrev && !jmCands.length && (
             <>
@@ -805,7 +805,7 @@ export default function ShopAdminView({ shop, name }: Props) {
                 onChange={(e) => setJmDraft(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void lookupJimoty(); } }}
                 autoComplete="nickname" />
-              <button type="button" className="cta go" disabled={jmBusy || !data}
+              <button type="button" className="cta" disabled={jmBusy || !data}
                 onClick={() => void lookupJimoty()}>
                 {jmBusy ? "検索中…" : "ジモティーから取り込む"}
               </button>
@@ -837,7 +837,7 @@ export default function ShopAdminView({ shop, name }: Props) {
                   </li>
                 ))}
               </ul>
-              <button type="button" className="cta go" disabled={jmBusy}
+              <button type="button" className="cta" disabled={jmBusy}
                 onClick={() => void confirmJimoty(jmPrev)}>
                 {jmBusy ? "取込中…" : "この人で取り込む"}
               </button>
