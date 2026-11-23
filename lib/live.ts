@@ -11,7 +11,7 @@ import { ensureAuth, getDb } from "./fb";
 import { tokyoYmd } from "./days";
 import {
   applyDates, applyMins, bookableDays, cartMeets, cartRule, claimFields, ELTON_SHOP, hasBuyerContact,
-  itemFields, normalizeSlots, parseShop, shortCode, shopFields, shopSlots,
+  itemFields, normalizeSlots, normalizeSpots, parseShop, shortCode, shopFields, shopSlots, shopSpots,
   storeFromDocs, takenSlots, uid, type Claim, type Item, type Store,
 } from "./store";
 
@@ -280,6 +280,11 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       await updateDoc(shopRef, { slots, updatedAt: new Date().toISOString() });
       return { slots };
     }
+    case "spots": {
+      const pickupSpots = normalizeSpots(body.pickupSpots);
+      await updateDoc(shopRef, { pickupSpots, updatedAt: new Date().toISOString() });
+      return { pickupSpots };
+    }
     case "publish": {
       const meta = (await getDoc(shopRef)).data() || {};
       const s = storeFromDocs(meta as Record<string, unknown>, [], []);
@@ -351,11 +356,12 @@ export async function joinWaitLive(shopRaw: string, itemId: string, account: str
 /** Buyer book — creates requested claim; snapshot reconciles. */
 export async function bookShop(shopRaw: string, body: {
   day: string; slot: string; itemIds: string[]; contact: string; contactMethod: "jimoty" | "line" | "phone";
-}): Promise<{ code: string; day: string; slot: string; address: string; contact: string; contactMethod: string; total: number; items: string[] }> {
+  spotId?: string;
+}): Promise<{ code: string; day: string; slot: string; address: string; contact: string; contactMethod: string; total: number; items: string[]; spotName?: string; spotMapsUrl?: string }> {
   const shop = parseShop(shopRaw);
   const user = await ensureAuth();
   const db = getDb();
-  const { day, slot, itemIds, contact, contactMethod } = body;
+  const { day, slot, itemIds, contact, contactMethod, spotId } = body;
   if (!day || !slot || !itemIds.length || !contactMethod || !contact.trim()) {
     throw new Error("日付・時間・連絡先・連絡方法・品目を確認してください");
   }
@@ -373,6 +379,9 @@ export async function bookShop(shopRaw: string, body: {
   if (!bookableDays(pre).includes(day)) throw new Error("その日は選べません");
   if (!shopSlots(pre).includes(slot)) throw new Error("その時間帯は選べません");
   if (takenSlots(pre, day).includes(slot)) throw new Error("その時間帯は埋まっています");
+  const spots = shopSpots(pre);
+  const spot = spotId ? spots.find((s) => s.id === spotId) : undefined;
+  if (spots.length && !spot) throw new Error("受取場所を選んでください");
 
   return runTransaction(db, async (tx) => {
     const itemSnaps = await Promise.all(itemIds.map((id) => tx.get(doc(db, "shops", shop, "items", id))));
@@ -408,6 +417,7 @@ export async function bookShop(shopRaw: string, body: {
       id: claimId, code, day, slot, itemIds: [...itemIds],
       contactMethod, contact: contact.trim(),
       status: "requested", createdAt: new Date().toISOString(), buyerUid: user.uid, waiters: [],
+      ...(spot ? { spotId: spot.id, spotName: spot.name, spotMapsUrl: spot.mapsUrl } : {}),
     };
     tx.set(doc(db, "shops", shop, "claims", claimId), claimFields(claim));
     // Only bind free items. Pending/orphan keep pointer; confirm() rebinds on 予約済.
@@ -418,6 +428,7 @@ export async function bookShop(shopRaw: string, body: {
     return {
       code, day, slot, address: String(meta.address || ""), contact: claim.contact!, contactMethod,
       total, items: items.map((it) => it.name),
+      ...(spot ? { spotName: spot.name, spotMapsUrl: spot.mapsUrl } : {}),
     };
   });
 }
