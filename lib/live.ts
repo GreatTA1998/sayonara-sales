@@ -123,6 +123,21 @@ export function listenShop(
   return () => { dead = true; stopShop?.(); stopItems?.(); stopClaims?.(); };
 }
 
+/** AppNav: unconfirmed 依頼 count (requested only — not 引き取り予定). */
+export function listenPendingRequests(shopRaw: string, onN: (n: number) => void): Unsubscribe {
+  const shop = parseShop(shopRaw);
+  let stop: Unsubscribe | null = null;
+  let dead = false;
+  // Auth so unpublished owner shops can still read claims.
+  void ensureAuth().then(() => {
+    if (dead) return;
+    stop = onSnapshot(collection(getDb(), "shops", shop, "claims"), (snap) => {
+      onN(snap.docs.reduce((n, d) => n + (d.data().status === "requested" ? 1 : 0), 0));
+    }, () => { if (!dead) onN(0); });
+  }).catch(() => { if (!dead) onN(0); });
+  return () => { dead = true; stop?.(); };
+}
+
 /** Home tabs — public shop+items. */
 export async function peekShop(shopRaw: string): Promise<{ address: string; count: number }> {
   const shop = parseShop(shopRaw);

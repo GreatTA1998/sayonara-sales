@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useLineOAuthReturn } from "@/components/line-oauth";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
+import { listenPendingRequests } from "@/lib/live";
 import { adminPath, ensureShopId, getId, getName, logout, softLogin, subscribeAuth } from "@/lib/shop";
 
 type Props = { top?: boolean };
@@ -24,6 +25,7 @@ export default function AppNav({ top }: Props) {
   const [shot, setShot] = useState<Shot | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(""); // "" | ok | "!err"
+  const [reqN, setReqN] = useState(0);
   const shotRef = useRef<Shot | null>(null);
   shotRef.current = shot;
 
@@ -31,6 +33,10 @@ export default function AppNav({ top }: Props) {
     if (shopId) router.prefetch(adminPath(shopId));
     if (name) router.prefetch("/me");
   }, [shopId, name, router]);
+  useEffect(() => {
+    if (!shopId) { setReqN(0); return; }
+    return listenPendingRequests(shopId, setReqN);
+  }, [shopId]);
   useLineOAuthReturn();
   useEffect(() => {
     if (!open) return;
@@ -116,7 +122,7 @@ export default function AppNav({ top }: Props) {
               if (shopId) return;
               e.preventDefault();
               router.push(adminPath(ensureShopId()));
-            }}>{shopId ? "投稿一覧" : "投稿"}</Link>
+            }}>{shopId ? <>投稿一覧{reqN > 0 ? <span className="nav-badge" aria-label={`依頼${reqN}件`}>{reqN}</span> : null}</> : "投稿"}</Link>
         </div>
         <div className="nav-end">
           <div className="nav-help">
