@@ -2,7 +2,8 @@
 
 Phone-first move-out sale. Hub `/`; seller UI `/s/{id}/admin` (Elton `/s/elton/admin`). Navbar **ヘルプ** → report. `/admin` = Elton-only report inbox (not public; not shop admin).
 
-**Production:** https://sayonara.tokyo
+**Production:** https://sayonara.tokyo (Promote only)  
+**Beta:** https://beta.sayonara.tokyo (merges land here first — see store `docs/beta-sayonara-tokyo.md`)
 
 Shop state: **Firebase Firestore** via the **client SDK** + security rules + `onSnapshot` sole SOT (no client optimistic listing ids). Photos stay on Vercel Blob. Soft identity = Jimoty and/or LINE name (one account); hard login = LINE OAuth (needs channel env). Anonymous Firebase Auth for writes. Soft-auth era: `/s/elton` admin writes need signed-in only (not `ownerUid` match); other shops still claim `ownerUid`.
 
@@ -27,7 +28,7 @@ shops/{shopId}/claims/{claimId}   # code, day, slot, itemIds, contact, buyerUid,
 | `BLOB_READ_WRITE_TOKEN` | prod | Photo uploads only |
 | `LINE_CHANNEL_ID` / `LINE_CHANNEL_SECRET` | optional | Hard LINE OAuth (see store `docs/line-login-setup.md`) |
 | `LINE_CALLBACK_URL` | optional | default `{origin}/api/auth/line/callback` |
-| `NEXT_PUBLIC_SITE_URL` | optional | default `https://sayonara.tokyo` |
+| `NEXT_PUBLIC_SITE_URL` | optional | prod default `https://sayonara.tokyo`; Preview/`beta` → `https://beta.sayonara.tokyo` |
 | `REPORT_WEBHOOK_URL` | optional | Cursor Automation webhook — POST on each Help report |
 | `REPORT_WEBHOOK_AUTH` | optional | Bearer for that webhook (`Generate auth header`) |
 | `AUTOFIX_DAILY_CAP` | optional | Max kicks / UTC day (default `5`; `0` = off) |

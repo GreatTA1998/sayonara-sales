@@ -1,0 +1,14 @@
+# Keep origin/beta = origin/main so beta.sayonara.tokyo tracks merges.
+# Prod (sayonara.tokyo) only moves via Vercel Promote (auto-assign domains off).
+name: sync-beta
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: git push origin HEAD:beta --force
