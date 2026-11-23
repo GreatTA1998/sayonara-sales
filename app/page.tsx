@@ -17,18 +17,20 @@ export default function HomePage() {
 
   const refresh = useCallback(async () => {
     const rows = listSales();
-    const enriched = await Promise.all(rows.map(async (r) => {
+    // Public home = published only (投稿 draft / empty stay private).
+    const enriched = (await Promise.all(rows.map(async (r) => {
       try {
         const d = await peekShop(r.id);
+        if (r.id !== ELTON_ID && !d.published) return null;
         return {
           ...r,
           ward: (d.address || "").trim() || r.ward || DEFAULT_WARD,
           count: d.count,
         } as Card;
       } catch {
-        return { ...r, count: 0 } as Card;
+        return null;
       }
-    }));
+    }))).filter((c): c is Card => !!c);
     setCards(enriched);
   }, []);
 
