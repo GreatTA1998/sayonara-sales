@@ -51,7 +51,7 @@ const claimSummary = (c: Claim, all: Item[]) => {
 const claimWhen = (c: Claim) => [c.contact && c.contact !== "LINE" && c.contact !== "ジモティー" ? c.contact : "", `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}`].filter(Boolean).join(" · ");
 
 const MUSE_URL = "https://muse.oriz.in";
-/** Muse seed — Sayonara→Jimoty copy-paste helper (no auto-post). */
+/** Muse seed — Sayonara→Jimoty listing sync via copy-paste. */
 function musePrompt(shop: string, bio: string, items: { name?: string; price?: number | null }[]) {
   const invite = `${SITE_URL}/s/${shop}`;
   const list = items.slice(0, 40).map((it) =>
@@ -59,7 +59,7 @@ function musePrompt(shop: string, bio: string, items: { name?: string; price?: n
   const memo = bio.trim()
     ? `${bio.trim()}\n\nまとめて予約・受け渡し → ${invite}`
     : `まとめて予約・受け渡しは Sayonara → ${invite}`;
-  return `次をジモティの出品文に整えて（簡潔・日本語・コピペ用）。Sayonara側は約24時間ごとに見なおして同期して：\n\n【招待】\n${memo}\n\n【出品一覧】\n${list || "（なし）"}\n`;
+  return `Sayonaraの出品をジモティ向けに整えて（簡潔・日本語・コピペ用）。約24時間ごとにSayonaraを見なおしてジモティへ同期して：\n\n【招待】\n${memo}\n\n【出品一覧】\n${list || "（なし）"}\n`;
 }
 
 export default function ShopAdminView({ shop, name }: Props) {
@@ -842,8 +842,9 @@ export default function ShopAdminView({ shop, name }: Props) {
 
       {!empty && (
         <p className="hint jm-muse">
+          Sayonara→ジモティは
           <a href={MUSE_URL} target="_blank" rel="noopener noreferrer">Muse</a>
-          で文章を整えてジモティへコピペ。
+          用プロンプトをコピーして整える。
           <button type="button" className="share" onClick={() => {
             void navigator.clipboard?.writeText(musePrompt(shop, bio, items)).catch(() => undefined);
             show("コピーしました", "ok");
