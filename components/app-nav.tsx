@@ -2,18 +2,19 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { AccountView } from "@/components/account-view";
 import { Icon } from "@/components/icons";
 import { useLineOAuthReturn } from "@/components/line-oauth";
 import { SoftLoginForm } from "@/components/soft-login";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { listenPendingRequests } from "@/lib/live";
-import { adminPath, ensureShopId, getId, getName, logout, subscribeAuth } from "@/lib/shop";
+import { adminPath, ensureShopId, getId, getName, subscribeAuth } from "@/lib/shop";
 
 type Shot = { preview: string; url?: string; err?: string };
 
 const IMG_ACCEPT = "image/*,image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif";
 
-/** brand+投稿一覧 · ヘルプ/ログイン|name menu-pop — always bottom fixed */
+/** brand+投稿一覧 · ヘルプ/ログイン|name account-pane — always bottom fixed */
 export default function AppNav() {
   const router = useRouter();
   const path = usePathname() || "";
@@ -30,17 +31,18 @@ export default function AppNav() {
 
   useEffect(() => {
     if (shopId) router.prefetch(adminPath(shopId));
-    if (name) router.prefetch("/me");
-  }, [shopId, name, router]);
+  }, [shopId, router]);
   useEffect(() => {
     if (!shopId) { setReqN(0); return; }
     return listenPendingRequests(shopId, setReqN);
   }, [shopId]);
   useLineOAuthReturn();
+  useEffect(() => { setOpen(""); }, [path]);
   useEffect(() => {
     if (!open) return;
+    const sel = open === "help" ? ".nav-help" : ".nav-me";
     const close = (e: PointerEvent) => {
-      if (!(e.target as Element).closest(open === "help" ? ".nav-help" : ".nav-me")) setOpen("");
+      if (!(e.target as Element).closest(sel)) setOpen("");
     };
     document.addEventListener("pointerdown", close);
     return () => document.removeEventListener("pointerdown", close);
@@ -101,10 +103,9 @@ export default function AppNav() {
 
   const sellHref = shopId ? adminPath(shopId) : "/";
   const sellOn = /\/s\/[^/]+\/admin\/?$/.test(path);
-  const meOn = path === "/me" || path.startsWith("/me/");
-  const toggleMe = () => setOpen(open === "me" ? "" : "me");
   const shotBusy = !!shot && !shot.url && !shot.err;
   const canSend = !!body.trim() && !busy && !shotBusy;
+  const closeMe = () => setOpen("");
 
   return (
     <nav className="app-nav bot" aria-label="アプリ">
@@ -170,19 +171,16 @@ export default function AppNav() {
             )}
           </div>
           <div className="nav-me">
-            <button type="button" className={`nav-a${(name && meOn) || open === "me" ? " on" : ""}`}
-              aria-expanded={open === "me"} aria-haspopup={name ? "menu" : "dialog"}
-              onClick={toggleMe}>{name || "ログイン"}</button>
+            <button type="button" className={`nav-a${open === "me" ? " on" : ""}`}
+              aria-expanded={open === "me"} aria-haspopup="dialog"
+              onClick={() => setOpen(open === "me" ? "" : "me")}>{name || "ログイン"}</button>
             {open === "me" && (name ? (
-              <div className="menu-pop up" role="menu">
-                <button type="button" role="menuitem"
-                  onClick={() => { setOpen(""); router.push("/me"); }}>履歴</button>
-                <button type="button" className="danger" role="menuitem"
-                  onClick={() => { setOpen(""); void logout(); }}>ログアウト</button>
+              <div className="menu-pop up pane help-pane me-pane" role="dialog" aria-label="アカウント">
+                <AccountView onAfterLogout={closeMe} onNav={closeMe} />
               </div>
             ) : (
               <SoftLoginForm className="menu-pop up pane soft-login" autoFocus
-                onDone={() => setOpen("")} />
+                onDone={closeMe} />
             ))}
           </div>
         </div>

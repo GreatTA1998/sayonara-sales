@@ -195,7 +195,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     return (
       <main className="wrap">
         <h1>ありがとう。依頼を受けました</h1>
-        <p className="hint">コード {receipt.code} · {dayLbl(receipt.day)} {receipt.slot}{receipt.spotName ? ` · ${receipt.spotName}` : ""} · {money(receipt.total ?? 0)}。選んだ連絡方法で、だいたい2日以内に返事します。履歴は右上の名前から（それがアカウントです）。</p>
+        <p className="hint">コード {receipt.code} · {dayLbl(receipt.day)} {receipt.slot}{receipt.spotName ? ` · ${receipt.spotName}` : ""} · {money(receipt.total ?? 0)}。選んだ連絡方法で、だいたい2日以内に返事します。履歴は下の名前から。</p>
         {receipt.spotName && receipt.spotMapsUrl ? (
           <p className="hint"><a className="linelink" href={receipt.spotMapsUrl} target="_blank" rel="noopener noreferrer">{receipt.spotName}（Maps）</a></p>
         ) : null}
