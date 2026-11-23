@@ -1,16 +1,18 @@
 "use client";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import ShopBuyerView from "@/components/buyer-ui";
 import { Snack, useSnack } from "@/components/snack";
 import { peekShop } from "@/lib/live";
 import {
-  AUTH_EVT, ELTON_ID, ELTON_LABEL, listSales, type SaleRow,
+  AUTH_EVT, ELTON_ID, ELTON_LABEL, adminPath, ensureShopId, listSales, type SaleRow,
 } from "@/lib/shop";
 import { SITE_URL } from "@/lib/site";
 
 type Card = SaleRow & { count: number };
 
 export default function HomePage() {
+  const router = useRouter();
   const [cards, setCards] = useState<Card[]>([]);
   const [selected, setSelected] = useState<string>(ELTON_ID);
   const { snack, show } = useSnack();
@@ -60,6 +62,8 @@ export default function HomePage() {
     <main className="home">
       <h1 className="slogan">非公式ジモティーお助けツール</h1>
       <p className="subhero">受付中かどうかをリアルタイムで確認して受け渡し日時を予約、あとはジモティーで連絡して取引完了</p>
+      <button type="button" className="cta go home-cta"
+        onClick={() => router.push(adminPath(ensureShopId()))}>2クリックで始める</button>
       <div className="home-browse">
         <div className="shop-tabs" role="tablist" aria-label="ショップ一覧">
           {cards.length ? cards.map((c) => (
