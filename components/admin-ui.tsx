@@ -48,7 +48,7 @@ const claimSummary = (c: Claim, all: Item[]) => {
   const list = claimItems(c, all);
   return list.length <= 1 ? `1点 · ${itemLabel(list[0])}` : `${list.length}点 · ${itemLabel(list[0])}…`;
 };
-const claimWhen = (c: Claim) => [c.contact && c.contact !== "LINE" && c.contact !== "ジモティー" ? c.contact : "", `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}`, c.status === "picked_up" ? "完了" : ""].filter(Boolean).join(" · ");
+const claimWho = (c: Claim) => (c.contact && c.contact !== "LINE" && c.contact !== "ジモティー" ? c.contact : "");
 
 const MUSE_URL = "https://muse.oriz.in";
 /** Muse seed — Sayonara→Jimoty listing sync via copy-paste. */
@@ -739,9 +739,12 @@ export default function ShopAdminView({ shop, name }: Props) {
             <ol className="timeline">
               {list.map((c) => (
                 <li key={c.id}>
-                  <button type="button" className="tl-card" onClick={() => openClaim(c.id)}>
-                    <b className="tl-when">{claimWhen(c)}</b>
-                    <span className="tl-sum">{claimSummary(c, data?.items || [])}</span>
+                  <button type="button" className="tl-card bk" onClick={() => openClaim(c.id)}>
+                    <span className="tl-row">
+                      <b className="tl-slot">{c.slot || "—"}</b>
+                      <span className="tl-day">{dayLbl(c.day)}{c.status === "picked_up" ? " · 完了" : ""}</span>
+                    </span>
+                    <span className="tl-sum">{[claimWho(c), claimSummary(c, data?.items || [])].filter(Boolean).join(" · ")}</span>
                   </button>
                 </li>
               ))}
@@ -1025,7 +1028,11 @@ export default function ShopAdminView({ shop, name }: Props) {
         <div className="mask" role="dialog" aria-modal="true" aria-label="予約詳細"
           onClick={closeClaim}>
           <div className="sheet claim-sheet" onClick={(e) => e.stopPropagation()}>
-            <b className="tl-when">{claimWhen(claimOpen)}</b>
+            <span className="tl-row">
+              <b className="tl-slot">{claimOpen.slot || "—"}</b>
+              <span className="tl-day">{dayLbl(claimOpen.day)}{claimOpen.status === "picked_up" ? " · 完了" : ""}</span>
+            </span>
+            {claimWho(claimOpen) ? <div className="tl-who">{claimWho(claimOpen)}</div> : null}
             {claimOpen.contactMethod ? <div className="text-sm text-muted" style={{ marginBottom: 8 }}>{methodJa(claimOpen.contactMethod)}</div> : null}
             {claimOpen.spotName ? (
               <p className="hint" style={{ marginBottom: 8 }}>
