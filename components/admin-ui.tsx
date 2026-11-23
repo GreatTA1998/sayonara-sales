@@ -51,7 +51,7 @@ function ClaimRow({ c, items, onOpen }: { c: Claim; items: Item[]; onOpen: (id: 
   return (
     <li>
       <button type="button" className="tl-r" onClick={() => onOpen(c.id)}>
-        <span className="tl-when">{dayLbl(c.day)} {c.slot || "—"}{c.status === "picked_up" ? " · 完了" : ""}
+        <span className="tl-when">{dayLbl(c.day)} {c.slot || "—"}{c.status === "picked_up" ? " · 引取済み" : ""}
           {soon ? <span className="tl-soon">{soon}</span> : null}</span>
         <span className="tl-goods">{its.flatMap((it) => it.photos?.[0] ? [<img key={it.id} src={it.photos[0]} alt="" />] : []).slice(0, 4)}
           <span className="tl-sum">{[claimWho(c), its.map(itemLabel).join("、")].filter(Boolean).join(" · ")}</span></span>
@@ -781,7 +781,7 @@ export default function ShopAdminView({ shop, name }: Props) {
           <div className="claims-h">{title}</div>
           {title === "引き取り予定" && hasDone && (
             <label className="late-check"><input type="checkbox" checked={showDone}
-              onChange={(e) => setShowDone(e.target.checked)} />完了済みを表示</label>
+              onChange={(e) => setShowDone(e.target.checked)} />引取済みを表示</label>
           )}
           {list.length > 0 && (
             <ol className="timeline">
@@ -1073,7 +1073,7 @@ export default function ShopAdminView({ shop, name }: Props) {
         <div className="mask" role="dialog" aria-modal="true" aria-label="予約詳細"
           onClick={closeClaim}>
           <div className="sheet claim-sheet" onClick={(e) => e.stopPropagation()}>
-            <p className="tl-when">{dayLbl(claimOpen.day)} {claimOpen.slot || "—"}{claimOpen.status === "picked_up" ? " · 完了" : ""}</p>
+            <p className="tl-when">{dayLbl(claimOpen.day)} {claimOpen.slot || "—"}{claimOpen.status === "picked_up" ? " · 引取済み" : ""}</p>
             {claimWho(claimOpen) ? <p className="hint">{claimWho(claimOpen)}</p> : null}
             {claimOpen.contactMethod ? <div className="text-sm text-muted" style={{ marginBottom: 8 }}>{methodJa(claimOpen.contactMethod)}</div> : null}
             {claimOpen.spotName ? (
@@ -1146,7 +1146,7 @@ export default function ShopAdminView({ shop, name }: Props) {
                     <button type="button" onClick={() => openResched(claimOpen)}>日程変更</button>
                     <button type="button"
                       onClick={() => claimAct({ action: "picked_up", id: claimOpen.id, itemIds: keep },
-                        "ありがとう。よい体験だったらうれしいです。\nお友だちにそっと教えてもらえると、ジモティーがエルトンを雇ってくれるかも。")}>受取済み</button>
+                        "ありがとう。よい体験だったらうれしいです。\nお友だちにそっと教えてもらえると、ジモティーがエルトンを雇ってくれるかも。")}>引取済み</button>
                   </>
                 ) : null}
               </div>

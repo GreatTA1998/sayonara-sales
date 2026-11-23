@@ -72,7 +72,7 @@ export function ListingTools({
         opts={[["asc", "安い順"], ["desc", "高い順"]]} />
       <label className="sold-tog">
         <input type="checkbox" checked={showSold} onChange={(e) => onShowSold(e.target.checked)} />
-        受取済み
+        引取済み
       </label>
     </div>
   );
