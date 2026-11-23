@@ -834,15 +834,17 @@ export default function ShopAdminView({ shop, name }: Props) {
               {setup === "one" && (
                 <p className="jm-who">ジモティー名を入力すると、ボットが出品を自動で取り込みます</p>
               )}
-              <input value={jmDraft} disabled={jmBusy || !data}
-                placeholder="ジモティー名" aria-label="ジモティー名"
-                onChange={(e) => setJmDraft(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void lookupJimoty(); } }}
-                autoComplete="nickname" />
-              <button type="button" className="cta" disabled={jmBusy || !data}
-                onClick={() => void lookupJimoty()}>
-                {jmBusy ? "検索中…" : "ジモティーから取り込む"}
-              </button>
+              <div className="jm-row">
+                <input value={jmDraft} disabled={jmBusy || !data}
+                  placeholder="ジモティー名" aria-label="ジモティー名"
+                  onChange={(e) => setJmDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void lookupJimoty(); } }}
+                  autoComplete="nickname" />
+                <button type="button" className="cta" disabled={jmBusy || !data}
+                  onClick={() => void lookupJimoty()}>
+                  {jmBusy ? "検索中…" : "ジモティーから取り込む"}
+                </button>
+              </div>
             </>
           )}
           {jmCands.length > 0 && (
@@ -873,7 +875,7 @@ export default function ShopAdminView({ shop, name }: Props) {
               </ul>
               <button type="button" className="cta" disabled={jmBusy}
                 onClick={() => void confirmJimoty(jmPrev)}>
-                {jmBusy ? "取込中…" : "この人で取り込む"}
+                {jmBusy ? "取込中…" : "このプロフィールで確定"}
               </button>
               <button type="button" className="share" disabled={jmBusy}
                 onClick={() => setJmPrev(null)}>もどる</button>
@@ -912,7 +914,7 @@ export default function ShopAdminView({ shop, name }: Props) {
         </div>
       )}
 
-      {empty && shop !== ELTON_SHOP && data && (
+      {empty && shop !== ELTON_SHOP && data && (setup === "manual" || !!jimoty.trim()) && (
         <p className="hint">
           <button type="button" className="share" disabled={delShopBusy}
             onClick={() => void deleteEmptyShop()}>
