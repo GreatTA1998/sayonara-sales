@@ -8,7 +8,7 @@ export { byPrice, type PriceDir };
 
 const PRICE_DIR_KEY = "ss-price-dir";
 const DENSE_KEY = "ss-dense";
-/** Jimoty closed listing status — hide by default. */
+/** Finished pickup (picked_up) — hide by default. */
 const SHOW_SOLD_KEY = "ss-show-sold";
 
 function useLS(key: string, init: string) {
@@ -32,22 +32,14 @@ export function useShowSold(): [boolean, (on: boolean) => void] {
   return [v === "1", (on) => set(on ? "1" : "0")];
 }
 
-function DensIco({ list }: { list?: boolean }) {
-  return list ? (
+function DensIco({ dense }: { dense?: boolean }) {
+  const n = dense ? 3 : 2, m = dense ? 1.25 : 1.5, c = dense ? 3 : 4.5, g = dense ? 1.25 : 2, rx = dense ? 0.6 : 1;
+  return (
     <svg width="18" height="18" viewBox="0 0 14 14" aria-hidden="true">
-      <circle cx="2.25" cy="3.25" r="1.1" fill="currentColor" />
-      <rect x="5" y="2.5" width="7.5" height="1.5" rx=".6" fill="currentColor" />
-      <circle cx="2.25" cy="7" r="1.1" fill="currentColor" />
-      <rect x="5" y="6.25" width="7.5" height="1.5" rx=".6" fill="currentColor" />
-      <circle cx="2.25" cy="10.75" r="1.1" fill="currentColor" />
-      <rect x="5" y="10" width="7.5" height="1.5" rx=".6" fill="currentColor" />
-    </svg>
-  ) : (
-    <svg width="18" height="18" viewBox="0 0 14 14" aria-hidden="true">
-      <rect x="1.5" y="1.5" width="4.5" height="4.5" rx="1" fill="currentColor" />
-      <rect x="8" y="1.5" width="4.5" height="4.5" rx="1" fill="currentColor" />
-      <rect x="1.5" y="8" width="4.5" height="4.5" rx="1" fill="currentColor" />
-      <rect x="8" y="8" width="4.5" height="4.5" rx="1" fill="currentColor" />
+      {Array.from({ length: n * n }, (_, i) => (
+        <rect key={i} x={m + (i % n) * (c + g)} y={m + ((i / n) | 0) * (c + g)}
+          width={c} height={c} rx={rx} fill="currentColor" />
+      ))}
     </svg>
   );
 }
@@ -75,12 +67,12 @@ export function ListingTools({
   return (
     <div className="psort-row">
       <Seg label="表示" value={dense ? "1" : "0"} onPick={(v) => onDense(v === "1")}
-        opts={[["0", <DensIco />, "通常"], ["1", <DensIco list />, "密集"]]} />
+        opts={[["0", <DensIco />, "通常"], ["1", <DensIco dense />, "密集"]]} />
       <Seg label="価格順" value={dir} onPick={(v) => onDir(v as PriceDir)}
         opts={[["asc", "安い順"], ["desc", "高い順"]]} />
       <label className="sold-tog">
         <input type="checkbox" checked={showSold} onChange={(e) => onShowSold(e.target.checked)} />
-        受付終了
+        受取済み
       </label>
     </div>
   );

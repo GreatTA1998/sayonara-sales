@@ -193,7 +193,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     () => [...(data?.items || [])].sort(byPrice(priceDir)),
     [data?.items, priceDir],
   );
-  const listItems = showSold || !data ? items : items.filter((it) => !itemFlags(data as Store, it).taken);
+  const listItems = showSold || !data ? items : items.filter((it) => !itemFlags(data as Store, it).sold);
   const open = useMemo(() => items.find((i) => i.id === openId) || null, [items, openId]);
   const pics = useMemo(() => {
     if (!open) return [] as string[];
