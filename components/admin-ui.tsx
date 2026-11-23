@@ -109,6 +109,9 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [listDraft, setListDraft] = useState("");
   const [jmDraft, setJmDraft] = useState("");
   const [jmBusy, setJmBusy] = useState(false);
+  type JmPrev = { id: string; name: string; url: string; count: number; samples: { name: string; price: number; photo?: string; url?: string }[] };
+  const [jmPrev, setJmPrev] = useState<JmPrev | null>(null);
+  const [jmCands, setJmCands] = useState<JmPrev[]>([]);
   const [museDraft, setMuseDraft] = useState("");
   const listRef = useRef<HTMLInputElement | null>(null);
   const dragRef = useRef<{ from: number; over: number; x: number; y: number; moved: boolean } | null>(null);
@@ -470,27 +473,54 @@ export default function ShopAdminView({ shop, name }: Props) {
     requestAnimationFrame(() => listRef.current?.focus());
   }
 
-  async function importJimoty() {
-    const profile = jmDraft.trim() || jimoty.trim();
-    if (!profile) { show("ジモティのプロフィールURLを入力してください", "err"); return; }
+  useEffect(() => {
+    if (softName) setJmDraft((d) => d || softName);
+  }, [softName]);
+
+  async function lookupJimoty() {
+    const name = jmDraft.trim() || softName.trim();
+    if (!name) { show("ジモティ名を入力してください", "err"); return; }
+    if (jmBusy) return;
+    setJmBusy(true); setErr(null); setJmPrev(null); setJmCands([]);
+    try {
+      const res = await fetch(`/api/jimoty?name=${encodeURIComponent(name)}&preview=1`);
+      const data = await res.json() as {
+        error?: string; candidates?: JmPrev[];
+        id?: string; name?: string; url?: string; count?: number;
+        samples?: JmPrev["samples"];
+      };
+      if (!res.ok) throw new Error(data.error || "失敗しました");
+      if (data.candidates?.length) { setJmCands(data.candidates); return; }
+      if (!data.id || !data.url) throw new Error("見つかりません");
+      setJmPrev({
+        id: data.id, name: data.name || name, url: data.url,
+        count: data.count || data.samples?.length || 0, samples: data.samples || [],
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "失敗しました";
+      setErr(msg); show(msg, "err");
+    } finally { setJmBusy(false); }
+  }
+
+  async function confirmJimoty(prev: JmPrev) {
     if (jmBusy) return;
     setJmBusy(true); setErr(null);
     try {
-      const res = await fetch(`/api/jimoty?profile=${encodeURIComponent(profile)}`);
+      const res = await fetch(`/api/jimoty?profile=${encodeURIComponent(prev.id)}`);
       const data = await res.json() as {
         error?: string; name?: string; url?: string;
         items?: { name: string; price: number; photo?: string }[];
       };
       if (!res.ok) throw new Error(data.error || "失敗しました");
       if (data.name) openShop(data.name);
-      const url = data.url || profile;
+      const url = data.url || prev.url;
       setJimoty(url);
       saveProfile({ bio, jimotyUrl: url, youtubeUrl: youtube });
       const ok = await act(
         { action: "import", items: data.items || [], jimotyUrl: url },
         `${data.items?.length || 0}件取り込みました`,
       );
-      if (ok) setJmDraft("");
+      if (ok) { setJmDraft(data.name || prev.name); setJmPrev(null); setJmCands([]); }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "失敗しました";
       setErr(msg); show(msg, "err");
@@ -712,17 +742,57 @@ export default function ShopAdminView({ shop, name }: Props) {
         )}
       </section>
 
+      {empty && (
+        <div className="jm-hero">
+          {!jmPrev && !jmCands.length && (
+            <>
+              <input value={jmDraft} disabled={jmBusy || !data}
+                placeholder="ジモティ名" aria-label="ジモティ名"
+                onChange={(e) => setJmDraft(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void lookupJimoty(); } }}
+                autoComplete="nickname" />
+              <button type="button" className="cta go" disabled={jmBusy || !data}
+                onClick={() => void lookupJimoty()}>
+                {jmBusy ? "検索中…" : "ジモティーから取り込む"}
+              </button>
+            </>
+          )}
+          {jmCands.length > 0 && (
+            <div className="jm-prev">
+              <p className="hint">どれですか？</p>
+              {jmCands.map((c) => (
+                <button key={c.id} type="button" className="jm-cand" disabled={jmBusy}
+                  onClick={() => { setJmPrev(c); setJmCands([]); }}>
+                  <b>{c.name}さん</b>
+                  <span>{c.samples.map((s) => s.name).filter(Boolean).slice(0, 2).join(" · ") || c.url}</span>
+                </button>
+              ))}
+              <button type="button" className="share" disabled={jmBusy}
+                onClick={() => setJmCands([])}>もどる</button>
+            </div>
+          )}
+          {jmPrev && (
+            <div className="jm-prev">
+              <p className="jm-who"><b>{jmPrev.name}さん</b>の公開出品（例）</p>
+              <ul className="jm-samples">
+                {jmPrev.samples.map((s) => (
+                  <li key={s.url || s.name}>
+                    {s.photo ? <img src={s.photo} alt="" /> : <span className="jm-ph" aria-hidden="true" />}
+                    <span>{s.name}{s.price ? ` · ¥${s.price.toLocaleString("ja-JP")}` : ""}</span>
+                  </li>
+                ))}
+              </ul>
+              <button type="button" className="cta go" disabled={jmBusy}
+                onClick={() => void confirmJimoty(jmPrev)}>
+                {jmBusy ? "取込中…" : "この人で取り込む"}
+              </button>
+              <button type="button" className="share" disabled={jmBusy}
+                onClick={() => setJmPrev(null)}>もどる</button>
+            </div>
+          )}
+        </div>
+      )}
       <div className="add-dual">
-        {empty && (
-          <div className="list-row">
-            <input value={jmDraft} disabled={jmBusy || !data}
-              placeholder="ジモティプロフィールURL" aria-label="ジモティプロフィールURL"
-              onChange={(e) => setJmDraft(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void importJimoty(); } }} />
-            <button type="button" className="share" disabled={jmBusy || !data}
-              onClick={() => void importJimoty()}>{jmBusy ? "取込中…" : "取り込む"}</button>
-          </div>
-        )}
         <button type="button" className="cta"
           disabled={!data || listBusy}
           onClick={() => {
