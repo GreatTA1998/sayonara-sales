@@ -11,15 +11,14 @@ export type LineSess = { uid: string; name: string; exp: number };
 export const lineConfigured = () =>
   !!(process.env.LINE_CHANNEL_ID?.trim() && process.env.LINE_CHANNEL_SECRET?.trim());
 
-export const callbackUrl = (req: Request) => {
-  const fixed = process.env.LINE_CALLBACK_URL?.trim() || process.env.LINE_LOGIN_CALLBACK?.trim();
-  if (fixed) return fixed.replace(/\/$/, "");
-  try {
-    return `${new URL(req.url).origin}/api/auth/line/callback`;
-  } catch {
-    return `${SITE_URL}/api/auth/line/callback`;
-  }
+/** Public origin from request host (beta / apex / vercel.app each get their own). */
+export const requestOrigin = (req: Request) => {
+  const host = (req.headers.get("x-forwarded-host") || req.headers.get("host") || "").split(",")[0].trim();
+  if (host) return `${(req.headers.get("x-forwarded-proto") || "https").split(",")[0].trim() || "https"}://${host}`;
+  try { return new URL(req.url).origin; } catch { return SITE_URL; }
 };
+
+export const callbackUrl = (req: Request) => `${requestOrigin(req)}/api/auth/line/callback`;
 
 export const safeReturn = (raw: string | null | undefined) => {
   const s = (raw || "/").trim();
