@@ -156,7 +156,9 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     });
     try {
       const data = await bookShop(shop, { day, slot, itemIds, contactMethod: method, contact: contactVal });
-      if (method === "jimoty" || (method === "line" && !loggedIn)) openShop(contactVal);
+      if (method === "jimoty" || (method === "line" && !loggedIn)) {
+        openShop(contactVal, method === "line" ? "line" : "jimoty");
+      }
       pushBuy({
         code: String(data.code || ""), shop, day, slot,
         items: Array.isArray(data.items) ? data.items.map(String) : [],

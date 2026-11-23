@@ -6,7 +6,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-/** Start optional LINE Login OAuth. Soft LINE名 login stays available without this. */
+/** Hard login: start LINE OAuth. Soft Jimoty/LINE names work without this. */
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const ret = safeReturn(url.searchParams.get("return"));

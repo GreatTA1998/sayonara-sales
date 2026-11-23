@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { LineLoginLink } from "@/components/line-oauth";
 import { dayLbl } from "@/lib/days";
-import { adminPath, getName, listBuys, openShop, subscribeAuth, type BuyRow } from "@/lib/shop";
+import { adminPath, getName, listBuys, softLogin, subscribeAuth, type BuyRow } from "@/lib/shop";
 
 const when = (day: string, slot?: string, who?: string) => [who, `${dayLbl(day)}${slot ? ` ${slot}` : ""}`].filter(Boolean).join(" · ");
 const pts = (names: (string | undefined | null)[]) => { const n = names.map((x) => x?.trim() || "無題"); return n.length <= 1 ? `1点 · ${n[0] || "無題"}` : `${n.length}点 · ${n[0]}…`; };
@@ -12,7 +12,8 @@ const pts = (names: (string | undefined | null)[]) => { const n = names.map((x) 
 export default function MePage() {
   const router = useRouter();
   const name = useSyncExternalStore(subscribeAuth, getName, () => "");
-  const [draft, setDraft] = useState("");
+  const [jimoty, setJimoty] = useState("");
+  const [line, setLine] = useState("");
   const [buys, setBuys] = useState<BuyRow[]>([]);
   useEffect(() => {
     const sync = () => setBuys(listBuys());
@@ -25,18 +26,23 @@ export default function MePage() {
       {!name && (
         <form onSubmit={(e) => {
           e.preventDefault();
-          if (!draft.trim()) return;
-          const id = openShop(draft);
-          setDraft("");
+          if (!jimoty.trim() && !line.trim()) return;
+          const id = softLogin(jimoty, line);
+          setJimoty(""); setLine("");
           if (id) router.push(adminPath(id));
         }}>
           <label className="float"><span>ジモティ名</span>
-            <input value={draft} onChange={(e) => setDraft(e.target.value)}
+            <input value={jimoty} onChange={(e) => setJimoty(e.target.value)}
               placeholder="ジモティ名" autoComplete="nickname" />
           </label>
-          <button type="submit" className="cta go" disabled={!draft.trim()}>サインイン</button>
+          <label className="float"><span>LINE名</span>
+            <input value={line} onChange={(e) => setLine(e.target.value)}
+              placeholder="LINE名" autoComplete="nickname" />
+          </label>
+          <button type="submit" className="cta go" disabled={!jimoty.trim() && !line.trim()}>サインイン</button>
         </form>
       )}
+      <LineLoginLink />
       <section className="claims">
         <div className="claims-h">買う · 引き取り履歴</div>
         {buys.length ? <ul className="timeline">{buys.map((b) => (
@@ -45,7 +51,6 @@ export default function MePage() {
             <span className="tl-sum">{pts(b.items)}</span></Link></li>
         ))}</ul> : null}
       </section>
-      {name ? <LineLoginLink /> : null}
     </main>
   );
 }
