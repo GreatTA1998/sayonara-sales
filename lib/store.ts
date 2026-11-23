@@ -5,9 +5,12 @@ export type Item = {
   id: string; name: string; price: number | null; note?: string; claimId?: string | null;
   photos?: string[]; paused?: boolean;
 };
+export type PickupSpot = { id: string; name: string; mapsUrl: string };
 export type Claim = {
   id: string; code: string; day: string; slot: string; itemIds: string[];
   contact?: string; contactMethod?: "jimoty" | "line" | "phone";
+  /** Snapshot at book — survives admin spot edits/deletes. */
+  spotId?: string; spotName?: string; spotMapsUrl?: string;
   /** requested = pending; booked = confirmed 予約済. */
   status: "requested" | "booked" | "picked_up" | "cancelled"; createdAt: string;
   waiters?: { account: string; at: string }[];
@@ -18,6 +21,7 @@ export type Store = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
   lineInviteUrl?: string; phone?: string;
   slots?: string[];
+  pickupSpots?: PickupSpot[];
   pickupFrom?: string; pickupTo?: string; moveOut?: string;
   leadDays?: number;
   /** 0 = off. Both set → count OR ¥ total. */
@@ -67,6 +71,8 @@ export function normalizeSlots(raw: unknown): string[] {
   if (!out.length) throw new Error("時間帯を1つ以上指定してください");
   return out;
 }
+
+export const shopSpots = (s: Store) => s.pickupSpots || [];
 
 export function applyDates(s: Store, raw: { pickupFrom?: unknown; pickupTo?: unknown; moveOut?: unknown; leadDays?: unknown }) {
   const from = asYmd(raw.pickupFrom) || s.pickupFrom || PICKUP_DAYS[0];
@@ -132,6 +138,24 @@ export function takenSlots(s: Store, day: string): string[] {
 export const uid = (p: string) => `${p}${Math.random().toString(36).slice(2, 8)}`;
 export const shortCode = () => Math.random().toString(36).slice(2, 6).toUpperCase();
 
+/** Patch-safe normalize; empty list clears spots. */
+export function normalizeSpots(raw: unknown): PickupSpot[] {
+  if (!Array.isArray(raw)) throw new Error("受取場所が不正です");
+  const out: PickupSpot[] = [];
+  const seen = new Set<string>();
+  for (const row of raw) {
+    const r = row as { id?: unknown; name?: unknown; mapsUrl?: unknown };
+    const name = String(r.name || "").trim();
+    const mapsUrl = String(r.mapsUrl || "").trim();
+    if (!name) continue;
+    const id = String(r.id || "").trim() || uid("p");
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push({ id, name, mapsUrl });
+  }
+  return out;
+}
+
 function claimOf(s: Store, item: Item) {
   return item.claimId ? s.claims.find((c) => c.id === item.claimId) : undefined;
 }
@@ -152,6 +176,7 @@ export function shopFields(s: Store): Record<string, unknown> {
     lineInviteUrl: s.lineInviteUrl || "",
     phone: s.phone || "",
     slots: s.slots?.length ? s.slots : [],
+    pickupSpots: s.pickupSpots || [],
     pickupFrom: s.pickupFrom || "",
     pickupTo: s.pickupTo || "",
     moveOut: s.moveOut || "",
@@ -175,6 +200,7 @@ export function claimFields(c: Claim): Record<string, unknown> {
     contact: c.contact || null, contactMethod: c.contactMethod || null,
     status: c.status, createdAt: c.createdAt,
     waiters: c.waiters || [],
+    ...(c.spotId ? { spotId: c.spotId, spotName: c.spotName || null, spotMapsUrl: c.spotMapsUrl || null } : {}),
     ...(c.buyerUid ? { buyerUid: c.buyerUid } : {}),
     ...(c.declineReason ? { declineReason: c.declineReason } : {}),
   };
@@ -205,6 +231,9 @@ export function storeFromDocs(
         };
         if (r.contact) c.contact = String(r.contact);
         if (r.contactMethod) c.contactMethod = r.contactMethod as Claim["contactMethod"];
+        if (r.spotId) c.spotId = String(r.spotId);
+        if (r.spotName) c.spotName = String(r.spotName);
+        if (r.spotMapsUrl) c.spotMapsUrl = String(r.spotMapsUrl);
         if (r.buyerUid) c.buyerUid = String(r.buyerUid);
         if (r.declineReason) c.declineReason = String(r.declineReason);
         if (Array.isArray(r.waiters)) {
@@ -222,6 +251,9 @@ export function storeFromDocs(
   if (shop.lineInviteUrl) s.lineInviteUrl = String(shop.lineInviteUrl);
   if (shop.phone) s.phone = String(shop.phone);
   if (Array.isArray(shop.slots) && shop.slots.length) s.slots = shop.slots.map(String);
+  if (Array.isArray(shop.pickupSpots) && shop.pickupSpots.length) {
+    try { s.pickupSpots = normalizeSpots(shop.pickupSpots); } catch { /* ignore bad snap */ }
+  }
   if (shop.pickupFrom) s.pickupFrom = String(shop.pickupFrom);
   if (shop.pickupTo) s.pickupTo = String(shop.pickupTo);
   if (shop.moveOut) s.moveOut = String(shop.moveOut);

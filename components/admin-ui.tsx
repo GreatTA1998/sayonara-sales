@@ -7,20 +7,20 @@ import SquareCam from "@/components/square-cam";
 import { Snack, useBodyScrollLock, useMaskDismiss, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { dayLbl } from "@/lib/days";
-import { DECLINE_PRESETS, DEF_LEAD, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
+import { DECLINE_PRESETS, DEF_LEAD, ELTON_SPOTS, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
 import { adminAct, listenShop } from "@/lib/live";
 import { getName, getProfile, openShop, saveProfile, subscribeAuth } from "@/lib/shop";
-import { bookableDays, shopMins, shopPublished, uid, type Store } from "@/lib/store";
+import { bookableDays, ELTON_SHOP, shopMins, shopPublished, uid, type PickupSpot, type Store } from "@/lib/store";
 import { SITE_URL } from "@/lib/site";
 
 type Item = PhotoItem & { claimId?: string | null; note?: string; paused?: boolean };
 type Claim = {
   id: string; code: string; day: string; slot?: string; contact?: string; contactMethod?: string;
-  itemIds: string[]; status: string;
+  itemIds: string[]; status: string; spotName?: string; spotMapsUrl?: string;
 };
 type AdminState = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
-  lineInviteUrl?: string; phone?: string; slots?: string[];
+  lineInviteUrl?: string; phone?: string; slots?: string[]; pickupSpots?: PickupSpot[];
   pickupFrom?: string; pickupTo?: string; moveOut?: string; leadDays?: number;
   minItems?: number; minTotal?: number; published?: boolean;
   items: Item[]; claims: Claim[];
@@ -96,6 +96,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [phone, setPhone] = useState("");
   const [contactMode, setContactMode] = useState<ContactMode>("jimoty");
   const [slots, setSlots] = useState<string[]>([...PICKUP_SLOTS]);
+  const [spots, setSpots] = useState<PickupSpot[]>([]);
   const [slotA, setSlotA] = useState("11:00");
   const [slotB, setSlotB] = useState("11:15");
   const [slotOpen, setSlotOpen] = useState(false);
@@ -147,6 +148,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     setYoutube(body.youtubeUrl || ytUrl(bioVal) || local.youtubeUrl || "");
     setContactMode((j.trim() && "jimoty") || (l.trim() && "line") || (p.trim() && "phone") || "jimoty");
     setSlots(body.slots?.length ? body.slots : [...PICKUP_SLOTS]);
+    setSpots(body.pickupSpots || []);
     setPickupFrom(body.pickupFrom || DEF_FROM);
     setPickupTo(body.pickupTo || body.moveOut || DEF_TO);
     setLeadDays(body.leadDays ?? DEF_LEAD);
@@ -608,6 +610,11 @@ export default function ShopAdminView({ shop, name }: Props) {
     const body = await act({ action: "slots", slots: next }, "保存しました");
     if (body?.slots) setSlots(body.slots as string[]);
   }
+  async function saveSpots(next: PickupSpot[]) {
+    const body = await act({ action: "spots", pickupSpots: next }, "保存しました");
+    if (body?.pickupSpots) setSpots(body.pickupSpots as PickupSpot[]);
+    else if (body) setSpots(next);
+  }
 
   async function saveDates(from: string, to: string, lead = leadDays) {
     const body = await act({ action: "dates", pickupFrom: from, pickupTo: to, moveOut: to, leadDays: lead }, "保存しました");
@@ -821,6 +828,35 @@ export default function ShopAdminView({ shop, name }: Props) {
             )}
           </span>
         </div>
+        <div className="spot-edit" aria-label="受取場所">
+          {spots.map((sp) => (
+            <div key={sp.id} className="spot-row">
+              <input aria-label="場所名" value={sp.name} placeholder="場所名"
+                onChange={(e) => setSpots((all) => all.map((x) => x.id === sp.id ? { ...x, name: e.target.value } : x))}
+                onBlur={(e) => {
+                  const next = spots.map((x) => x.id === sp.id ? { ...x, name: e.target.value } : x).filter((x) => x.name.trim());
+                  setSpots(next); void saveSpots(next);
+                }} />
+              <input aria-label="Maps URL" value={sp.mapsUrl} placeholder="Google Maps URL" inputMode="url"
+                onChange={(e) => setSpots((all) => all.map((x) => x.id === sp.id ? { ...x, mapsUrl: e.target.value } : x))}
+                onBlur={(e) => {
+                  const next = spots.map((x) => x.id === sp.id ? { ...x, mapsUrl: e.target.value } : x).filter((x) => x.name.trim());
+                  setSpots(next); void saveSpots(next);
+                }} />
+              <button type="button" className="spot-x" aria-label={`${sp.name || "場所"}を削除`}
+                onClick={() => void saveSpots(spots.filter((x) => x.id !== sp.id))}>×</button>
+            </div>
+          ))}
+          <button type="button" className="slot" onClick={() => setSpots((s) => [...s, { id: uid("p"), name: "", mapsUrl: "" }])}>場所を追加</button>
+          {shop === ELTON_SHOP && (
+            <div className="slot-edit" role="group" aria-label="場所の候補">
+              {ELTON_SPOTS.filter((s) => !spots.some((x) => x.name === s.name)).map((s) => (
+                <button key={s.name} type="button" className="slot"
+                  onClick={() => void saveSpots([...spots.filter((x) => x.name.trim()), { id: uid("p"), name: s.name, mapsUrl: s.mapsUrl }])}>{s.name}</button>
+              ))}
+            </div>
+          )}
+        </div>
         <details className="opt">
           <summary>任意</summary>
           <div className="name-price">
@@ -867,6 +903,13 @@ export default function ShopAdminView({ shop, name }: Props) {
           <div className="sheet claim-sheet" onClick={(e) => e.stopPropagation()}>
             <b className="tl-when">{claimWhen(claimOpen)}</b>
             {claimOpen.contactMethod ? <div className="text-sm text-muted" style={{ marginBottom: 8 }}>{methodJa(claimOpen.contactMethod)}</div> : null}
+            {claimOpen.spotName ? (
+              <p className="hint" style={{ marginBottom: 8 }}>
+                {claimOpen.spotMapsUrl
+                  ? <a className="linelink" href={claimOpen.spotMapsUrl} target="_blank" rel="noopener noreferrer">{claimOpen.spotName}</a>
+                  : claimOpen.spotName}
+              </p>
+            ) : null}
             <ul className="claim-items">
               {claimList.map((it) => (
                 <li key={it.id}>

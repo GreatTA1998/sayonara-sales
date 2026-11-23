@@ -14,3 +14,4 @@
 .sheet.drawer{position:absolute;inset:auto 0 0;width:100%;max-width:var(--page-max);margin:0 auto;border-radius:16px 16px 0 0;max-height:calc(100% - max(12vh,100px));overflow:auto;padding:14px 16px max(20px,env(safe-area-inset-bottom,0px));box-shadow:0 -8px 28px rgba(0,0,0,.18);animation:sheet-up .18s ease-out}
 @keyframes sheet-up{from{transform:translateY(100%)}to{transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.sheet.drawer{animation:none}}@media(min-width:900px){:root{--page-px:24px}}
+.spot-edit{display:flex;flex-direction:column;gap:6px;margin:0 0 8px}.spot-row{display:grid;grid-template-columns:1fr 1fr auto;gap:4px;align-items:center}.spot-row input{min-width:0;padding:8px 10px;border:1px solid #ccc;border-radius:8px;font:inherit;font-size:var(--t-sm);background:#fff}.spot-x{width:32px;height:32px;border:0;background:transparent;font-size:20px;line-height:1;cursor:pointer;color:var(--c-muted)}

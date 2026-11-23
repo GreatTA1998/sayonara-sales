@@ -4,6 +4,11 @@ export const PICKUP_DAYS = [
 ];
 export const PICKUP_SLOTS = ["10:00–10:15", "14:00–14:15", "20:00–20:15"];
 export const DEF_LEAD = 2;
+/** Elton shop suggestions only — not auto-seeded. */
+export const ELTON_SPOTS = [
+  { name: "目黒駅SOUP STOCK", mapsUrl: "https://maps.google.com/?q=SOUP+STOCK+Tokyo+%E7%9B%AE%E9%BB%92%E9%A7%85" },
+  { name: "不動前駅WEST gate", mapsUrl: "https://maps.google.com/?q=%E4%B8%8D%E5%8B%95%E5%89%8D%E9%A7%85" },
+] as const;
 
 /** Seller polite-decline presets (requested claims). */
 export const DECLINE_PRESETS = [
