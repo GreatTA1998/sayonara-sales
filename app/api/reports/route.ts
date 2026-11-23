@@ -3,8 +3,8 @@ import { addReport, listReports } from "@/lib/reports";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
-  if (req.headers.get("x-ss-shop") !== "elton") return NextResponse.json({ reports: [] });
+export async function GET() {
+  // Temporary: open inbox (SS-289). Re-gate later if needed.
   return NextResponse.json({ reports: await listReports() });
 }
 

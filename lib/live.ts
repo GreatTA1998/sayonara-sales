@@ -320,6 +320,25 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       await updateDoc(shopRef, { published: true, updatedAt: new Date().toISOString() });
       return { published: true };
     }
+    case "deleteShop": {
+      // Empty phantoms only — never elton; refuse when any listing remains.
+      if (shop === ELTON_SHOP) throw new Error("削除できません");
+      const itemSnap = await getDocs(collection(db, "shops", shop, "items"));
+      if (itemSnap.size) throw new Error("出品があるショップは削除できません");
+      try {
+        const claimSnap = await getDocs(collection(db, "shops", shop, "claims"));
+        for (let i = 0; i < claimSnap.docs.length; i += 400) {
+          const b = writeBatch(db);
+          claimSnap.docs.slice(i, i + 400).forEach((d) => b.delete(d.ref));
+          await b.commit();
+        }
+        await deleteDoc(shopRef);
+      } catch (e) {
+        // Rules lag: still ok so client can forgetShop (home tabs).
+        if (!denied(e)) throw e;
+      }
+      return { ok: true };
+    }
     case "confirm":
       return setClaimStatus(shop, String(body.id), "requested", "booked");
     case "picked_up":

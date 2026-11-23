@@ -187,6 +187,19 @@ export const pushBuy = (row: Omit<BuyRow, "at">) => {
   notifyAuth();
 };
 
+/** Drop a shop from local map/pointer (home tabs + 投稿一覧). Does not touch Firestore. */
+export const forgetShop = (id: string) => {
+  if (typeof window === "undefined" || !isShop(id) || id === ELTON_ID) return;
+  const map = readMap();
+  for (const [k, v] of Object.entries(map)) if (v === id) delete map[k];
+  localStorage.setItem(MAP_KEY, JSON.stringify(map));
+  const umap = readUidMap();
+  for (const [k, v] of Object.entries(umap)) if (v === id) delete umap[k];
+  localStorage.setItem(UID_MAP, JSON.stringify(umap));
+  if (stored(ID_KEY) === id) localStorage.removeItem(ID_KEY);
+  notifyAuth();
+};
+
 /** Hub sales: Elton in 目黒区 + local soft-identity shops. */
 export const listSales = (): SaleRow[] => {
   if (typeof window === "undefined") {

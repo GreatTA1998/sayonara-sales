@@ -9,7 +9,7 @@ import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { dayLbl } from "@/lib/days";
 import { DECLINE_PRESETS, DEF_LEAD, ELTON_SPOTS, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
 import { adminAct, listenShop } from "@/lib/live";
-import { getName, getProfile, openShop, saveProfile, subscribeAuth } from "@/lib/shop";
+import { forgetShop, getName, getProfile, openShop, saveProfile, subscribeAuth } from "@/lib/shop";
 import { ELTON_SHOP, itemFlags, pickupDays, shopMins, shopPublished, uid, type PickupSpot, type Store } from "@/lib/store";
 import { SITE_URL } from "@/lib/site";
 
@@ -116,6 +116,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [jmWipeBusy, setJmWipeBusy] = useState(false);
   const [jmMore, setJmMore] = useState(false);
   const [wipeTyped, setWipeTyped] = useState<string | null>(null);
+  const [delShopBusy, setDelShopBusy] = useState(false);
   const listRef = useRef<HTMLInputElement | null>(null);
   const dragRef = useRef<{ from: number; over: number; x: number; y: number; moved: boolean } | null>(null);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
@@ -529,6 +530,20 @@ export default function ShopAdminView({ shop, name }: Props) {
     } finally { setJmBusy(false); }
   }
 
+  async function deleteEmptyShop() {
+    if (delShopBusy || shop === ELTON_SHOP || items.length) return;
+    if (!window.confirm("空のショップを削除しますか？")) return;
+    setDelShopBusy(true);
+    try {
+      await adminAct(shop, { action: "deleteShop" });
+      forgetShop(shop);
+      show("ショップを削除しました", "ok");
+      router.push("/");
+    } catch (e) {
+      show(e instanceof Error ? e.message : "削除に失敗しました", "err");
+    } finally { setDelShopBusy(false); }
+  }
+
   async function wipeJimotyImport() {
     if (wipeTyped !== "OK" || jmWipeBusy) return;
     const tagged = items.filter((i) => i.jimoty).length;
@@ -851,6 +866,15 @@ export default function ShopAdminView({ shop, name }: Props) {
           </div>
         )}
       </div>
+
+      {empty && shop !== ELTON_SHOP && data && (
+        <p className="hint">
+          <button type="button" className="share" disabled={delShopBusy}
+            onClick={() => void deleteEmptyShop()}>
+            {delShopBusy ? "削除中…" : "このショップを削除"}
+          </button>
+        </p>
+      )}
 
       {!empty && (
         <p className="hint jm-muse">

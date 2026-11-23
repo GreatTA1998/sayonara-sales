@@ -35,7 +35,8 @@ service cloud.firestore {
         || (signedIn() && !('ownerUid' in resource.data)
             && request.resource.data.ownerUid == request.auth.uid);
 
-      allow delete: if false;
+      // Empty-shop cleanup (SS-288); client refuses delete when items remain.
+      allow delete: if canAdmin(shopId);
 
       match /items/{itemId} {
         allow read: if shopOpen(shopId);
@@ -60,7 +61,7 @@ service cloud.firestore {
           signedIn()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['waiters'])
         );
-        allow delete: if false;
+        allow delete: if canAdmin(shopId);
       }
     }
   }
