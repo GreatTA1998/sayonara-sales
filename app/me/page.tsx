@@ -5,14 +5,21 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { LineLoginLink } from "@/components/line-oauth";
 import { SoftLoginForm } from "@/components/soft-login";
 import { dayLbl } from "@/lib/days";
-import { adminPath, getLineUid, getName, listBuys, logout, subscribeAuth, type BuyRow } from "@/lib/shop";
+import {
+  adminPath, getJimotyName, getLineName, getLineUid, getName, listBuys, logout, subscribeAuth, type BuyRow,
+} from "@/lib/shop";
 
 const when = (day: string, slot?: string, who?: string) => [who, `${dayLbl(day)}${slot ? ` ${slot}` : ""}`].filter(Boolean).join(" · ");
 const pts = (names: (string | undefined | null)[]) => { const n = names.map((x) => x?.trim() || "無題"); return n.length <= 1 ? `1点 · ${n[0] || "無題"}` : `${n.length}点 · ${n[0]}…`; };
+const row = (label: string, value: string) => (
+  <li><span>{label}</span><b>{value}</b></li>
+);
 
 export default function MePage() {
   const router = useRouter();
   const name = useSyncExternalStore(subscribeAuth, getName, () => "");
+  const jimoty = useSyncExternalStore(subscribeAuth, getJimotyName, () => "");
+  const lineName = useSyncExternalStore(subscribeAuth, getLineName, () => "");
   const hard = useSyncExternalStore(subscribeAuth, getLineUid, () => "");
   const [buys, setBuys] = useState<BuyRow[]>([]);
   useEffect(() => {
@@ -27,6 +34,14 @@ export default function MePage() {
         <SoftLoginForm className="soft-login" onDone={(id) => { if (id) router.push(adminPath(id)); }} />
       ) : (
         <>
+          <section className="acct" aria-label="アカウント連携">
+            <div className="claims-h">アカウント</div>
+            <ul>
+              {row("ジモティ名", jimoty || "未設定")}
+              {row("LINE名", lineName || "未設定")}
+              {row("LINEアカウント", hard ? "連携済み" : "未連携")}
+            </ul>
+          </section>
           {!hard && (
             <>
               <p className="hint">任意：あとでLINEでアカウントを保護できます</p>
