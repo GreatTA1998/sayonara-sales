@@ -113,6 +113,8 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [jmPrev, setJmPrev] = useState<JmPrev | null>(null);
   const [jmCands, setJmCands] = useState<JmPrev[]>([]);
   const [jmWipeBusy, setJmWipeBusy] = useState(false);
+  const [jmMore, setJmMore] = useState(false);
+  const [wipeTyped, setWipeTyped] = useState<string | null>(null);
   const listRef = useRef<HTMLInputElement | null>(null);
   const dragRef = useRef<{ from: number; over: number; x: number; y: number; moved: boolean } | null>(null);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
@@ -527,14 +529,10 @@ export default function ShopAdminView({ shop, name }: Props) {
   }
 
   async function wipeJimotyImport() {
+    if (wipeTyped !== "OK" || jmWipeBusy) return;
     const tagged = items.filter((i) => i.jimoty).length;
     const n = tagged || items.length;
     if (!n) { show("削除する出品がありません", "err"); return; }
-    const msg = tagged
-      ? `取り込み分 ${tagged}件を削除しますか？（手入力はそのまま）`
-      : `タグなしのため全出品 ${n}件を削除しますか？`;
-    if (!confirm(msg)) return;
-    if (jmWipeBusy) return;
     setJmWipeBusy(true); show("削除中…", "busy");
     try {
       const body = await adminAct(shop, { action: "wipeImport" }) as { count?: number };
@@ -842,17 +840,44 @@ export default function ShopAdminView({ shop, name }: Props) {
 
       {!empty && (
         <p className="hint jm-muse">
-          Sayonara→ジモティは
           <a href={MUSE_URL} target="_blank" rel="noopener noreferrer">Muse</a>
-          用プロンプトをコピーして整える。
+          なら、ここの出品をジモティへ自動掲載・定期同期・メッセージ返信もできます。開始プロンプトをコピーして貼り付けて。
           <button type="button" className="share" onClick={() => {
             void navigator.clipboard?.writeText(musePrompt(shop, bio, items)).catch(() => undefined);
             show("コピーしました", "ok");
           }}>コピー</button>
-          <button type="button" className="share" disabled={jmWipeBusy || !data}
-            onClick={() => void wipeJimotyImport()}>
-            {jmWipeBusy ? "削除中…" : "取り込んだ出品を削除"}
-          </button>
+          <span className="save-more">
+            <IconBtn name="more" label="その他" size={20}
+              onClick={() => { setJmMore((v) => !v); setWipeTyped(null); }} />
+            {jmMore && (
+              <div className={`menu-pop${wipeTyped != null ? " pane" : ""}`}>
+                {wipeTyped == null ? (
+                  <button type="button" className="danger" disabled={jmWipeBusy || !data}
+                    onClick={() => {
+                      if (!(items.some((i) => i.jimoty) || items.length)) {
+                        show("削除する出品がありません", "err"); setJmMore(false); return;
+                      }
+                      setWipeTyped("");
+                    }}>
+                    取り込んだ出品を削除
+                  </button>
+                ) : (
+                  <>
+                    <p className="hint">{items.filter((i) => i.jimoty).length
+                      ? `取り込み分 ${items.filter((i) => i.jimoty).length}件（手入力は残る）。OK と入力`
+                      : `全出品 ${items.length}件。OK と入力`}</p>
+                    <input value={wipeTyped} placeholder="OK" aria-label="OK と入力" autoFocus
+                      onChange={(e) => setWipeTyped(e.target.value)} />
+                    <button type="button" className="danger"
+                      disabled={wipeTyped !== "OK" || jmWipeBusy}
+                      onClick={() => { void wipeJimotyImport(); setJmMore(false); setWipeTyped(null); }}>
+                      {jmWipeBusy ? "削除中…" : "削除する"}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </span>
         </p>
       )}
       <SquareCam open={camOpen} accept={IMG_ACCEPT}
