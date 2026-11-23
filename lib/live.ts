@@ -229,22 +229,43 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       if (used >= 2) throw new Error("ジモティ取込は1日2回までです");
       const base = (await getDocs(collection(db, "shops", shop, "items"))).size;
       const batch = writeBatch(db);
+      const spotFromItems: { name: string; mapsUrl: string }[] = [];
+      const spotSeen = new Set<string>();
       rows.forEach((row, i) => {
         const r = row as Record<string, unknown>;
         const id = uid("i");
         const photos = typeof r.photo === "string" && r.photo ? [String(r.photo)]
           : Array.isArray(r.photos) ? r.photos.map(String).filter(Boolean) : [];
+        const note = typeof r.note === "string" ? r.note.trim() : "";
+        const spotName = typeof r.spotName === "string" ? r.spotName.trim() : "";
+        if (spotName && !spotSeen.has(spotName)) {
+          spotSeen.add(spotName);
+          spotFromItems.push({ name: spotName, mapsUrl: typeof r.spotMapsUrl === "string" ? r.spotMapsUrl.trim() : "" });
+        }
         batch.set(doc(db, "shops", shop, "items", id), itemFields({
           id, name: String(r.name || "").trim(), price: numPrice(r.price),
-          jimoty: true, ...(photos.length ? { photos } : {}),
+          jimoty: true, ...(photos.length ? { photos } : {}), ...(note ? { note } : {}),
         }, base + i));
       });
       await batch.commit();
       const jurl = typeof body.jimotyUrl === "string" ? body.jimotyUrl.trim() : "";
+      // Merge Jimoty meetup names into shop spots (Maps URL optional / blank OK).
+      let pickupSpots: ReturnType<typeof normalizeSpots> | undefined;
+      if (spotFromItems.length) {
+        const byName = new Map((Array.isArray(meta.pickupSpots) ? normalizeSpots(meta.pickupSpots) : [])
+          .map((s) => [s.name, s]));
+        for (const s of normalizeSpots(spotFromItems)) {
+          const prev = byName.get(s.name);
+          if (!prev) byName.set(s.name, s);
+          else if (!prev.mapsUrl && s.mapsUrl) byName.set(s.name, { ...prev, mapsUrl: s.mapsUrl });
+        }
+        pickupSpots = [...byName.values()];
+      }
       await updateDoc(shopRef, {
         jimotyImportDay: day, jimotyImportCount: used + 1,
         updatedAt: new Date().toISOString(),
         ...(jurl ? { jimotyUrl: jurl } : {}),
+        ...(pickupSpots ? { pickupSpots } : {}),
       });
       return { ok: true, count: rows.length, left: 1 - used };
     }

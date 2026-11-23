@@ -528,7 +528,7 @@ export default function ShopAdminView({ shop, name }: Props) {
       const res = await fetch(`/api/jimoty?profile=${encodeURIComponent(prev.id)}`);
       const data = await res.json() as {
         error?: string; name?: string; url?: string;
-        items?: { name: string; price: number; photo?: string }[];
+        items?: { name: string; price: number; photo?: string; note?: string; spotName?: string; spotMapsUrl?: string }[];
       };
       if (!res.ok) throw new Error(data.error || "失敗しました");
       if (data.name) openShop(data.name);
