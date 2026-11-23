@@ -8,7 +8,7 @@ export { byPrice, type PriceDir };
 
 const PRICE_DIR_KEY = "ss-price-dir";
 const DENSE_KEY = "ss-dense";
-/** Jimoty closed listing status — hide by default. */
+/** Finished pickup (picked_up) — hide by default. */
 const SHOW_SOLD_KEY = "ss-show-sold";
 
 function useLS(key: string, init: string) {
@@ -80,7 +80,7 @@ export function ListingTools({
         opts={[["asc", "安い順"], ["desc", "高い順"]]} />
       <label className="sold-tog">
         <input type="checkbox" checked={showSold} onChange={(e) => onShowSold(e.target.checked)} />
-        受付終了
+        受取済み
       </label>
     </div>
   );
