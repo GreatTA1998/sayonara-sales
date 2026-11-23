@@ -157,21 +157,39 @@ const numPrice = (v: unknown) => {
   return Math.max(0, Number(v));
 };
 
-async function setClaimStatus(shop: string, id: string, from: string, to: string) {
+/**
+ * Keep ⊂ claim.itemIds (≥1). Drops clear item.claimId when bound here.
+ * `keepRaw` null = keep current list. `from` gates status transitions.
+ */
+async function setClaimItems(
+  shop: string, id: string, keepRaw: string[] | null,
+  opts?: { status?: string; from?: string | string[] },
+) {
   const db = getDb();
   const cref = doc(db, "shops", shop, "claims", id);
   const csnap = await getDoc(cref);
-  if (!csnap.exists() || csnap.data().status !== from) throw new Error("No claim");
+  const st = csnap.exists() ? String(csnap.data().status) : "";
+  const from = opts?.from;
+  const fromOk = !from || (Array.isArray(from) ? from.includes(st) : st === from);
+  if (!csnap.exists() || !fromOk) throw new Error("No claim");
+  const cur: string[] = Array.isArray(csnap.data().itemIds) ? csnap.data().itemIds.map(String) : [];
+  const keep = keepRaw == null ? cur : [...new Set(keepRaw.map(String).filter((x: string) => cur.includes(x)))];
+  if (!keep.length) throw new Error("品目がありません");
+  const drop = cur.filter((x) => !keep.includes(x));
+  const patch: Record<string, unknown> = {
+    ...(drop.length ? { itemIds: keep } : {}),
+    ...(opts?.status ? { status: opts.status } : {}),
+  };
+  if (!Object.keys(patch).length) return asClaim(id, csnap.data());
+  const dropSnaps = await Promise.all(drop.map((iid: string) => getDoc(doc(db, "shops", shop, "items", iid))));
   const batch = writeBatch(db);
-  batch.update(cref, { status: to });
-  // Confirm binds items so parallel pending 依頼 yield to 予約済 — one commit RTT.
-  if (to === "booked") {
-    for (const iid of (Array.isArray(csnap.data().itemIds) ? csnap.data().itemIds.map(String) : [])) {
-      batch.update(doc(db, "shops", shop, "items", iid), { claimId: id });
-    }
-  }
+  batch.update(cref, patch);
+  if (opts?.status === "booked") for (const iid of keep) batch.update(doc(db, "shops", shop, "items", iid), { claimId: id });
+  dropSnaps.forEach((s, i) => {
+    if (s.exists() && s.data().claimId === id) batch.update(doc(db, "shops", shop, "items", drop[i]), { claimId: null });
+  });
   await batch.commit();
-  return asClaim(csnap.id, { ...csnap.data(), status: to });
+  return asClaim(id, { ...csnap.data(), ...patch });
 }
 
 /** Admin mutations — same action surface as old /api/admin. */
@@ -321,9 +339,21 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       return { published: true };
     }
     case "confirm":
-      return setClaimStatus(shop, String(body.id), "requested", "booked");
+      return setClaimItems(
+        shop, String(body.id), Array.isArray(body.itemIds) ? body.itemIds.map(String) : null,
+        { from: "requested", status: "booked" },
+      );
     case "picked_up":
-      return setClaimStatus(shop, String(body.id), "booked", "picked_up");
+      return setClaimItems(
+        shop, String(body.id), Array.isArray(body.itemIds) ? body.itemIds.map(String) : null,
+        { from: "booked", status: "picked_up" },
+      );
+    case "items":
+      // Checklist: keep checked line-items; drop frees availability (依頼 / 予定 / 完了).
+      if (!Array.isArray(body.itemIds)) throw new Error("品目がありません");
+      return setClaimItems(shop, String(body.id), body.itemIds.map(String), {
+        from: ["requested", "booked", "picked_up"],
+      });
     case "reschedule": {
       // day+slot + agreed checkbox; no buyer lead; pending or confirmed.
       if (!body.agreed) throw new Error("チャットで合意が必要です");
