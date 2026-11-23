@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as PtrEv } from "react";
 import { useRouter } from "next/navigation";
 import { DateField, Icon, IconBtn } from "@/components/icons";
-import { byPrice, Listings, ListingTools, Seg, useDense, usePriceDir, type PhotoItem } from "@/components/photo-listing";
+import { byPrice, Listings, ListingTools, Seg, useDense, usePriceDir, useShowSold, type PhotoItem } from "@/components/photo-listing";
 import SquareCam from "@/components/square-cam";
 import { Snack, useBodyScrollLock, useMaskDismiss, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
@@ -10,7 +10,7 @@ import { dayLbl } from "@/lib/days";
 import { DECLINE_PRESETS, DEF_LEAD, ELTON_SPOTS, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
 import { adminAct, listenShop } from "@/lib/live";
 import { getName, getProfile, openShop, saveProfile, subscribeAuth } from "@/lib/shop";
-import { ELTON_SHOP, pickupDays, shopMins, shopPublished, uid, type PickupSpot, type Store } from "@/lib/store";
+import { ELTON_SHOP, itemFlags, pickupDays, shopMins, shopPublished, uid, type PickupSpot, type Store } from "@/lib/store";
 import { SITE_URL } from "@/lib/site";
 
 type Item = PhotoItem & { claimId?: string | null; note?: string; paused?: boolean; jimoty?: boolean };
@@ -135,6 +135,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const editReq = useRef(0);
   const [priceDir, setPriceDir] = usePriceDir();
   const [dense, setDense] = useDense();
+  const [showSold, setShowSold] = useShowSold();
 
   const applySnap = useCallback((body: Store) => {
     setErr(null);
@@ -179,6 +180,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     () => [...(data?.items || [])].sort(byPrice(priceDir)),
     [data?.items, priceDir],
   );
+  const listItems = showSold || !data ? items : items.filter((it) => !itemFlags(data as Store, it).taken);
   const open = useMemo(() => items.find((i) => i.id === openId) || null, [items, openId]);
   const pics = useMemo(() => {
     if (!open) return [] as string[];
@@ -896,10 +898,11 @@ export default function ShopAdminView({ shop, name }: Props) {
 
       {!empty && (
         <>
-          <ListingTools dir={priceDir} onDir={setPriceDir} dense={dense} onDense={setDense} />
-          <Listings items={items} dense={dense} onSelect={openDetail}
+          <ListingTools dir={priceDir} onDir={setPriceDir} dense={dense} onDense={setDense}
+            showSold={showSold} onShowSold={setShowSold} />
+          <Listings items={listItems} dense={dense} onSelect={openDetail}
             disabledFor={(it) => deleting === it.id}
-            classNameFor={(it) => (deleting === it.id || it.paused ? "dim" : "")} />
+            classNameFor={(it) => `${deleting === it.id || it.paused ? "dim" : ""}${data && itemFlags(data as Store, it).taken ? " sold" : ""}`.trim()} />
         </>
       )}
 

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { byPrice, Listings, ListingTools, money, Seg, useDense, usePriceDir } from "@/components/photo-listing";
+import { byPrice, Listings, ListingTools, money, Seg, useDense, usePriceDir, useShowSold } from "@/components/photo-listing";
 import { useBodyScrollLock, useMaskDismiss } from "@/components/snack";
 import { dayLbl, moveOutLeft } from "@/lib/days";
 import { bookShop, joinWaitLive, listenShop } from "@/lib/live";
@@ -72,6 +72,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [priceDir, setPriceDir] = usePriceDir();
   const [dense, setDense] = useDense();
+  const [showSold, setShowSold] = useShowSold();
   const jimotyUrl = (state?.jimotyUrl || "").trim();
   const lineUrl = (state?.lineInviteUrl || "").trim();
   const phoneDisp = (state?.phone || "").trim();
@@ -119,6 +120,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     if (!spotId && spots.length === 1) setSpotId(spots[0].id);
   }, [spots, spotId]);
   const gridItems = [...(state?.items || [])].sort(byPrice(priceDir));
+  const listItems = showSold ? gridItems : gridItems.filter((i) => !i.taken);
   const pickedItems = (state?.items || []).filter((i) => picked.has(i.id) && !locked(i));
   const waitItems = (state?.items || []).filter((i) => state?.waiting?.includes(i.id));
   const cartTotal = pickedItems.reduce((n, i) => n + (i.price ?? 0), 0);
@@ -244,9 +246,10 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
       </p>
       {err && !checkout && !open && <div className="err">{err}</div>}
       {gridItems.length > 0 && (
-        <ListingTools dir={priceDir} onDir={setPriceDir} dense={dense} onDense={setDense} />
+        <ListingTools dir={priceDir} onDir={setPriceDir} dense={dense} onDense={setDense}
+          showSold={showSold} onShowSold={setShowSold} />
       )}
-      <Listings items={gridItems} dense={dense} onSelect={(it) => { setErr(null); setOpen(it); }}
+      <Listings items={listItems} dense={dense} onSelect={(it) => { setErr(null); setOpen(it); }}
         classNameFor={(item) => `${picked.has(item.id) ? "on" : ""}${item.taken ? " sold" : item.reqN ? " req" : ""}`.trim()} />
       {!state && <p className="text-sm text-muted pad">読み込み中…</p>}
       {open && !checkout && (
