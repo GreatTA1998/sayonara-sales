@@ -47,14 +47,12 @@ export default function HomePage() {
 
   const active = cards.find((c) => c.id === selected) || cards[0];
   const shopId = active?.id || ELTON_ID;
-  const copyUrl = () => {
+  const copyUrl = (e: { stopPropagation(): void }) => {
+    e.stopPropagation();
     const url = `${SITE_URL}/s/${shopId}`;
     void navigator.clipboard?.writeText(url).catch(() => undefined);
     show(`コピーしました\n${url}`, "ok");
   };
-  const shareBtn = (
-    <button key="url-copy" type="button" className="share" onClick={copyUrl}>URLコピー</button>
-  );
 
   return (
     <main className="home">
@@ -62,16 +60,20 @@ export default function HomePage() {
       <p className="subhero">受付中かどうかをリアルタイムで確認して受け渡し日時を予約、あとはジモティーで連絡して取引完了</p>
       <div className="home-browse">
         <div className="shop-tabs" role="tablist" aria-label="ショップ一覧">
-          {cards.length ? cards.flatMap((c) => [
+          {cards.length ? cards.map((c) => (
             <button key={c.id} type="button" role="tab"
               className={`shop-tab${selected === c.id ? " on" : ""}`}
               aria-selected={selected === c.id}
               onClick={() => setSelected(c.id)}>
               {c.count}点 {c.ward}
-            </button>,
-            ...(c.id === shopId ? [shareBtn] : []),
-          ]) : (
-            <><span className="shop-tab ph">読み込み中…</span>{shareBtn}</>
+              {c.id === shopId && (
+                <span className="share" onClick={copyUrl}>URLコピー</span>
+              )}
+            </button>
+          )) : (
+            <span className="shop-tab ph on">読み込み中…
+              <span className="share" onClick={copyUrl}>URLコピー</span>
+            </span>
           )}
         </div>
         <div className="home-shop">
