@@ -7,8 +7,8 @@ import { dayLbl, moveOutLeft } from "@/lib/days";
 import { bookShop, joinWaitLive, listenShop } from "@/lib/live";
 import { applyLineSession, getId, getName, openShop, pushBuy, subscribeAuth } from "@/lib/shop";
 import {
-  bookableDays, cartMeets, cartRule, itemFlags, shopContact, shopSlots, shopSpots, takenSlots,
-  type PickupSpot, type Store,
+  ALLOW_LINE_PHONE_CONTACT, bookableDays, cartMeets, cartRule, itemFlags, shopContact, shopSlots,
+  shopSpots, takenSlots, type PickupSpot, type Store,
 } from "@/lib/store";
 import { telHref, ytUrl } from "@/lib/sale";
 
@@ -79,7 +79,11 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const jimotyUrl = (state?.jimotyUrl || "").trim();
   const lineUrl = (state?.lineInviteUrl || "").trim();
   const phoneDisp = (state?.phone || "").trim();
-  const canJimoty = !!jimotyUrl, canLine = !!lineUrl, canPhone = !!phoneDisp;
+  const canJimoty = !!jimotyUrl;
+  const canLine = ALLOW_LINE_PHONE_CONTACT && !!lineUrl;
+  const canPhone = ALLOW_LINE_PHONE_CONTACT && !!phoneDisp;
+  const methodOpts = ([["jimoty", canJimoty], ["line", canLine], ["phone", canPhone]] as const)
+    .filter(([, ok]) => ok).map(([id]) => [id, CH[id][0]] as [Method, string]);
   const barMove = moveOutLeft(state?.moveOut ? [state.moveOut] : []);
   const loggedIn = !!knownName;
   const contactVal = (method === "jimoty" && loggedIn ? knownName : lineName).trim();
@@ -330,28 +334,33 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             )))}</ul>
             {rule ? <p className={minsOk ? "hint" : "sw"}>{rule}{minsOk ? "" : " — まだ足りません"}</p> : null}
             <div className="field contact"><span>連絡方法</span>
-              {(canJimoty || canLine || canPhone) ? (
-                <Seg label="連絡方法" value={method || ""} onPick={(v) => { setMethod(v as Method); setChanOk(false); }}
-                  opts={([["jimoty", canJimoty], ["line", canLine], ["phone", canPhone]] as const)
-                    .filter(([, ok]) => ok).map(([id]) => [id, CH[id][0]])} />
-              ) : <p className="sw">出品者の連絡先が未設定です。しばらくしてから再度お試しください。</p>}
-              {method && <>
-                <div className="linebox">
-                  <a className="linelink" target="_blank" rel="noopener noreferrer"
-                    href={method === "jimoty" ? jimotyUrl : method === "line" ? lineUrl : telHref(phoneDisp)}>
-                    {method === "jimoty" ? "出品者のジモティ" : method === "line" ? "LINE招待リンク" : phoneDisp}
-                  </a>
-                  <label className="late-check"><input type="checkbox" checked={chanOk}
-                    onChange={(e) => setChanOk(e.target.checked)} />{CH[method][1]}</label>
-                </div>
-                {!(loggedIn && method === "jimoty") && (
-                  <label className="float"><span>{CH[method][2]}</span>
-                    <input value={lineName} onChange={(e) => setLineName(e.target.value)}
-                      placeholder={method === "phone" ? "080-0000-0000" : "表示名"}
-                      inputMode={method === "phone" ? "tel" : "text"} autoComplete="nickname"
-                      enterKeyHint="done" /></label>
-                )}
-              </>}
+              {!methodOpts.length ? (
+                <p className="sw">出品者の連絡先が未設定です。しばらくしてから再度お試しください。</p>
+              ) : (
+                <>
+                  {methodOpts.length > 1 && (
+                    <Seg label="連絡方法" value={method || ""} onPick={(v) => { setMethod(v as Method); setChanOk(false); }}
+                      opts={methodOpts} />
+                  )}
+                  {method && <>
+                    <div className="linebox">
+                      <a className="linelink" target="_blank" rel="noopener noreferrer"
+                        href={method === "jimoty" ? jimotyUrl : method === "line" ? lineUrl : telHref(phoneDisp)}>
+                        {method === "jimoty" ? "出品者のジモティ" : method === "line" ? "LINE招待リンク" : phoneDisp}
+                      </a>
+                      <label className="late-check"><input type="checkbox" checked={chanOk}
+                        onChange={(e) => setChanOk(e.target.checked)} />{CH[method][1]}</label>
+                    </div>
+                    {!(loggedIn && method === "jimoty") && (
+                      <label className="float"><span>{CH[method][2]}</span>
+                        <input value={lineName} onChange={(e) => setLineName(e.target.value)}
+                          placeholder={method === "phone" ? "080-0000-0000" : "表示名"}
+                          inputMode={method === "phone" ? "tel" : "text"} autoComplete="nickname"
+                          enterKeyHint="done" /></label>
+                    )}
+                  </>}
+                </>
+              )}
             </div>
             {err && <div className="err">{err}</div>}
             <button type="button" className={`cta${canSend ? " go" : ""}`} disabled={busy || !canSend}
