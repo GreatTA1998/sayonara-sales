@@ -368,7 +368,7 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
         { from: "booked", status: "picked_up" },
       );
     case "items":
-      // Checklist: keep checked line-items; drop frees availability (依頼 / 予定 / 完了).
+      // Checklist: keep checked line-items; drop frees availability (依頼 / 予定 / 引取済み).
       if (!Array.isArray(body.itemIds)) throw new Error("品目がありません");
       return setClaimItems(shop, String(body.id), body.itemIds.map(String), {
         from: ["requested", "booked", "picked_up"],
