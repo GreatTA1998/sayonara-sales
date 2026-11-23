@@ -13,7 +13,7 @@ import { telHref, ytUrl } from "@/lib/sale";
 
 type Item = {
   id: string; name: string; price: number | null; note?: string;
-  taken: boolean; reqN?: number; photos?: string[];
+  taken: boolean; sold: boolean; reqN?: number; photos?: string[];
 };
 type State = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
@@ -120,7 +120,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     if (!spotId && spots.length === 1) setSpotId(spots[0].id);
   }, [spots, spotId]);
   const gridItems = [...(state?.items || [])].sort(byPrice(priceDir));
-  const listItems = showSold ? gridItems : gridItems.filter((i) => !i.taken);
+  const listItems = showSold ? gridItems : gridItems.filter((i) => !i.sold);
   const pickedItems = (state?.items || []).filter((i) => picked.has(i.id) && !locked(i));
   const waitItems = (state?.items || []).filter((i) => state?.waiting?.includes(i.id));
   const cartTotal = pickedItems.reduce((n, i) => n + (i.price ?? 0), 0);
@@ -203,7 +203,8 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     );
   }
 
-  const takenOpen = !!open?.taken;
+  const soldOpen = !!open?.sold;
+  const takenOpen = !!open?.taken && !soldOpen;
   const onOpen = open ? picked.has(open.id) : false;
   const waiting = !!(open && state?.waiting?.includes(open.id));
   const openPics = open?.photos || [];
@@ -259,7 +260,9 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             <div className="sp">{money(open.price)}</div>
             <h2>{open.name}</h2>
             {open.note ? <p className="sn">{open.note}</p> : null}
-            {takenOpen ? (
+            {soldOpen ? (
+              <p className="sw sold">受付終了</p>
+            ) : takenOpen ? (
               <>
                 <p className="sw sold">予約済 — 他の方が引き取り予定</p>
                 {needWlName && (
