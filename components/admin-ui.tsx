@@ -16,7 +16,7 @@ import { SITE_URL } from "@/lib/site";
 type Item = PhotoItem & { claimId?: string | null; note?: string; paused?: boolean; jimoty?: boolean };
 type Claim = {
   id: string; code: string; day: string; slot?: string; contact?: string; contactMethod?: string;
-  itemIds: string[]; status: string; spotName?: string; spotMapsUrl?: string;
+  itemIds: string[]; status: string; spotName?: string; spotMapsUrl?: string; offer?: number;
 };
 type AdminState = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
@@ -46,7 +46,8 @@ function claimItems(c: Claim, all: Item[]) {
 }
 const claimSummary = (c: Claim, all: Item[]) => {
   const list = claimItems(c, all);
-  return list.length <= 1 ? `1点 · ${itemLabel(list[0])}` : `${list.length}点 · ${itemLabel(list[0])}…`;
+  const base = list.length <= 1 ? `1点 · ${itemLabel(list[0])}` : `${list.length}点 · ${itemLabel(list[0])}…`;
+  return c.offer != null ? `${base} · 希望¥${c.offer.toLocaleString("ja-JP")}` : base;
 };
 const claimWho = (c: Claim) => (c.contact && c.contact !== "LINE" && c.contact !== "ジモティー" ? c.contact : "");
 
@@ -83,6 +84,8 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [rsDay, setRsDay] = useState("");
   const [rsSlot, setRsSlot] = useState<string | null>(null);
   const [rsOk, setRsOk] = useState(false);
+  /** Checked line-items that stay on the 依頼; unchecked leave + become available. */
+  const [keep, setKeep] = useState<string[]>([]);
   const [showDone, setShowDone] = useState(false);
   const softName = useSyncExternalStore(subscribeAuth, getName, () => "");
   const logged = !!softName;
@@ -195,6 +198,9 @@ export default function ShopAdminView({ shop, name }: Props) {
   const claimList = useMemo(
     () => (claimOpen && data ? claimItems(claimOpen, data.items) : []),
     [claimOpen, data],
+  );
+  const keepDirty = !!claimOpen && (
+    keep.length !== claimOpen.itemIds.length || keep.some((id) => !claimOpen.itemIds.includes(id))
   );
   const rsDays = data ? pickupDays(data as Store) : [];
   const rsOpts = rsDay && !rsDays.includes(rsDay) ? [rsDay, ...rsDays] : rsDays;
@@ -675,22 +681,41 @@ export default function ShopAdminView({ shop, name }: Props) {
     setMinItems(Number(body.minItems) || 0);
     setMinTotal(Number(body.minTotal) || 0);
   }
-  function openClaim(id: string) { setPane(null); setRsOk(false); setClaimId(id); }
-  function closeClaim() { setPane(null); setRsOk(false); setClaimId(null); }
+  function openClaim(id: string) {
+    const c = (data?.claims || []).find((x) => x.id === id);
+    setPane(null); setRsOk(false); setKeep(c ? [...c.itemIds] : []); setClaimId(id);
+  }
+  function closeClaim() { setPane(null); setRsOk(false); setKeep([]); setClaimId(null); }
   function openResched(c: Claim) {
     setRsDay(c.day || rsDays[0] || "");
     setRsSlot(c.slot || null); setRsOk(false); setPane("resched");
+  }
+  function toggleKeep(id: string) {
+    setKeep((k) => (k.includes(id) ? (k.length <= 1 ? k : k.filter((x) => x !== id)) : [...k, id]));
   }
   /** Like publish / photo-delete: dismiss + snack first; local patch then snap. */
   function claimAct(payload: Record<string, unknown>, okMsg: string) {
     const id = String(payload.id || "");
     const prev = data;
+    const nextIds = Array.isArray(payload.itemIds) ? payload.itemIds.map(String) : null;
     if (payload.action === "reschedule") {
       const day = String(payload.day || ""), slot = String(payload.slot || "");
       setData((d) => d && { ...d, claims: d.claims.map((c) => (c.id === id ? { ...c, day, slot } : c)) });
     } else {
-      const st = payload.action === "confirm" ? "booked" : payload.action === "picked_up" ? "picked_up" : "cancelled";
-      setData((d) => d && { ...d, claims: d.claims.map((c) => (c.id === id ? { ...c, status: st } : c)) });
+      const st = payload.action === "items" ? null
+        : payload.action === "confirm" ? "booked"
+          : payload.action === "picked_up" ? "picked_up" : "cancelled";
+      setData((d) => d && {
+        ...d,
+        claims: d.claims.map((c) => (c.id !== id ? c : {
+          ...c, ...(st ? { status: st } : {}), ...(nextIds ? { itemIds: nextIds } : {}),
+        })),
+        items: d.items.map((it) => {
+          if (it.claimId !== id) return it;
+          if (st === "cancelled" || (nextIds && !nextIds.includes(it.id))) return { ...it, claimId: null };
+          return st === "booked" ? { ...it, claimId: id } : it;
+        }),
+      });
     }
     closeClaim(); show(okMsg, "ok");
     void adminAct(shop, payload).catch((e) => {
@@ -771,7 +796,7 @@ export default function ShopAdminView({ shop, name }: Props) {
         )}
       </section>
 
-      {empty && (
+      {empty && contactMode === "jimoty" && (
         <div className="jm-hero">
           {!jmPrev && !jmCands.length && (
             <>
@@ -780,7 +805,7 @@ export default function ShopAdminView({ shop, name }: Props) {
                 onChange={(e) => setJmDraft(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void lookupJimoty(); } }}
                 autoComplete="nickname" />
-              <button type="button" className="cta go" disabled={jmBusy || !data}
+              <button type="button" className="cta" disabled={jmBusy || !data}
                 onClick={() => void lookupJimoty()}>
                 {jmBusy ? "検索中…" : "ジモティーから取り込む"}
               </button>
@@ -812,7 +837,7 @@ export default function ShopAdminView({ shop, name }: Props) {
                   </li>
                 ))}
               </ul>
-              <button type="button" className="cta go" disabled={jmBusy}
+              <button type="button" className="cta" disabled={jmBusy}
                 onClick={() => void confirmJimoty(jmPrev)}>
                 {jmBusy ? "取込中…" : "この人で取り込む"}
               </button>
@@ -1040,14 +1065,22 @@ export default function ShopAdminView({ shop, name }: Props) {
                   : claimOpen.spotName}
               </p>
             ) : null}
-            <ul className="claim-items">
+            <ul className="claim-items" aria-label="依頼の品目">
               {claimList.map((it) => (
                 <li key={it.id}>
-                  <span>{itemLabel(it)}</span>
+                  <label className="late-check claim-keep">
+                    <input type="checkbox" checked={keep.includes(it.id)}
+                      disabled={keep.length <= 1 && keep.includes(it.id)}
+                      onChange={() => toggleKeep(it.id)} />
+                    <span>{itemLabel(it)}</span>
+                  </label>
                   {it.price != null ? <span className="text-sm text-muted">¥{it.price.toLocaleString("ja-JP")}</span> : null}
                 </li>
               ))}
             </ul>
+            {claimOpen.offer != null ? (
+              <p className="total">希望額 ¥{claimOpen.offer.toLocaleString("ja-JP")}</p>
+            ) : null}
             {claimOpen.status === "requested" && pane === "decline" ? (
               <div className="decline-list" role="group" aria-label="お断り理由">
                 <p className="hint">丁寧なお断り文を選んでください</p>
@@ -1080,12 +1113,16 @@ export default function ShopAdminView({ shop, name }: Props) {
               </div>
             ) : (
               <div className="claim-acts">
+                {keepDirty ? (
+                  <button type="button"
+                    onClick={() => claimAct({ action: "items", id: claimOpen.id, itemIds: keep }, "品目を更新しました")}>品目を更新</button>
+                ) : null}
                 {claimOpen.status === "requested" ? (
                   <>
                     <button type="button" onClick={() => setPane("decline")}>お断り</button>
                     <button type="button" onClick={() => openResched(claimOpen)}>日程変更</button>
                     <button type="button"
-                      onClick={() => claimAct({ action: "confirm", id: claimOpen.id }, "確認しました")}>確認する</button>
+                      onClick={() => claimAct({ action: "confirm", id: claimOpen.id, itemIds: keep }, "確認しました")}>確認する</button>
                   </>
                 ) : claimOpen.status === "booked" ? (
                   <>
@@ -1093,7 +1130,7 @@ export default function ShopAdminView({ shop, name }: Props) {
                       onClick={() => claimAct({ action: "cancel", id: claimOpen.id }, "キャンセルしました")}>キャンセル</button>
                     <button type="button" onClick={() => openResched(claimOpen)}>日程変更</button>
                     <button type="button"
-                      onClick={() => claimAct({ action: "picked_up", id: claimOpen.id }, "受取済み")}>受取済み</button>
+                      onClick={() => claimAct({ action: "picked_up", id: claimOpen.id, itemIds: keep }, "受取済み")}>受取済み</button>
                   </>
                 ) : null}
               </div>

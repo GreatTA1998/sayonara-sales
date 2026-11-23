@@ -1,4 +1,4 @@
-import { addDays, daysBetween, tokyoYmd } from "./days";
+import { addDays, dayLbl, daysBetween, tokyoYmd } from "./days";
 import { CANON_LINE, CANON_PHONE, DEF_LEAD, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "./sale";
 
 export type Item = {
@@ -13,6 +13,8 @@ export type Claim = {
   contact?: string; contactMethod?: "jimoty" | "line" | "phone";
   /** Snapshot at book — survives admin spot edits/deletes. */
   spotId?: string; spotName?: string; spotMapsUrl?: string;
+  /** Optional buyer offer ¥ (may be below/above 現金合計). */
+  offer?: number;
   /** requested = pending; booked = confirmed 予約済. */
   status: "requested" | "booked" | "picked_up" | "cancelled"; createdAt: string;
   waiters?: { account: string; at: string }[];
@@ -171,11 +173,15 @@ function claimOf(s: Store, item: Item) {
   return item.claimId ? s.claims.find((c) => c.id === item.claimId) : undefined;
 }
 
-/** taken = 予約済; reqN = pending 依頼 count (still 依頼可). Orphan/cancelled → not taken. */
+/** taken = 予約済; when = claim day+slot; reqN = pending 依頼 (still 依頼可). */
 export function itemFlags(s: Store, item: Item) {
-  const st = claimOf(s, item)?.status;
-  const taken = st === "booked" || st === "picked_up";
-  return { taken, reqN: taken ? 0 : s.claims.reduce((n, c) => n + (c.status === "requested" && c.itemIds.includes(item.id) ? 1 : 0), 0) };
+  const c = claimOf(s, item);
+  const taken = c?.status === "booked" || c?.status === "picked_up";
+  return {
+    taken,
+    reqN: taken ? 0 : s.claims.reduce((n, x) => n + (x.status === "requested" && x.itemIds.includes(item.id) ? 1 : 0), 0),
+    ...(taken && c?.day ? { when: `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}` } : {}),
+  };
 }
 
 export function shopFields(s: Store): Record<string, unknown> {
@@ -213,6 +219,7 @@ export function claimFields(c: Claim): Record<string, unknown> {
     status: c.status, createdAt: c.createdAt,
     waiters: c.waiters || [],
     ...(c.spotId ? { spotId: c.spotId, spotName: c.spotName || null, spotMapsUrl: c.spotMapsUrl || null } : {}),
+    ...(c.offer != null ? { offer: c.offer } : {}),
     ...(c.buyerUid ? { buyerUid: c.buyerUid } : {}),
     ...(c.declineReason ? { declineReason: c.declineReason } : {}),
   };
@@ -247,6 +254,7 @@ export function storeFromDocs(
         if (r.spotId) c.spotId = String(r.spotId);
         if (r.spotName) c.spotName = String(r.spotName);
         if (r.spotMapsUrl) c.spotMapsUrl = String(r.spotMapsUrl);
+        if (r.offer != null && Number.isFinite(Number(r.offer))) c.offer = Math.floor(Number(r.offer));
         if (r.buyerUid) c.buyerUid = String(r.buyerUid);
         if (r.declineReason) c.declineReason = String(r.declineReason);
         if (Array.isArray(r.waiters)) {
