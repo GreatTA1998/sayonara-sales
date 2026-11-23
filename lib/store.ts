@@ -136,12 +136,11 @@ function claimOf(s: Store, item: Item) {
   return item.claimId ? s.claims.find((c) => c.id === item.claimId) : undefined;
 }
 
-/** taken = confirmed 予約済; requested = pending soft notice only (still 依頼可). Orphan/cancelled → free. */
+/** taken = 予約済; reqN = pending 依頼 count (still 依頼可). Orphan/cancelled → not taken. */
 export function itemFlags(s: Store, item: Item) {
-  if (!item.claimId) return { taken: false, requested: false };
   const st = claimOf(s, item)?.status;
-  if (!st || st === "cancelled") return { taken: false, requested: false };
-  return { taken: st === "booked" || st === "picked_up", requested: st === "requested" };
+  const taken = st === "booked" || st === "picked_up";
+  return { taken, reqN: taken ? 0 : s.claims.reduce((n, c) => n + (c.status === "requested" && c.itemIds.includes(item.id) ? 1 : 0), 0) };
 }
 
 export function shopFields(s: Store): Record<string, unknown> {
