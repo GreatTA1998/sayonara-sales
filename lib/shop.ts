@@ -106,8 +106,15 @@ const readUidMap = (): Record<string, string> => {
   catch { return {}; }
 };
 
-/** Soft login: Jimoty and/or LINE → one account. Empty both clears soft names. */
-export const softLogin = (jimoty: string, line: string) => {
+/** LINE uid already bound to this shop (empty = soft-only / unbound). */
+const uidBoundTo = (id: string) => {
+  const u = Object.entries(readUidMap()).find(([, v]) => v === id)?.[0] || "";
+  return u;
+};
+
+/** Soft login: Jimoty and/or LINE → one account. Empty both clears soft names.
+ *  null = account is LINE-secured; soft bypass denied (use OAuth). */
+export const softLogin = (jimoty: string, line: string): string | null => {
   if (typeof window === "undefined") return "";
   const j = jimoty.trim(), l = line.trim();
   if (!j && !l) { clearNames(); notifyAuth(); return getId(); }
@@ -115,6 +122,10 @@ export const softLogin = (jimoty: string, line: string) => {
   const cur = getId();
   let id = knownId(j) || knownId(l) || (j && map[norm(j)]) || (l && map[norm(l)]) || "";
   if (!isShop(id) && isShop(cur)) id = cur;
+  if (isShop(id)) {
+    const bound = uidBoundTo(id);
+    if (bound && stored(UID_KEY) !== bound) return null;
+  }
   if (j) localStorage.setItem(JIMOTY_KEY, j);
   if (l) localStorage.setItem(LINE_KEY, l);
   if (isShop(id)) {
@@ -129,18 +140,27 @@ export const softLogin = (jimoty: string, line: string) => {
 
 /** Single-name soft bind (checkout / legacy). kind=line writes LINE soft name. */
 export const openShop = (n: string, kind: "jimoty" | "line" = "jimoty") =>
-  softLogin(kind === "jimoty" ? n : "", kind === "line" ? n : "");
+  softLogin(kind === "jimoty" ? n : "", kind === "line" ? n : "") ?? "";
 
 /** Hard LINE OAuth uid (empty = soft-only / logged out). */
 export const getLineUid = () =>
   typeof window === "undefined" ? "" : (hydrate(), stored(UID_KEY));
 
-/** Bind LINE OAuth userId → shop; soft-upgrade LINE display name (keeps Jimoty if set). */
-export const bindLineUser = (uid: string, displayName: string) => {
+/**
+ * Bind LINE OAuth userId → shop; soft-upgrade LINE display name (keeps Jimoty if set).
+ * Prefer active soft shop (or OAuth shop hint) over a stale uid→shop map so soft→hard links.
+ */
+export const bindLineUser = (uid: string, displayName: string, shopHint = "") => {
   if (typeof window === "undefined" || !uid.trim()) return "";
   const umap = readUidMap();
   const cur = getId();
-  let id = umap[uid] || (isShop(cur) ? cur : "");
+  const hint = isShop(shopHint) ? shopHint : "";
+  const free = (id: string) => { const b = uidBoundTo(id); return !b || b === uid; };
+  let id =
+    (isShop(cur) && free(cur) ? cur : "") ||
+    (hint && free(hint) ? hint : "") ||
+    umap[uid] ||
+    "";
   const name = displayName.trim();
   localStorage.setItem(UID_KEY, uid);
   if (!isShop(id)) id = softLogin("", name || "LINE") || ensureShopId();
@@ -162,9 +182,9 @@ export const applyLineSession = async () => {
   if (typeof window === "undefined") return null;
   const res = await fetch("/api/auth/session", { cache: "no-store", credentials: "same-origin" });
   if (!res.ok) return null;
-  const body = await res.json() as { ok?: boolean; uid?: string; name?: string };
+  const body = await res.json() as { ok?: boolean; uid?: string; name?: string; shop?: string };
   if (!body.ok || !body.uid || !body.name) return null;
-  bindLineUser(body.uid, body.name);
+  bindLineUser(body.uid, body.name, body.shop || "");
   return body;
 };
 

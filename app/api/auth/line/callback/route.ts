@@ -1,8 +1,8 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import {
-  STATE_COOKIE, RET_COOKIE, SESS_COOKIE, callbackUrl, cookieOpts,
-  exchangeCode, fetchProfile, requestOrigin, safeReturn, signSess,
+  STATE_COOKIE, RET_COOKIE, SHOP_COOKIE, SESS_COOKIE, SESS_MAX_AGE, callbackUrl, cookieOpts,
+  exchangeCode, fetchProfile, requestOrigin, safeReturn, safeShop, signSess,
 } from "@/lib/line";
 
 export const dynamic = "force-dynamic";
@@ -20,9 +20,11 @@ export async function GET(req: Request) {
   const origin = requestOrigin(req);
   const jar = await cookies();
   const ret = safeReturn(jar.get(RET_COOKIE)?.value);
+  const shop = safeShop(jar.get(SHOP_COOKIE)?.value);
   const clear = (res: NextResponse) => {
     res.cookies.set(STATE_COOKIE, "", { ...cookieOpts(0), maxAge: 0 });
     res.cookies.set(RET_COOKIE, "", { ...cookieOpts(0), maxAge: 0 });
+    res.cookies.set(SHOP_COOKIE, "", { ...cookieOpts(0), maxAge: 0 });
     return res;
   };
 
@@ -43,8 +45,9 @@ export async function GET(req: Request) {
     res.cookies.set(SESS_COOKIE, signSess({
       uid: profile.userId,
       name: profile.displayName,
-      exp: Date.now() + 30 * 24 * 3600 * 1000,
-    }), cookieOpts(30 * 24 * 3600));
+      exp: Date.now() + SESS_MAX_AGE * 1000,
+      ...(shop ? { shop } : {}),
+    }), cookieOpts(SESS_MAX_AGE));
     return res;
   } catch {
     return clear(NextResponse.redirect(bounce(origin, ret, "token")));

@@ -13,6 +13,7 @@ export async function GET() {
     ok: !!sess,
     uid: sess?.uid || "",
     name: sess?.name || "",
+    shop: sess?.shop || "",
   });
 }
 

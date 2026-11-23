@@ -5,8 +5,19 @@ import { SITE_URL } from "./site";
 export const STATE_COOKIE = "ss-line-oauth-state";
 export const SESS_COOKIE = "ss-line-sess";
 export const RET_COOKIE = "ss-line-oauth-ret";
+/** Soft shop id at OAuth start → signed into session for durable restore. */
+export const SHOP_COOKIE = "ss-line-oauth-shop";
 
-export type LineSess = { uid: string; name: string; exp: number };
+export type LineSess = { uid: string; name: string; exp: number; shop?: string };
+
+/** dig5 or reserved elton — keep in sync with lib/shop isShop. */
+export const safeShop = (raw: string | null | undefined) => {
+  const s = (raw || "").trim();
+  return /^\d{5}$/.test(s) || s === "elton" ? s : "";
+};
+
+/** Durable hard session (90d). Tradeoff: longer cookie lifetime if device shared. */
+export const SESS_MAX_AGE = 90 * 24 * 3600;
 
 export const lineConfigured = () =>
   !!(process.env.LINE_CHANNEL_ID?.trim() && process.env.LINE_CHANNEL_SECRET?.trim());
