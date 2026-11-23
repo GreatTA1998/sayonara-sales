@@ -678,6 +678,10 @@ export default function ShopAdminView({ shop, name }: Props) {
   }
   function openClaim(id: string) { setPane(null); setRsOk(false); setClaimId(id); }
   function closeClaim() { setPane(null); setRsOk(false); setClaimId(null); }
+  function openResched(c: Claim) {
+    setRsDay(c.day || rsDays[0] || "");
+    setRsSlot(c.slot || null); setRsOk(false); setPane("resched");
+  }
   /** Like publish / photo-delete: dismiss + snack first; local patch then snap. */
   function claimAct(payload: Record<string, unknown>, okMsg: string) {
     const id = String(payload.id || "");
@@ -1047,7 +1051,7 @@ export default function ShopAdminView({ shop, name }: Props) {
                 ))}
                 <button type="button" className="decline-back" onClick={() => setPane(null)}>戻る</button>
               </div>
-            ) : claimOpen.status === "requested" && pane === "resched" ? (
+            ) : (claimOpen.status === "requested" || claimOpen.status === "booked") && pane === "resched" ? (
               <div className="decline-list" role="group" aria-label="日程変更">
                 <div className="when">
                   <span className="date-ctl"><select value={rsDay} aria-label="日付"
@@ -1073,10 +1077,7 @@ export default function ShopAdminView({ shop, name }: Props) {
                 {claimOpen.status === "requested" ? (
                   <>
                     <button type="button" onClick={() => setPane("decline")}>お断り</button>
-                    <button type="button" onClick={() => {
-                      setRsDay(claimOpen.day || rsDays[0] || "");
-                      setRsSlot(claimOpen.slot || null); setRsOk(false); setPane("resched");
-                    }}>日程変更</button>
+                    <button type="button" onClick={() => openResched(claimOpen)}>日程変更</button>
                     <button type="button"
                       onClick={() => claimAct({ action: "confirm", id: claimOpen.id }, "確認しました")}>確認する</button>
                   </>
@@ -1084,6 +1085,7 @@ export default function ShopAdminView({ shop, name }: Props) {
                   <>
                     <button type="button"
                       onClick={() => claimAct({ action: "cancel", id: claimOpen.id }, "キャンセルしました")}>キャンセル</button>
+                    <button type="button" onClick={() => openResched(claimOpen)}>日程変更</button>
                     <button type="button"
                       onClick={() => claimAct({ action: "picked_up", id: claimOpen.id }, "受取済み")}>受取済み</button>
                   </>
