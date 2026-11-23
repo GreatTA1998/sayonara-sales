@@ -68,7 +68,6 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [lineName, setLineName] = useState("");
   const knownName = useSyncExternalStore(subscribeAuth, getName, () => "");
   const [chanOk, setChanOk] = useState(false);
-  const [offer, setOffer] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
@@ -161,10 +160,6 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   async function book() {
     const itemIds = pickedItems.map((i) => i.id);
     if (!itemIds.length || !slot || !method || !contactVal || busy || !canSend || !minsOk) return;
-    const offerN = offer.trim() === "" ? undefined : Math.floor(Number(offer));
-    if (offer.trim() !== "" && (offerN == null || !Number.isFinite(offerN) || offerN < 0)) {
-      setErr("希望額を確認してください"); return;
-    }
     setBusy(true); setErr(null);
     setState((prev) => prev && {
       ...prev,
@@ -175,7 +170,6 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
       const data = await bookShop(shop, {
         day, slot, itemIds, contactMethod: method, contact: contactVal,
         ...(spotId ? { spotId } : {}),
-        ...(offerN != null ? { offer: offerN } : {}),
       });
       if (method === "jimoty" || (method === "line" && !loggedIn)) {
         openShop(contactVal, method === "line" ? "line" : "jimoty");
@@ -192,7 +186,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
       });
       setPicked(new Set());
       try { localStorage.removeItem(cartKey); } catch { /* ignore */ }
-      setSlot(null); setSpotId(null); setMethod(null); setChanOk(false); setOffer("");
+      setSlot(null); setSpotId(null); setMethod(null); setChanOk(false);
     } catch (e) { setErr(e instanceof Error ? e.message : "失敗しました"); }
     finally { setBusy(false); }
   }
@@ -232,7 +226,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             if (n) setLineName(n);
             setOpen(null); setSlot(null); setSpotId(spots.length === 1 ? spots[0].id : null);
             setMethod(canJimoty ? "jimoty" : canLine ? "line" : canPhone ? "phone" : null);
-            setChanOk(false); setOffer(""); setErr(null); setCheckout(true);
+            setChanOk(false); setErr(null); setCheckout(true);
           }}>
           {pickedItems.length ? `引き取りを依頼 (${pickedItems.length})` : "引き取りを依頼"}
         </button>
@@ -330,12 +324,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
                 </div>
               </div>
             )}
-            <p className="total"><span>現金合計 {money(cartTotal)}</span>
-              <label className="offer">希望額
-                <input inputMode="numeric" pattern="[0-9]*" value={offer}
-                  onChange={(e) => setOffer(e.target.value.replace(/[^\d]/g, ""))}
-                  placeholder="任意" aria-label="希望額" enterKeyHint="done" /></label>
-            </p>
+            <p className="total">現金合計 {money(cartTotal)}</p>
             <ul className="claim-items">{pickedItems.map((i) => (
               <li key={i.id}><span>{i.name?.trim() || "無題"}</span><span>{money(i.price)}</span></li>
             )).concat(waitItems.map((i) => (
