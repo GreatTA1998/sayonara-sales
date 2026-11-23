@@ -8,7 +8,7 @@ export { byPrice, type PriceDir };
 
 const PRICE_DIR_KEY = "ss-price-dir";
 const DENSE_KEY = "ss-dense";
-/** Jimoty closed listing status — hide by default. */
+/** Completed (picked_up) listings — hide by default; reserved/booked stay visible. */
 const SHOW_SOLD_KEY = "ss-show-sold";
 
 function useLS(key: string, init: string) {

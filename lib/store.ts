@@ -171,11 +171,12 @@ function claimOf(s: Store, item: Item) {
   return item.claimId ? s.claims.find((c) => c.id === item.claimId) : undefined;
 }
 
-/** taken = 予約済; reqN = pending 依頼 count (still 依頼可). Orphan/cancelled → not taken. */
+/** taken = 予約済|完了 (not cartable); sold = 受付終了 (picked_up only). Orphan/cancelled → neither. */
 export function itemFlags(s: Store, item: Item) {
   const st = claimOf(s, item)?.status;
-  const taken = st === "booked" || st === "picked_up";
-  return { taken, reqN: taken ? 0 : s.claims.reduce((n, c) => n + (c.status === "requested" && c.itemIds.includes(item.id) ? 1 : 0), 0) };
+  const sold = st === "picked_up";
+  const taken = st === "booked" || sold;
+  return { taken, sold, reqN: taken ? 0 : s.claims.reduce((n, c) => n + (c.status === "requested" && c.itemIds.includes(item.id) ? 1 : 0), 0) };
 }
 
 export function shopFields(s: Store): Record<string, unknown> {
