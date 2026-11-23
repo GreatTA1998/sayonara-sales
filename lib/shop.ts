@@ -131,6 +131,10 @@ export const softLogin = (jimoty: string, line: string) => {
 export const openShop = (n: string, kind: "jimoty" | "line" = "jimoty") =>
   softLogin(kind === "jimoty" ? n : "", kind === "line" ? n : "");
 
+/** Hard LINE OAuth uid (empty = soft-only / logged out). */
+export const getLineUid = () =>
+  typeof window === "undefined" ? "" : (hydrate(), stored(UID_KEY));
+
 /** Bind LINE OAuth userId → shop; soft-upgrade LINE display name (keeps Jimoty if set). */
 export const bindLineUser = (uid: string, displayName: string) => {
   if (typeof window === "undefined" || !uid.trim()) return "";
@@ -138,6 +142,7 @@ export const bindLineUser = (uid: string, displayName: string) => {
   const cur = getId();
   let id = umap[uid] || (isShop(cur) ? cur : "");
   const name = displayName.trim();
+  localStorage.setItem(UID_KEY, uid);
   if (!isShop(id)) id = softLogin("", name || "LINE") || ensureShopId();
   else if (name) {
     const map = readMap();
@@ -145,18 +150,17 @@ export const bindLineUser = (uid: string, displayName: string) => {
     localStorage.setItem(MAP_KEY, JSON.stringify(map));
     localStorage.setItem(LINE_KEY, name);
     localStorage.setItem(ID_KEY, id);
-    notifyAuth();
   }
   umap[uid] = id;
   localStorage.setItem(UID_MAP, JSON.stringify(umap));
-  localStorage.setItem(UID_KEY, uid);
+  notifyAuth();
   return id;
 };
 
-/** After OAuth redirect (?line_ok=1): pull session and soft-upgrade. */
+/** Soft-upgrade from hard LINE cookie (any load; also after ?line_ok=1). */
 export const applyLineSession = async () => {
   if (typeof window === "undefined") return null;
-  const res = await fetch("/api/auth/session", { cache: "no-store" });
+  const res = await fetch("/api/auth/session", { cache: "no-store", credentials: "same-origin" });
   if (!res.ok) return null;
   const body = await res.json() as { ok?: boolean; uid?: string; name?: string };
   if (!body.ok || !body.uid || !body.name) return null;
