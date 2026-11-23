@@ -9,7 +9,7 @@ import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { dayLbl } from "@/lib/days";
 import { DECLINE_PRESETS, DEF_LEAD, PICKUP_DAYS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
 import { adminAct, listenShop } from "@/lib/live";
-import { getName, getProfile, saveProfile, subscribeAuth } from "@/lib/shop";
+import { getName, getProfile, openShop, saveProfile, subscribeAuth } from "@/lib/shop";
 import { bookableDays, shopMins, shopPublished, uid, type Store } from "@/lib/store";
 import { SITE_URL } from "@/lib/site";
 
@@ -94,6 +94,8 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [minTotal, setMinTotal] = useState(0);
   const [listOpen, setListOpen] = useState(false);
   const [listDraft, setListDraft] = useState("");
+  const [jmDraft, setJmDraft] = useState("");
+  const [jmBusy, setJmBusy] = useState(false);
   const listRef = useRef<HTMLInputElement | null>(null);
   const dragRef = useRef<{ from: number; over: number; x: number; y: number; moved: boolean } | null>(null);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
@@ -453,6 +455,33 @@ export default function ShopAdminView({ shop, name }: Props) {
     requestAnimationFrame(() => listRef.current?.focus());
   }
 
+  async function importJimoty() {
+    const profile = jmDraft.trim() || jimoty.trim();
+    if (!profile) { show("ジモティのプロフィールURLを入力してください", "err"); return; }
+    if (jmBusy) return;
+    setJmBusy(true); setErr(null);
+    try {
+      const res = await fetch(`/api/jimoty?profile=${encodeURIComponent(profile)}`);
+      const data = await res.json() as {
+        error?: string; name?: string; url?: string;
+        items?: { name: string; price: number; photo?: string }[];
+      };
+      if (!res.ok) throw new Error(data.error || "失敗しました");
+      if (data.name) openShop(data.name);
+      const url = data.url || profile;
+      setJimoty(url);
+      saveProfile({ bio, jimotyUrl: url, youtubeUrl: youtube });
+      const ok = await act(
+        { action: "import", items: data.items || [], jimotyUrl: url },
+        `${data.items?.length || 0}件取り込みました`,
+      );
+      if (ok) setJmDraft("");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "失敗しました";
+      setErr(msg); show(msg, "err");
+    } finally { setJmBusy(false); }
+  }
+
   async function deleteItem(item: Item) {
     if (!confirm(`「${item.name || "無題"}」を削除しますか？`)) return;
     setDeleting(item.id); show("削除中…", "busy");
@@ -664,6 +693,16 @@ export default function ShopAdminView({ shop, name }: Props) {
       </section>
 
       <div className="add-dual">
+        {empty && (
+          <div className="list-row">
+            <input value={jmDraft} disabled={jmBusy || !data}
+              placeholder="ジモティプロフィールURL" aria-label="ジモティプロフィールURL"
+              onChange={(e) => setJmDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void importJimoty(); } }} />
+            <button type="button" className="share" disabled={jmBusy || !data}
+              onClick={() => void importJimoty()}>{jmBusy ? "取込中…" : "取り込む"}</button>
+          </div>
+        )}
         <button type="button" className="cta"
           disabled={!data || listBusy}
           onClick={() => {

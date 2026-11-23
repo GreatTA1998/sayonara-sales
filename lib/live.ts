@@ -184,6 +184,26 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       await setDoc(ref, itemFields(item, (await getDocs(collection(db, "shops", shop, "items"))).size));
       return item;
     }
+    case "import": {
+      const rows = Array.isArray(body.items) ? body.items.slice(0, 50) : [];
+      if (!rows.length) throw new Error("取り込む出品がありません");
+      const base = (await getDocs(collection(db, "shops", shop, "items"))).size;
+      const batch = writeBatch(db);
+      rows.forEach((row, i) => {
+        const r = row as Record<string, unknown>;
+        const id = uid("i");
+        const photos = typeof r.photo === "string" && r.photo ? [String(r.photo)]
+          : Array.isArray(r.photos) ? r.photos.map(String).filter(Boolean) : [];
+        batch.set(doc(db, "shops", shop, "items", id), itemFields({
+          id, name: String(r.name || "").trim(), price: numPrice(r.price),
+          ...(photos.length ? { photos } : {}),
+        }, base + i));
+      });
+      await batch.commit();
+      const jurl = typeof body.jimotyUrl === "string" ? body.jimotyUrl.trim() : "";
+      if (jurl) await updateDoc(shopRef, { jimotyUrl: jurl, updatedAt: new Date().toISOString() });
+      return { ok: true, count: rows.length };
+    }
     case "edit": {
       const id = String(body.id);
       const ref = doc(db, "shops", shop, "items", id);
