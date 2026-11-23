@@ -1,6 +1,6 @@
 "use client";
 import { useEffect } from "react";
-import { applyLineSession } from "@/lib/shop";
+import { applyLineSession, getId } from "@/lib/shop";
 
 function cleanUrl() {
   const u = new URL(window.location.href);
@@ -26,7 +26,12 @@ export function useLineOAuthReturn(onDone?: () => void) {
 
 export const lineLoginHref = () => {
   if (typeof window === "undefined") return "/api/auth/line";
-  return `/api/auth/line?return=${encodeURIComponent(window.location.pathname + window.location.search || "/")}`;
+  const q = new URLSearchParams({
+    return: window.location.pathname + window.location.search || "/",
+  });
+  const shop = getId();
+  if (shop) q.set("shop", shop);
+  return `/api/auth/line?${q}`;
 };
 
 /** Hard login. Needs LINE_CHANNEL_ID/SECRET on Vercel; else ?line_err=config. */

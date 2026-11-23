@@ -11,6 +11,7 @@ export function SoftLoginForm({
   const [mode, setMode] = useState<"jimoty" | "line">("jimoty");
   const [jimoty, setJimoty] = useState("");
   const [line, setLine] = useState("");
+  const [err, setErr] = useState("");
   const ok = !!(jimoty.trim() || line.trim());
   return (
     <form className={className} {...(className?.includes("pane")
@@ -19,7 +20,11 @@ export function SoftLoginForm({
         e.preventDefault();
         if (!ok) return;
         const id = softLogin(jimoty, line);
-        setJimoty(""); setLine("");
+        if (id === null) {
+          setErr("このアカウントはLINEログインが必要です");
+          return;
+        }
+        setErr(""); setJimoty(""); setLine("");
         onDone?.(id);
       }}>
       <Seg label="ソフトログイン" value={mode} onPick={(v) => setMode(v as "jimoty" | "line")}
@@ -29,7 +34,7 @@ export function SoftLoginForm({
         placeholder={mode === "jimoty" ? "ジモティ名" : "LINE名"}
         autoComplete="nickname" autoFocus={autoFocus} />
       <button type="submit" className="cta go" disabled={!ok}>サインイン</button>
-      <p className="hint">任意：あとでLINEでアカウントを保護できます</p>
+      {err ? <p className="sw">{err}</p> : <p className="hint">任意：あとでLINEでアカウントを保護できます</p>}
       <LineLoginLink />
     </form>
   );
