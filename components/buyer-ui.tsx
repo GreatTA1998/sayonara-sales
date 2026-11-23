@@ -268,7 +268,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             <h2>{open.name}</h2>
             {open.note ? <p className="sn">{open.note}</p> : null}
             {soldOpen ? (
-              <p className="sw sold">受付終了</p>
+              <p className="sw sold">完了</p>
             ) : takenOpen ? (
               <>
                 <p className="sw sold">予約済{open.when ? ` — ${open.when}` : ""}</p>
