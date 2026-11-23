@@ -122,7 +122,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     if (!spotId && spots.length === 1) setSpotId(spots[0].id);
   }, [spots, spotId]);
   const gridItems = [...(state?.items || [])].sort(byPrice(priceDir));
-  const listItems = showSold ? gridItems : gridItems.filter((i) => !i.taken);
+  const listItems = showSold ? gridItems : gridItems.filter((i) => !i.sold);
   const pickedItems = (state?.items || []).filter((i) => picked.has(i.id) && !locked(i));
   const waitItems = (state?.items || []).filter((i) => state?.waiting?.includes(i.id));
   const cartTotal = pickedItems.reduce((n, i) => n + (i.price ?? 0), 0);
