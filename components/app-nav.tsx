@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Icon } from "@/components/icons";
 import { useLineOAuthReturn } from "@/components/line-oauth";
 import { SoftLoginForm } from "@/components/soft-login";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
@@ -138,8 +139,8 @@ export default function AppNav({ top }: Props) {
                   e.preventDefault();
                   void takeShot(f);
                 }}>
-                <textarea rows={4} value={body} onChange={(e) => setBody(e.target.value)}
-                  placeholder="バグ・要望・質問（スクショ貼付可）" />
+                <textarea className="grow" rows={1} value={body} onChange={(e) => setBody(e.target.value)}
+                  placeholder="バグ・要望・質問" />
                 {shot ? (
                   <div className="help-shot">
                     <img src={shot.preview} alt="" />
@@ -153,8 +154,9 @@ export default function AppNav({ top }: Props) {
                   </div>
                 ) : (
                   <label className="help-pic">
-                    写真を追加
-                    <input type="file" accept={IMG_ACCEPT} hidden
+                    <Icon name="camera" size={18} />
+                    <span>Ctrl+V / 貼り付けでスクショ可</span>
+                    <input type="file" accept={IMG_ACCEPT} hidden aria-label="写真を追加"
                       onChange={(e) => {
                         const f = e.target.files?.[0];
                         e.target.value = "";
