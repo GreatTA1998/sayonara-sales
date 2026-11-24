@@ -1232,7 +1232,7 @@ export default function ShopAdminView({ shop, name }: Props) {
               <textarea className="grow" value={editNote} disabled={busyOpen} rows={1}
                 onChange={(e) => patchEdit("note", e.target.value)} />
             </label>
-            <DateField label="受取可能日" value={editAfter}
+            <DateField label="この日以降" optional value={editAfter}
               onChange={(v) => { if (!busyOpen) patchEdit("after", v); }} />
             <button type="button" className="cta soft" disabled={busyOpen}
               onClick={() => void togglePause(open)}>
