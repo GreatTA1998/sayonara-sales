@@ -199,13 +199,10 @@ export default function ShopAdminView({ shop, name }: Props) {
     () => [...(data?.items || [])].sort(byPrice(priceDir)),
     [data?.items, priceDir],
   );
-  const listItems = useMemo(() => {
-    const base = showSold || !data ? items : items.filter((it) => !itemFlags(data as Store, it).sold);
-    return !data ? base : base.map((it) => {
-      const b = itemFlags(data as Store, it).badge;
-      return b ? { ...it, badge: b } : it;
-    });
-  }, [items, showSold, data]);
+  const listItems = useMemo(
+    () => showSold || !data ? items : items.filter((it) => !itemFlags(data as Store, it).sold),
+    [items, showSold, data],
+  );
   const open = useMemo(() => items.find((i) => i.id === openId) || null, [items, openId]);
   const pics = useMemo(() => {
     if (!open) return [] as string[];

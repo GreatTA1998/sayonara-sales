@@ -13,7 +13,7 @@
 .xcard.dim,.xtxt.dim{opacity:.45}
 .xcard:is(.sold,.booked) .xphoto{filter:brightness(.92)}
 .xcard:is(.sold,.booked,.req) .xphoto::after,.xtxt:is(.sold,.booked,.req)::after{content:"依頼中";position:absolute;z-index:1;border-radius:4px;background:rgba(17,17,17,.72);color:#fff;font-size:var(--t-sm);font-weight:var(--fw-bold);line-height:1.3;pointer-events:none;white-space:nowrap}
-.xcard:is(.sold,.booked,.req) .xphoto::after{left:6px;top:6px;padding:2px 7px}.xcard.dense:is(.sold,.booked,.req) .xphoto::after{left:3px;top:3px;padding:1px 4px;font-size:10px}.xtxt:is(.sold,.booked,.req)::after{right:8px;top:8px;padding:1px 6px}.xtxt.dense:is(.sold,.booked,.req)::after{right:0;top:50%;transform:translateY(-50%);padding:0 4px;font-size:10px}.xtxt.dense:is(.sold,.booked,.req) .xname{padding-right:5.5em}.xcard.booked .xphoto::after,.xtxt.booked::after{content:attr(data-badge)}.xcard.sold .xphoto::after,.xtxt.sold::after{content:"引取済"}
+.xcard:is(.sold,.booked,.req) .xphoto::after{left:6px;top:6px;padding:2px 7px}.xcard.dense:is(.sold,.booked,.req) .xphoto::after{left:3px;top:3px;padding:1px 4px;font-size:10px}.xtxt:is(.sold,.booked,.req)::after{right:8px;top:8px;padding:1px 6px}.xtxt.dense:is(.sold,.booked,.req)::after{right:0;top:50%;transform:translateY(-50%);padding:0 4px;font-size:10px}.xtxt.dense:is(.sold,.booked,.req) .xname{padding-right:5.5em}.xcard.booked .xphoto::after,.xtxt.booked::after{content:"予約済"}.xcard.sold .xphoto::after,.xtxt.sold::after{content:"引取済"}
 .xcard .xphoto{position:relative;flex:0 0 auto;aspect-ratio:1/1;background:#eee;overflow:hidden}
 .xcard .xphoto img{display:block;width:100%;height:100%;object-fit:contain}
 .xcard .xmeta{display:flex;flex-direction:column;gap:2px;padding:8px 10px 10px;min-height:0}

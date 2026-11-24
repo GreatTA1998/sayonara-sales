@@ -13,7 +13,7 @@ import { telHref, ytUrl } from "@/lib/sale";
 
 type Item = {
   id: string; name: string; price: number | null; note?: string;
-  taken: boolean; sold?: boolean; reqN?: number; when?: string; badge?: string; photos?: string[];
+  taken: boolean; sold?: boolean; reqN?: number; when?: string; photos?: string[];
 };
 type State = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
@@ -265,7 +265,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
               <p className="sw sold">引取済</p>
             ) : takenOpen ? (
               <>
-                <p className="sw sold">確定済{open.when ? ` — ${open.when}` : ""}</p>
+                <p className="sw sold">予約済{open.when ? ` — ${open.when}` : ""}</p>
                 {needWlName && (
                   <label className="float"><span>ジモティー名</span>
                     <input value={lineName} onChange={(e) => setLineName(e.target.value)}

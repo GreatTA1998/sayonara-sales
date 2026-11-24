@@ -512,7 +512,7 @@ export async function bookShop(shopRaw: string, body: {
         st = csnap.exists() ? String(csnap.data()!.status || "") : "";
         claimCache.set(cur, st);
       }
-      if (st === "booked" || st === "picked_up") throw new Error(`${it.name}: 確定済です`);
+      if (st === "booked" || st === "picked_up") throw new Error(`${it.name}: 予約済です`);
     }
     const totalPre = items.reduce((n, it) => n + (it.price ?? 0), 0);
     if (!cartMeets(pre, items.length, totalPre)) {
@@ -527,7 +527,7 @@ export async function bookShop(shopRaw: string, body: {
       ...(spot ? { spotId: spot.id, spotName: spot.name, spotMapsUrl: spot.mapsUrl } : {}),
     };
     tx.set(doc(db, "shops", shop, "claims", claimId), claimFields(claim));
-    // Only bind free items. Pending/orphan keep pointer; confirm() rebinds on 確定済.
+    // Only bind free items. Pending/orphan keep pointer; confirm() rebinds on 予約済.
     for (let i = 0; i < items.length; i++) {
       if (!items[i].claimId) tx.update(doc(db, "shops", shop, "items", itemIds[i]), { claimId });
     }
