@@ -838,13 +838,11 @@ export default function ShopAdminView({ shop, name }: Props) {
         </section>
       )}
 
-      {empty && (setup === "one" || contactMode === "jimoty") && (
+      {empty && setup === "one" && (
         <div className="jm-hero">
           {!jmPrev && !jmCands.length && (
             <>
-              {setup === "one" && (
-                <p className="jm-who">ジモティー名を入力すると、ボットが出品を自動で取り込みます</p>
-              )}
+              <p className="jm-who">ジモティー名を入力すると、ボットが出品を自動で取り込みます</p>
               <div className="jm-row">
                 <input value={jmDraft} disabled={jmBusy || !data}
                   placeholder="ジモティー名" aria-label="ジモティー名"
@@ -925,7 +923,7 @@ export default function ShopAdminView({ shop, name }: Props) {
         </div>
       )}
 
-      {empty && shop !== ELTON_SHOP && data && (setup === "manual" || !!(data.jimotyUrl || "").trim()) && (
+      {empty && shop !== ELTON_SHOP && data && !!(data.jimotyUrl || "").trim() && (
         <div className="prof-block">
           <button type="button" className="share" disabled={delShopBusy}
             onClick={() => void deleteEmptyShop()}>
