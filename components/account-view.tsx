@@ -45,7 +45,7 @@ export function AccountView({
               <p className="hint">LINEでセキュアにログイン中</p>
               <dl className="id-view">
                 <div><dt>LINE名</dt><dd>{line || "—"}</dd></div>
-                <div><dt>ジモティ名</dt><dd>{jimoty || "—"}</dd></div>
+                <div><dt>ジモティー名</dt><dd>{jimoty || "—"}</dd></div>
               </dl>
             </>
           ) : (

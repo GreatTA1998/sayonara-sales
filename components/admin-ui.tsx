@@ -74,7 +74,7 @@ function musePrompt(shop: string, bio: string, items: { name?: string; price?: n
   const memo = bio.trim()
     ? `${bio.trim()}\n\nまとめて予約・受け渡し → ${invite}`
     : `まとめて予約・受け渡しは Sayonara → ${invite}`;
-  return `Sayonaraの出品をジモティ向けに整えて（簡潔・日本語・コピペ用）。約24時間ごとにSayonaraを見なおしてジモティへ同期して：\n\n【招待】\n${memo}\n\n【出品一覧】\n${list || "（なし）"}\n`;
+  return `Sayonaraの出品をジモティー向けに整えて（簡潔・日本語・コピペ用）。約24時間ごとにSayonaraを見なおしてジモティーへ同期して：\n\n【招待】\n${memo}\n\n【出品一覧】\n${list || "（なし）"}\n`;
 }
 
 export default function ShopAdminView({ shop, name }: Props) {
@@ -509,7 +509,7 @@ export default function ShopAdminView({ shop, name }: Props) {
 
   async function lookupJimoty() {
     const name = jmDraft.trim() || softName.trim();
-    if (!name) { show("ジモティ名を入力してください", "err"); return; }
+    if (!name) { show("ジモティー名を入力してください", "err"); return; }
     if (jmBusy) return;
     setJmBusy(true); setErr(null); setJmPrev(null); setJmCands([]);
     try {
@@ -938,7 +938,7 @@ export default function ShopAdminView({ shop, name }: Props) {
         <p className="hint jm-muse">
           無料だから、僕は
           <a href="https://muse.ai" target="_blank" rel="noopener noreferrer">Muse AI</a>
-          をおすすめ。ジモティへ自動掲載・定期同期・メッセージ返信もできるよ。開始プロンプトをコピーして貼り付けて。
+          をおすすめ。ジモティーへ自動掲載・定期同期・メッセージ返信もできるよ。開始プロンプトをコピーして貼り付けて。
           <button type="button" className="share" onClick={() => {
             void navigator.clipboard?.writeText(musePrompt(shop, bio, items)).catch(() => undefined);
             show("コピーしました", "ok");
