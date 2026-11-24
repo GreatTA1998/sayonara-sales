@@ -812,7 +812,7 @@ export default function ShopAdminView({ shop, name }: Props) {
       {empty && (
         <div className="prof-block">
           <Seg label="設定" value={setup} onPick={(v) => setSetup(v as "one" | "manual")}
-            opts={[["one", "ワンクリック設定"], ["manual", "手動設定"]]} />
+            opts={[["one", "ジモティーから取り込む"], ["manual", "最初から出品"]]} />
         </div>
       )}
       {forms && (
@@ -925,13 +925,13 @@ export default function ShopAdminView({ shop, name }: Props) {
         </div>
       )}
 
-      {empty && shop !== ELTON_SHOP && data && (setup === "manual" || !!jimoty.trim()) && (
-        <p className="hint">
+      {empty && shop !== ELTON_SHOP && data && (setup === "manual" || !!(data.jimotyUrl || "").trim()) && (
+        <div className="prof-block">
           <button type="button" className="share" disabled={delShopBusy}
             onClick={() => void deleteEmptyShop()}>
             {delShopBusy ? "削除中…" : "このショップを削除"}
           </button>
-        </p>
+        </div>
       )}
 
       {!empty && (
