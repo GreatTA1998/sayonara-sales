@@ -11,7 +11,7 @@ type Props = {
   accept: string;
   /** Create-listing tip under header; omit for edit/append. */
   tip?: string;
-  /** Edit/append: 0-radius viewfinder inset to match strip padding; create keeps rounded. */
+  /** Edit/append: 0-radius viewfinder; create keeps top-only 16px radius. Both share strip gutters. */
   sharp?: boolean;
 };
 
@@ -250,7 +250,7 @@ export default function SquareCam({ open, onClose, onShot, accept, tip, sharp }:
         <span className="scam-title">カメラ</span>
         <button type="button" className="scam-next" disabled={!shots.length} onClick={done}>次へ</button>
       </header>
-      {tip ? <p className="scam-tip hint">{tip}</p> : null}
+      {tip ? <p className="scam-tip">{tip}</p> : null}
 
       <div className={`scam-view${sharp ? " sharp" : ""}`}>
         <video ref={videoRef} className="scam-video" playsInline muted autoPlay />
@@ -265,12 +265,17 @@ export default function SquareCam({ open, onClose, onShot, accept, tip, sharp }:
       </div>
 
       <div className="scam-strip" aria-label="撮影した写真">
-        {shots.map((s) => (
-          <img key={s.url} src={s.url} alt="" className="scam-thumb" />
-        ))}
-        {Array.from({ length: Math.max(0, 6 - shots.length) }).map((_, i) => (
-          <span key={`e${i}`} className="scam-slot" aria-hidden="true" />
-        ))}
+        {Array.from({ length: 6 }, (_, i) => {
+          const s = shots[i];
+          return (
+            <div key={s?.url ?? `e${i}`} className="scam-cell">
+              {s
+                ? <img src={s.url} alt="" className="scam-thumb" />
+                : <span className="scam-slot" aria-hidden="true" />}
+              <span className="scam-lbl">{i + 1}点目</span>
+            </div>
+          );
+        })}
       </div>
 
       <div className="scam-ctrl">
