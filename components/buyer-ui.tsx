@@ -238,7 +238,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         </button>
       </header>
       {bioShow ? <p className="hint bio">{bioShow}</p> : null}
-      {rule ? <p className="hint rule">{rule}</p> : null}
+      {rule ? <p className="ask">{rule}</p> : null}
       {state?.jimotyUrl ? (
         <p className="ext-links">
           <a className="ext-link" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">
@@ -321,7 +321,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             )).concat(waitItems.map((i) => (
               <li key={i.id}><span>{i.name?.trim() || "無題"} · キャンセル待ち</span><span>{money(i.price)}</span></li>
             )))}</ul>
-            {rule ? <p className="hint">{rule}</p> : null}
+            {rule ? <p className="ask">{rule}</p> : null}
             <div className="field contact"><span>連絡方法</span>
               {!methodOpts.length ? (
                 <p className="sw">出品者の連絡先が未設定です。しばらくしてから再度お試しください。</p>

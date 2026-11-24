@@ -127,16 +127,16 @@ type Mins = { minItems?: number; minTotal?: number };
 export const shopMins = (s: Mins) => ({
   minItems: asMin(s.minItems), minTotal: asMin(s.minTotal),
 });
-/** Soft buyer ask when a cart min is set (recommendation; not a hard gate). */
+/** Soft seller-voiced ask when a cart min is set (optional; not a hard gate). */
 export function cartRule(s: Mins): string | null {
   const { minItems: n, minTotal: y } = shopMins(s);
   if (!n && !y) return null;
   const yen = y ? `合計¥${y.toLocaleString("ja-JP")}以上` : "";
   if (n) {
-    const core = y ? `${n}点以上（または${yen}）` : `${n}点以上`;
-    return `${core}でのご依頼をおすすめします（不人気・大型は1点でも歓迎）`;
+    const want = y ? `まとめて${n}点以上（または${yen}）` : `まとめて${n}点以上`;
+    return `出品者は${want}希望（不人気・大型は1点でも歓迎）`;
   }
-  return `${yen}でのご依頼をおすすめします`;
+  return `出品者は${yen}希望`;
 }
 export function applyMins(s: Store, raw: { minItems?: unknown; minTotal?: unknown }) {
   s.minItems = asMin(raw.minItems);
