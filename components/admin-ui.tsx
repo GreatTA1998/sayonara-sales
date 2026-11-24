@@ -30,7 +30,6 @@ type AdminState = {
 };
 type Props = { shop: string; name: string };
 const fmtSlot = (a: string, b: string) => `${a}–${b}`;
-const IMG_ACCEPT = "image/*,image/jpeg,image/jpg,image/png,image/heic,image/heif,image/webp,image/gif,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif";
 type ContactMode = "jimoty" | "line" | "phone";
 const CONTACT_OPTS: [string, string][] = [["jimoty", "ジモティー"], ["line", "LINE"], ["phone", "電話"]];
 const methodJa = (m?: string) => (m === "jimoty" ? "ジモティー" : m === "phone" ? "電話" : m === "line" ? "LINE" : m || "");
@@ -968,7 +967,7 @@ export default function ShopAdminView({ shop, name }: Props) {
           </span>
         </p>
       )}
-      <SquareCam open={camOpen} accept={IMG_ACCEPT}
+      <SquareCam open={camOpen}
         tip={camItemId ? undefined : "1枚＝1出品。名前はあとで。"}
         sharp={!!camItemId}
         onClose={() => { setCamOpen(false); setCamItemId(null); }}

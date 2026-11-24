@@ -8,7 +8,6 @@ type Props = {
   onClose: () => void;
   /** Each shutter (and album pick) — parent queues async create/upload. */
   onShot: (file: File) => void;
-  accept: string;
   /** Create-listing tip under header; omit for edit/append. */
   tip?: string;
   /** Edit/append: 0-radius viewfinder inset to match strip padding; create keeps rounded. */
@@ -97,7 +96,7 @@ async function squareFromFile(file: File): Promise<File> {
 }
 
 /** Mercari-like 1:1 camera: live preview, real square files (shutter + album), rounded viewfinder affordance. */
-export default function SquareCam({ open, onClose, onShot, accept, tip, sharp }: Props) {
+export default function SquareCam({ open, onClose, onShot, tip, sharp }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const albumRef = useRef<HTMLInputElement>(null);
@@ -288,7 +287,7 @@ export default function SquareCam({ open, onClose, onShot, accept, tip, sharp }:
           onClick={() => setTab("cam")}>カメラ</button>
       </nav>
 
-      <input ref={albumRef} type="file" accept={accept} multiple hidden
+      <input ref={albumRef} type="file" accept="image/*" multiple hidden
         onChange={(e) => {
           const files = Array.from(e.target.files || []);
           e.target.value = "";
