@@ -1,18 +1,26 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LineLoginLink } from "@/components/line-oauth";
 import { Seg } from "@/components/photo-listing";
-import { softLogin } from "@/lib/shop";
+import { setLogin, softLogin } from "@/lib/shop";
 
-/** Seg ジモティー名|LINE名 (one field); hard LINE optional below. */
+/** Seg ジモティー名|LINE名 (one field); hard LINE optional below. slot = outside-click root. */
 export function SoftLoginForm({
-  className, autoFocus, onDone,
-}: { className?: string; autoFocus?: boolean; onDone?: (id: string) => void }) {
+  className, autoFocus, onDone, slot,
+}: { className?: string; autoFocus?: boolean; onDone?: (id: string) => void; slot?: string }) {
   const [mode, setMode] = useState<"jimoty" | "line">("jimoty");
   const [jimoty, setJimoty] = useState("");
   const [line, setLine] = useState("");
   const [err, setErr] = useState("");
   const ok = !!(jimoty.trim() || line.trim());
+  useEffect(() => {
+    if (!slot) return;
+    const close = (e: PointerEvent) => {
+      if (!(e.target as Element).closest(slot)) setLogin("");
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [slot]);
   return (
     <form className={className} {...(className?.includes("pane")
       ? { role: "dialog" as const, "aria-label": "ログイン" } : {})}
@@ -25,6 +33,7 @@ export function SoftLoginForm({
           return;
         }
         setErr(""); setJimoty(""); setLine("");
+        if (slot) setLogin("");
         onDone?.(id);
       }}>
       <Seg label="ソフトログイン" value={mode} onPick={(v) => setMode(v as "jimoty" | "line")}
