@@ -6,7 +6,7 @@ import { afterLbl, dayLbl, moveOutLeft, tokyoYmd } from "@/lib/days";
 import { bookShop, joinWaitLive, listenShop } from "@/lib/live";
 import { applyLineSession, getId, getName, openShop, pushBuy, subscribeAuth } from "@/lib/shop";
 import {
-  ALLOW_LINE_PHONE_CONTACT, bookableDays, cartAfter, cartRule, itemFlags, shopContact, shopSlots,
+  bookableDays, cartAfter, cartRule, itemFlags, shopContact, shopSlots,
   takenSlots, type Store,
 } from "@/lib/store";
 import { telHref, ytUrl } from "@/lib/sale";
@@ -84,9 +84,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const jimotyUrl = (state?.jimotyUrl || "").trim();
   const lineUrl = (state?.lineInviteUrl || "").trim();
   const phoneDisp = (state?.phone || "").trim();
-  const canJimoty = !!jimotyUrl;
-  const canLine = ALLOW_LINE_PHONE_CONTACT && !!lineUrl;
-  const canPhone = ALLOW_LINE_PHONE_CONTACT && !!phoneDisp;
+  const canJimoty = !!jimotyUrl, canLine = !!lineUrl, canPhone = !!phoneDisp;
   const methodOpts = ([["jimoty", canJimoty], ["line", canLine], ["phone", canPhone]] as const)
     .filter(([, ok]) => ok).map(([id]) => [id, CH[id][0]] as [Method, string]);
   const barMove = moveOutLeft(state?.moveOut ? [state.moveOut] : []);
@@ -327,10 +325,8 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
                 <p className="sw">出品者の連絡先が未設定です。しばらくしてから再度お試しください。</p>
               ) : (
                 <>
-                  {methodOpts.length > 1 && (
-                    <Seg label="連絡方法" value={method || ""} onPick={(v) => { setMethod(v as Method); setChanOk(false); }}
-                      opts={methodOpts} />
-                  )}
+                  <Seg label="連絡方法" value={method || ""} onPick={(v) => { setMethod(v as Method); setChanOk(false); }}
+                    opts={methodOpts} />
                   {method && <>
                     <div className="linebox">
                       <a className="linelink" target="_blank" rel="noopener noreferrer"
@@ -340,6 +336,11 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
                       <label className="late-check"><input type="checkbox" checked={chanOk}
                         onChange={(e) => setChanOk(e.target.checked)} />{CH[method][1]}</label>
                     </div>
+                    {method === "jimoty" ? (
+                      <p className="hint">ジモティーから来た方は、できればジモティー上で取引を完了してください。</p>
+                    ) : method === "line" ? (
+                      <p className="hint">ジモティーのアカウントをお持ちでない方向けです。</p>
+                    ) : null}
                     {!(loggedIn && method === "jimoty") && (
                       <label className="float"><span>{CH[method][2]}</span>
                         <input value={lineName} onChange={(e) => setLineName(e.target.value)}
