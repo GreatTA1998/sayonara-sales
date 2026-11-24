@@ -4,6 +4,8 @@ import { CANON_LINE, CANON_PHONE, DEF_LEAD, PICKUP_SLOTS, ytUrl } from "./sale";
 export type Item = {
   id: string; name: string; price: number | null; note?: string; claimId?: string | null;
   photos?: string[]; paused?: boolean;
+  /** Buyer pickup on/after this YMD; seller may list earlier. Clearable. */
+  availableAfter?: string;
   /** Set on Jimoty magic-import rows — wipeImport deletes these only. */
   jimoty?: boolean;
 };
@@ -72,6 +74,16 @@ const shopLeadDays = (s: Store) =>
 /** Buyer bookable — shop leadDays from today. */
 export const bookableDays = (s: Store) =>
   pickupDays(s).filter((d) => d >= addDays(tokyoYmd(), shopLeadDays(s)));
+
+/** Latest availableAfter among cart items (most limiting). Empty = no clamp. */
+export function cartAfter(items: { availableAfter?: string }[]) {
+  let m = "";
+  for (const it of items) {
+    const d = asYmd(it.availableAfter);
+    if (d > m) m = d;
+  }
+  return m;
+}
 
 /** Soonest day+slot first (no past-bucket / not by name). */
 export const byClaimWhen = (a: { day?: unknown; slot?: unknown }, b: { day?: unknown; slot?: unknown }) => {
@@ -213,6 +225,7 @@ export function itemFields(it: Item, pos: number): Record<string, unknown> {
   return {
     name: it.name, price: it.price, note: it.note || null, claimId: it.claimId || null,
     photos: it.photos || [], paused: !!it.paused, pos,
+    availableAfter: asYmd(it.availableAfter) || null,
     ...(it.jimoty ? { jimoty: true } : {}),
   };
 }
@@ -242,6 +255,7 @@ export function storeFromDocs(
       if (r.claimId) it.claimId = String(r.claimId);
       if (Array.isArray(r.photos) && r.photos.length) it.photos = r.photos.map(String);
       if (r.paused) it.paused = true;
+      { const a = asYmd(r.availableAfter); if (a) it.availableAfter = a; }
       if (r.jimoty) it.jimoty = true;
       return it;
     }),
