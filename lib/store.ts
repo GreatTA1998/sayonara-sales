@@ -127,19 +127,16 @@ type Mins = { minItems?: number; minTotal?: number };
 export const shopMins = (s: Mins) => ({
   minItems: asMin(s.minItems), minTotal: asMin(s.minTotal),
 });
-/** Both set → count OR ¥. One set → that gate. Neither → open. */
-export function cartMeets(s: Mins, count: number, total: number) {
-  const { minItems: n, minTotal: y } = shopMins(s);
-  if (!n && !y) return true;
-  if (n && y) return count >= n || total >= y;
-  return n ? count >= n : total >= y;
-}
+/** Soft buyer ask when a cart min is set (recommendation; not a hard gate). */
 export function cartRule(s: Mins): string | null {
   const { minItems: n, minTotal: y } = shopMins(s);
   if (!n && !y) return null;
-  const pts = n ? `${n}点以上` : "";
   const yen = y ? `合計¥${y.toLocaleString("ja-JP")}以上` : "";
-  return `引き取り条件：${pts && yen ? `${pts}、または${yen}` : pts || yen}`;
+  if (n) {
+    const core = y ? `${n}点以上（または${yen}）` : `${n}点以上`;
+    return `${core}でのご依頼をおすすめします（不人気・大型は1点でも歓迎）`;
+  }
+  return `${yen}でのご依頼をおすすめします`;
 }
 export function applyMins(s: Store, raw: { minItems?: unknown; minTotal?: unknown }) {
   s.minItems = asMin(raw.minItems);
