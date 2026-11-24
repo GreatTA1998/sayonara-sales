@@ -6,10 +6,10 @@ import { dayLbl, moveOutLeft } from "@/lib/days";
 import { bookShop, joinWaitLive, listenShop } from "@/lib/live";
 import { applyLineSession, getId, getName, openShop, pushBuy, subscribeAuth } from "@/lib/shop";
 import {
-  ALLOW_LINE_PHONE_CONTACT, bookableDays, cartMeets, cartRule, itemFlags, shopContact, shopSlots,
-  shopSpots, takenSlots, type PickupSpot, type Store,
+  bookableDays, cartMeets, cartRule, itemFlags, shopContact, shopSlots, shopSpots, takenSlots,
+  type PickupSpot, type Store,
 } from "@/lib/store";
-import { telHref, ytUrl } from "@/lib/sale";
+import { ytUrl } from "@/lib/sale";
 
 type Item = {
   id: string; name: string; price: number | null; note?: string;
@@ -77,11 +77,10 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [showSold, setShowSold] = useShowSold();
   const jimotyUrl = (state?.jimotyUrl || "").trim();
   const lineUrl = (state?.lineInviteUrl || "").trim();
-  const phoneDisp = (state?.phone || "").trim();
   const canJimoty = !!jimotyUrl;
-  const canLine = ALLOW_LINE_PHONE_CONTACT && !!lineUrl;
-  const canPhone = ALLOW_LINE_PHONE_CONTACT && !!phoneDisp;
-  const methodOpts = ([["jimoty", canJimoty], ["line", canLine], ["phone", canPhone]] as const)
+  const canLine = !!lineUrl;
+  // Phone stays hidden (SS-341); Jimoty default when both available.
+  const methodOpts = ([["jimoty", canJimoty], ["line", canLine]] as const)
     .filter(([, ok]) => ok).map(([id]) => [id, CH[id][0]] as [Method, string]);
   const barMove = moveOutLeft(state?.moveOut ? [state.moveOut] : []);
   const loggedIn = !!knownName;
@@ -133,7 +132,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const minsOk = !state || cartMeets(state, pickedItems.length, cartTotal);
   const spotOk = !spots.length || !!spotId;
   const canSend = !!slot && spotOk && !!method && !!contactVal && chanOk && pickedItems.length > 0 && minsOk
-    && (method === "jimoty" ? canJimoty : method === "line" ? canLine : canPhone);
+    && (method === "jimoty" ? canJimoty : canLine);
   const rule = state?.rule || null;
 
   function toggle(id: string) {
@@ -230,7 +229,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             const n = getName();
             if (n) setLineName(n);
             setOpen(null); setSlot(null); setSpotId(spots.length === 1 ? spots[0].id : null);
-            setMethod(canJimoty ? "jimoty" : canLine ? "line" : canPhone ? "phone" : null);
+            setMethod(canJimoty ? "jimoty" : canLine ? "line" : null);
             setChanOk(false); setErr(null); setCheckout(true);
           }}>
           {pickedItems.length ? `引き取りを依頼 (${pickedItems.length})` : "引き取りを依頼"}
@@ -343,18 +342,19 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
                   {method && <>
                     <div className="linebox">
                       <a className="linelink" target="_blank" rel="noopener noreferrer"
-                        href={method === "jimoty" ? jimotyUrl : method === "line" ? lineUrl : telHref(phoneDisp)}>
-                        {method === "jimoty" ? "出品者のジモティー" : method === "line" ? "LINE招待リンク" : phoneDisp}
+                        href={method === "jimoty" ? jimotyUrl : lineUrl}>
+                        {method === "jimoty" ? "出品者のジモティー" : "LINE招待リンク"}
                       </a>
                       <label className="late-check"><input type="checkbox" checked={chanOk}
                         onChange={(e) => setChanOk(e.target.checked)} />{CH[method][1]}</label>
                     </div>
+                    {method === "line" && (
+                      <p className="hint">ジモティーから来た方は、できればジモティー上で取引を完了してください。</p>
+                    )}
                     {!(loggedIn && method === "jimoty") && (
                       <label className="float"><span>{CH[method][2]}</span>
                         <input value={lineName} onChange={(e) => setLineName(e.target.value)}
-                          placeholder={method === "phone" ? "080-0000-0000" : "表示名"}
-                          inputMode={method === "phone" ? "tel" : "text"} autoComplete="nickname"
-                          enterKeyHint="done" /></label>
+                          placeholder="表示名" autoComplete="nickname" enterKeyHint="done" /></label>
                     )}
                   </>}
                 </>

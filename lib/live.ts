@@ -10,7 +10,7 @@ import {
 import { ensureAuth, getDb } from "./fb";
 import { tokyoYmd } from "./days";
 import {
-  ALLOW_LINE_PHONE_CONTACT, applyDates, applyMins, bookableDays, cartMeets, cartRule, claimFields,
+  applyDates, applyMins, bookableDays, cartMeets, cartRule, claimFields,
   ELTON_SHOP, hasBuyerContact, itemFields, normalizeSlots, normalizeSpots, parseShop, shortCode,
   shopFields, shopSlots, shopSpots, storeFromDocs, takenSlots, uid, type Claim, type Item, type Store,
 } from "./store";
@@ -356,11 +356,7 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
     case "publish": {
       const meta = (await getDoc(shopRef)).data() || {};
       const s = storeFromDocs(meta as Record<string, unknown>, [], []);
-      if (!hasBuyerContact(shop, s)) {
-        throw new Error(ALLOW_LINE_PHONE_CONTACT
-          ? "Jimoty・LINE・電話のいずれかを入力してください"
-          : "Jimoty profileを入力してください");
-      }
+      if (!hasBuyerContact(shop, s)) throw new Error("Jimoty・LINEのいずれかを入力してください");
       await updateDoc(shopRef, { published: true, updatedAt: new Date().toISOString() });
       return { published: true };
     }
@@ -469,9 +465,7 @@ export async function bookShop(shopRaw: string, body: {
   if (!day || !slot || !itemIds.length || !contactMethod || !contact.trim()) {
     throw new Error("日付・時間・連絡先・連絡方法・品目を確認してください");
   }
-  if (!ALLOW_LINE_PHONE_CONTACT && contactMethod !== "jimoty") {
-    throw new Error("ジモティーで連絡してください");
-  }
+  if (contactMethod === "phone") throw new Error("ジモティーまたはLINEで連絡してください");
 
   const [shopSnap, claimSnaps] = await Promise.all([
     getDoc(doc(db, "shops", shop)),

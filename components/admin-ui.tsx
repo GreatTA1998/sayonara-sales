@@ -10,10 +10,7 @@ import { dayLbl, relativeDay, tokyoYmd } from "@/lib/days";
 import { DECLINE_PRESETS, DEF_LEAD, ELTON_SPOTS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
 import { adminAct, listenShop } from "@/lib/live";
 import { forgetShop, getName, getProfile, openLogin, openShop, saveProfile, subscribeAuth } from "@/lib/shop";
-import {
-  ALLOW_LINE_PHONE_CONTACT, ELTON_SHOP, itemFlags, pickupDays, shopMins, shopPublished, uid,
-  type PickupSpot, type Store,
-} from "@/lib/store";
+import { ELTON_SHOP, itemFlags, pickupDays, shopMins, shopPublished, uid, type PickupSpot, type Store } from "@/lib/store";
 import { SITE_URL } from "@/lib/site";
 
 type Item = PhotoItem & { claimId?: string | null; note?: string; paused?: boolean; jimoty?: boolean };
@@ -32,9 +29,8 @@ type Props = { shop: string; name: string };
 const fmtSlot = (a: string, b: string) => `${a}–${b}`;
 const IMG_ACCEPT = "image/*,image/jpeg,image/jpg,image/png,image/heic,image/heif,image/webp,image/gif,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif";
 type ContactMode = "jimoty" | "line" | "phone";
-const CONTACT_OPTS: [string, string][] = ([["jimoty", "ジモティー"], ["line", "LINE"], ["phone", "電話"]] as const)
-  .filter(([id]) => id === "jimoty" || ALLOW_LINE_PHONE_CONTACT)
-  .map(([id, label]) => [id, label]);
+/** Phone stays hidden (SS-341); stored phone kept. */
+const CONTACT_OPTS: [string, string][] = [["jimoty", "ジモティー"], ["line", "LINE"]];
 const methodJa = (m?: string) => (m === "jimoty" ? "ジモティー" : m === "phone" ? "電話" : m === "line" ? "LINE" : m || "");
 const kuStem = (v: string) => v.replace(/区$/, "");
 const kuFull = (v: string) => { const s = kuStem(v).trim(); return s ? `${s}区` : ""; };
@@ -172,8 +168,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     const l = body.lineInviteUrl || "", p = body.phone || "";
     setJimoty(j); setLineInvite(l); setPhone(p);
     setYoutube(body.youtubeUrl || ytUrl(bioVal) || local.youtubeUrl || "");
-    setContactMode(!ALLOW_LINE_PHONE_CONTACT ? "jimoty"
-      : (j.trim() && "jimoty") || (l.trim() && "line") || (p.trim() && "phone") || "jimoty");
+    setContactMode((j.trim() && "jimoty") || (l.trim() && "line") || "jimoty");
     setSlots(body.slots?.length ? body.slots : [...PICKUP_SLOTS]);
     setSpots(body.pickupSpots || []);
     setPickupTo(body.pickupTo || body.moveOut || "");
@@ -824,18 +819,13 @@ export default function ShopAdminView({ shop, name }: Props) {
               onChange={(e) => setBio(e.target.value)}
               onBlur={() => void persistProfile(bio, jimoty, youtube)}
               placeholder="動作確認・値引き・引越し・車・まとめ買い優先など" /></label>
-          {CONTACT_OPTS.length > 1 && (
-            <Seg label="買い手連絡" value={contactMode} onPick={(v) => setContactMode(v as ContactMode)}
-              opts={CONTACT_OPTS} />
-          )}
-          {ALLOW_LINE_PHONE_CONTACT && contactMode !== "jimoty" && (
-            <label className="float"><span>{contactMode === "line" ? "LINE招待リンク" : "電話番号"}</span>
-              <input value={contactMode === "line" ? lineInvite : phone}
-                onChange={(e) => (contactMode === "line" ? setLineInvite : setPhone)(e.target.value)}
+          <Seg label="買い手連絡" value={contactMode === "phone" ? "jimoty" : contactMode}
+            onPick={(v) => setContactMode(v as ContactMode)} opts={CONTACT_OPTS} />
+          {contactMode === "line" && (
+            <label className="float"><span>LINE招待リンク</span>
+              <input value={lineInvite} onChange={(e) => setLineInvite(e.target.value)}
                 onBlur={() => void persistProfile(bio, jimoty, youtube, lineInvite, phone)}
-                placeholder={contactMode === "line" ? "https://line.me/ti/p/…" : "080-0000-0000"}
-                inputMode={contactMode === "line" ? "url" : "tel"}
-                autoComplete={contactMode === "line" ? "off" : "tel"} /></label>
+                placeholder="https://line.me/ti/p/…" inputMode="url" autoComplete="off" /></label>
           )}
         </section>
       )}
