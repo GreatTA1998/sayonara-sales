@@ -7,6 +7,11 @@ const UID_KEY = "ss-line-uid";
 const UID_MAP = "ss-line-uid-map";
 const PROF_KEY = "ss-profile";
 export const AUTH_EVT = "ss-auth";
+export const LOGIN_OPEN_EVT = "ss-login-open";
+/** Open AppNav login popover (stay on current page). */
+export const openLogin = () => {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(LOGIN_OPEN_EVT));
+};
 
 export const ELTON_ID = "elton";
 export const ELTON_LABEL = "エルトン";
