@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useBodyScrollLock } from "@/components/snack";
+import { compressImage } from "@/lib/compress";
 
 type Shot = { url: string; file: File };
 type Props = {
@@ -75,27 +76,7 @@ async function squareFromVideo(video: HTMLVideoElement): Promise<File> {
   return encodeSquare(canvas, "cam");
 }
 
-/** Center-crop any album image to a real 1:1 file (same as shutter). */
-async function squareFromFile(file: File): Promise<File> {
-  const bmp = await createImageBitmap(file);
-  try {
-    const side = Math.min(bmp.width, bmp.height);
-    if (!side) throw new Error("画像を読めません");
-    const sx = (bmp.width - side) / 2, sy = (bmp.height - side) / 2;
-    const out = Math.min(side, MAX);
-    const canvas = document.createElement("canvas");
-    canvas.width = out;
-    canvas.height = out;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("キャプチャ失敗");
-    ctx.drawImage(bmp, sx, sy, side, side, 0, 0, out, out);
-    return encodeSquare(canvas, "alb");
-  } finally {
-    bmp.close();
-  }
-}
-
-/** Mercari-like 1:1 camera: live preview, real square files (shutter + album), rounded viewfinder affordance. */
+/** Mercari-like 1:1 camera: shutter stays square; album keeps full frame (letterbox in UI). */
 export default function SquareCam({ open, onClose, onShot, tip, sharp }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -226,7 +207,7 @@ export default function SquareCam({ open, onClose, onShot, tip, sharp }: Props) 
     try {
       for (const raw of files) {
         try {
-          const file = await squareFromFile(raw);
+          const file = await compressImage(raw);
           const url = URL.createObjectURL(file);
           setShots((s) => [...s, { url, file }]);
           onShot(file);
