@@ -355,9 +355,9 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
                       <label className="late-check"><input type="checkbox" checked={chanOk}
                         onChange={(e) => setChanOk(e.target.checked)} />{CH[method][1]}</label>
                     </div>
-                    {method === "line" && (
-                      <p className="hint">ジモティーから来た方は、できればジモティー上で取引を完了してください。</p>
-                    )}
+                    <p className="hint">{method === "jimoty"
+                      ? "ジモティーから来た方は、できればジモティー上で取引を完了してください。"
+                      : "ジモティーのアカウントをお持ちでない方向けです。"}</p>
                     {!(loggedIn && method === "jimoty") && (
                       <label className="float"><span>{CH[method][2]}</span>
                         <input value={lineName} onChange={(e) => setLineName(e.target.value)}
