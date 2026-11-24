@@ -226,7 +226,7 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       const meta = (await getDoc(shopRef)).data() || {};
       const day = tokyoYmd();
       const used = String(meta.jimotyImportDay || "") === day ? Number(meta.jimotyImportCount || 0) : 0;
-      if (used >= 2) throw new Error("ジモティ取込は1日2回までです");
+      if (used >= 2) throw new Error("ジモティー取込は1日2回までです");
       const base = (await getDocs(collection(db, "shops", shop, "items"))).size;
       const batch = writeBatch(db);
       const spotFromItems: { name: string; mapsUrl: string }[] = [];

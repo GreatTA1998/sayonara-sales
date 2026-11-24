@@ -34,7 +34,7 @@ shops/{shopId}/claims/{claimId}   # code, day, slot, itemIds, contact, buyerUid,
 
 **Do not set** `FIREBASE_CLIENT_EMAIL` / `FIREBASE_PRIVATE_KEY` — no server SA path.
 
-Soft identity = ジモティ名 and/or LINE名. Pickup lead default 2 days (`leadDays`, 0 ok). Reports Blob: `sayonara-reports.json`.
+Soft identity = ジモティー名 and/or LINE名. Pickup lead default 2 days (`leadDays`, 0 ok). Reports Blob: `sayonara-reports.json`.
 
 ## Firebase setup (once)
 

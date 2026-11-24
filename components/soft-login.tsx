@@ -4,7 +4,7 @@ import { LineLoginLink } from "@/components/line-oauth";
 import { Seg } from "@/components/photo-listing";
 import { softLogin } from "@/lib/shop";
 
-/** Seg ジモティ名|LINE名 (one field); hard LINE optional below. */
+/** Seg ジモティー名|LINE名 (one field); hard LINE optional below. */
 export function SoftLoginForm({
   className, autoFocus, onDone,
 }: { className?: string; autoFocus?: boolean; onDone?: (id: string) => void }) {
@@ -28,10 +28,10 @@ export function SoftLoginForm({
         onDone?.(id);
       }}>
       <Seg label="ソフトログイン" value={mode} onPick={(v) => setMode(v as "jimoty" | "line")}
-        opts={[["jimoty", "ジモティ名"], ["line", "LINE名"]]} />
+        opts={[["jimoty", "ジモティー名"], ["line", "LINE名"]]} />
       <input value={mode === "jimoty" ? jimoty : line}
         onChange={(e) => (mode === "jimoty" ? setJimoty : setLine)(e.target.value)}
-        placeholder={mode === "jimoty" ? "ジモティ名" : "LINE名"}
+        placeholder={mode === "jimoty" ? "ジモティー名" : "LINE名"}
         autoComplete="nickname" autoFocus={autoFocus} />
       <button type="submit" className="cta go" disabled={!ok}>サインイン</button>
       {err ? <p className="sw">{err}</p> : <p className="hint">任意：あとでLINEでアカウントを保護できます</p>}

@@ -26,7 +26,7 @@ type State = {
 type Receipt = { code: string; day: string; slot: string; total?: number; spotName?: string; spotMapsUrl?: string };
 type Method = "jimoty" | "line" | "phone";
 type Props = { shop: string; name: string; /** Flatten padding when embedded on home. */ embed?: boolean };
-const CH = { jimoty: ["ジモティー", "メッセージ済み", "ジモティ名（依頼の識別）"], line: ["LINE", "友だち追加してメッセージ済み", "LINE名"], phone: ["電話", "メッセージ済み", "電話番号"] } as const;
+const CH = { jimoty: ["ジモティー", "メッセージ済み", "ジモティー名（依頼の識別）"], line: ["LINE", "友だち追加してメッセージ済み", "LINE名"], phone: ["電話", "メッセージ済み", "電話番号"] } as const;
 
 /** Confirmed only — pending is disclaimer + still 依頼可. */
 const locked = (i: Item) => i.taken;
@@ -148,7 +148,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
 
   async function joinWait(id: string) {
     const n = (getName() || lineName).trim();
-    if (!n) { setErr("ジモティ名を入力してください"); return; }
+    if (!n) { setErr("ジモティー名を入力してください"); return; }
     const account = openShop(n) || n;
     setLineName(n); setErr(null); setBusy(true);
     try {
@@ -267,7 +267,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
               <>
                 <p className="sw sold">予約済{open.when ? ` — ${open.when}` : ""}</p>
                 {needWlName && (
-                  <label className="float"><span>ジモティ名</span>
+                  <label className="float"><span>ジモティー名</span>
                     <input value={lineName} onChange={(e) => setLineName(e.target.value)}
                       placeholder="表示名" autoComplete="nickname" enterKeyHint="done" /></label>
                 )}
@@ -344,7 +344,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
                     <div className="linebox">
                       <a className="linelink" target="_blank" rel="noopener noreferrer"
                         href={method === "jimoty" ? jimotyUrl : method === "line" ? lineUrl : telHref(phoneDisp)}>
-                        {method === "jimoty" ? "出品者のジモティ" : method === "line" ? "LINE招待リンク" : phoneDisp}
+                        {method === "jimoty" ? "出品者のジモティー" : method === "line" ? "LINE招待リンク" : phoneDisp}
                       </a>
                       <label className="late-check"><input type="checkbox" checked={chanOk}
                         onChange={(e) => setChanOk(e.target.checked)} />{CH[method][1]}</label>

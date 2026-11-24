@@ -19,7 +19,7 @@ function profileId(raw: string) {
 
 async function html(url: string) {
   const res = await fetch(url, { headers: hdr, cache: "no-store" });
-  if (!res.ok) throw new Error(res.status === 404 ? "見つかりません" : "ジモティ取得に失敗しました");
+  if (!res.ok) throw new Error(res.status === 404 ? "見つかりません" : "ジモティー取得に失敗しました");
   return res.text();
 }
 
@@ -111,7 +111,7 @@ async function resolveName(name: string) {
   return ids;
 }
 
-/** GET ?name=ジモティ名&preview=1 | ?profile=URL|hex → listings / confirm preview. */
+/** GET ?name=ジモティー名&preview=1 | ?profile=URL|hex → listings / confirm preview. */
 export async function GET(req: Request) {
   try {
     const sp = new URL(req.url).searchParams;
@@ -120,9 +120,9 @@ export async function GET(req: Request) {
     let id = profileId(sp.get("profile") || rawName);
 
     if (!id) {
-      if (!rawName) throw new Error("ジモティ名を入力してください");
+      if (!rawName) throw new Error("ジモティー名を入力してください");
       const ids = await resolveName(rawName);
-      if (!ids.length) throw new Error("そのジモティ名の出品が見つかりません");
+      if (!ids.length) throw new Error("そのジモティー名の出品が見つかりません");
       if (ids.length > 1 && preview) {
         const candidates = [];
         for (const cand of ids.slice(0, 4)) {
