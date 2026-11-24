@@ -24,7 +24,7 @@ type State = {
   lineInviteUrl?: string | null; phone?: string | null; items: Item[];
   minItems?: number; minTotal?: number; rule?: string | null;
 };
-type Receipt = { code: string; day: string; slot: string; total?: number };
+type Receipt = { day: string; slot: string; total?: number };
 type Method = "jimoty" | "line" | "phone";
 type Props = { shop: string; name: string; /** Flatten padding when embedded on home. */ embed?: boolean };
 const CH = { jimoty: ["ジモティー", "メッセージ済み", "ジモティ名（依頼の識別）"], line: ["LINE", "友だち追加してメッセージ済み", "LINE名"], phone: ["電話", "メッセージ済み", "電話番号"] } as const;
@@ -190,7 +190,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         items: Array.isArray(data.items) ? data.items.map(String) : [],
       });
       setCheckout(false); setOpen(null);
-      setReceipt({ code: String(data.code || ""), day, slot, total: data.total });
+      setReceipt({ day, slot, total: data.total });
       setPicked(new Set());
       try { localStorage.removeItem(cartKey); } catch { /* ignore */ }
       setSlot(null); setMethod(null); setChanOk(false);
@@ -202,7 +202,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     return (
       <main className="wrap">
         <h1>ありがとう。依頼を受けました</h1>
-        <p className="hint">コード {receipt.code} · {dayLbl(receipt.day)} {receipt.slot} · {money(receipt.total ?? 0)}。選んだ連絡方法で、だいたい2日以内に返事します。履歴は下の名前から。</p>
+        <p className="hint">{dayLbl(receipt.day)} {receipt.slot} · {money(receipt.total ?? 0)}。選んだ連絡方法で、だいたい2日以内に返事します。履歴は下の名前から。</p>
         <button type="button" className="dark" onClick={() => setReceipt(null)}>一覧に戻る</button>
       </main>
     );

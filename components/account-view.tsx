@@ -8,7 +8,6 @@ import {
   getJimotyName, getLineName, getLineUid, getName, listBuys, logout, subscribeAuth, type BuyRow,
 } from "@/lib/shop";
 
-const when = (day: string, slot?: string, who?: string) => [who, `${dayLbl(day)}${slot ? ` ${slot}` : ""}`].filter(Boolean).join(" · ");
 const pts = (names: (string | undefined | null)[]) => {
   const n = names.map((x) => x?.trim() || "無題");
   return n.length <= 1 ? `1点 · ${n[0] || "無題"}` : `${n.length}点 · ${n[0]}…`;
@@ -61,9 +60,9 @@ export function AccountView({
         <div className="claims-h">買う · 引き取り履歴</div>
         {buys.length ? (
           <ul className="timeline">{buys.map((b) => (
-            <li key={`${b.code}-${b.at}`}>
+            <li key={b.at}>
               <Link className="tl-card" href={`/s/${b.shop}`} prefetch onClick={onNav}>
-                <b className="tl-when">{when(b.day, b.slot, b.code)}</b>
+                <b className="tl-when">{dayLbl(b.day)}{b.slot ? ` ${b.slot}` : ""}</b>
                 <span className="tl-sum">{pts(b.items)}</span>
               </Link>
             </li>
