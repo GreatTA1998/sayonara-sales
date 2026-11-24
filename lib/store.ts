@@ -13,7 +13,7 @@ export type Claim = {
   contact?: string; contactMethod?: "jimoty" | "line" | "phone";
   /** Snapshot at book — survives admin spot edits/deletes. */
   spotId?: string; spotName?: string; spotMapsUrl?: string;
-  /** requested = pending; booked = 予約済; picked_up = 引取済 (sold). */
+  /** requested = pending; booked = 確定済; picked_up = 引取済 (sold). */
   status: "requested" | "booked" | "picked_up" | "cancelled"; createdAt: string;
   waiters?: { account: string; at: string }[];
   buyerUid?: string;
@@ -177,7 +177,7 @@ function claimOf(s: Store, item: Item) {
   return item.claimId ? s.claims.find((c) => c.id === item.claimId) : undefined;
 }
 
-/** taken = locked; sold = 引取済; booked → when + badge 予約済 N日後; reqN = pending 依頼. */
+/** taken = locked; sold = 引取済; booked → when + badge 確定済 N日後; reqN = pending 依頼. */
 export function itemFlags(s: Store, item: Item) {
   const c = claimOf(s, item);
   const sold = c?.status === "picked_up";
@@ -188,7 +188,7 @@ export function itemFlags(s: Store, item: Item) {
     reqN: taken ? 0 : s.claims.reduce((n, x) => n + (x.status === "requested" && x.itemIds.includes(item.id) ? 1 : 0), 0),
     ...(c?.status === "booked" ? {
       ...(c.day ? { when: `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}` } : {}),
-      badge: rel ? `予約済 ${rel}` : "予約済",
+      badge: rel ? `確定済 ${rel}` : "確定済",
     } : {}),
   };
 }
