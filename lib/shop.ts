@@ -130,11 +130,9 @@ const readUidMap = (): Record<string, string> => {
   catch { return {}; }
 };
 
-/** LINE uid already bound to this shop (empty = soft-only / unbound). */
-const uidBoundTo = (id: string) => {
-  const u = Object.entries(readUidMap()).find(([, v]) => v === id)?.[0] || "";
-  return u;
-};
+/** Shop ownerLineUid (LINE OAuth); empty = soft-only / unbound. */
+const ownerLineUid = (id: string) =>
+  Object.entries(readUidMap()).find(([, v]) => v === id)?.[0] || "";
 
 /** Soft login: Jimoty and/or LINE → one account. Empty both clears soft names.
  *  null = account is LINE-secured; soft bypass denied (use OAuth). */
@@ -147,7 +145,7 @@ export const softLogin = (jimoty: string, line: string): string | null => {
   let id = knownId(j) || knownId(l) || (j && map[norm(j)]) || (l && map[norm(l)]) || "";
   if (!isShop(id) && isShop(cur)) id = cur;
   if (isShop(id)) {
-    const bound = uidBoundTo(id);
+    const bound = ownerLineUid(id);
     if (bound && stored(UID_KEY) !== bound) return null;
   }
   if (j) localStorage.setItem(JIMOTY_KEY, j);
@@ -171,7 +169,8 @@ export const getLineUid = () =>
   typeof window === "undefined" ? "" : (hydrate(), stored(UID_KEY));
 
 /**
- * Bind LINE OAuth uid → shop. Soft/hint/known|map reclaim beat stale uid→dig5; display ≠ shop key.
+ * Bind LINE OAuth → shop. First bind: soft cur/hint → stamp ownerLineUid.
+ * After: umap[uid] only — never re-key ownership by display name.
  */
 export const bindLineUser = (uid: string, displayName: string, shopHint = "") => {
   if (typeof window === "undefined" || !uid.trim()) return "";
@@ -180,7 +179,7 @@ export const bindLineUser = (uid: string, displayName: string, shopHint = "") =>
   const cur = getId();
   const hint = isShop(shopHint) ? shopHint : "";
   const name = displayName.trim();
-  let id = (isShop(cur) ? cur : "") || hint || knownId(name) || (name && map[norm(name)]) || umap[uid] || "";
+  let id = (isShop(cur) ? cur : "") || hint || umap[uid] || "";
   localStorage.setItem(UID_KEY, uid);
   if (!isShop(id)) id = ensureShopId();
   if (name) {
@@ -190,7 +189,7 @@ export const bindLineUser = (uid: string, displayName: string, shopHint = "") =>
   }
   localStorage.setItem(ID_KEY, id);
   for (const [k, v] of Object.entries(umap)) if (v === id && k !== uid) delete umap[k];
-  umap[uid] = id;
+  umap[uid] = id; // stamp ownerLineUid — soft shop becomes LINE-owned
   localStorage.setItem(UID_MAP, JSON.stringify(umap));
   notifyAuth();
   return id;
