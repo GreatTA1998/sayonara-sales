@@ -78,10 +78,11 @@ export function listenShop(
   const shop = parseShop(shopRaw);
   const db = getDb();
   const state: ShopSnap = { meta: null, items: new Map(), claims: new Map() };
-  // Paint on items alone (shop meta fills in; claims soft-lock via item.claimId).
+  // Gate first paint on items+claims so 引取済 filter (default off) never flashes sold.
   let itemsReady = false;
+  let claimsReady = false;
   let dead = false;
-  const emit = () => { if (itemsReady && !dead) onData(assemble(state)); };
+  const emit = () => { if (itemsReady && claimsReady && !dead) onData(assemble(state)); };
   const fail = (e: unknown) => {
     if (dead) return;
     onErr?.(e instanceof Error ? e : new Error(String(e)));
@@ -94,9 +95,10 @@ export function listenShop(
     if (stopClaims || dead) return;
     stopClaims = onSnapshot(collection(db, "shops", shop, "claims"), (snap) => {
       state.claims = new Map(snap.docs.map((d) => [d.id, d.data() as Record<string, unknown>]));
+      claimsReady = true;
       emit();
     }, (e) => {
-      if (denied(e)) { emit(); return; }
+      if (denied(e)) { claimsReady = true; emit(); return; }
       fail(e);
     });
   };
@@ -110,8 +112,8 @@ export function listenShop(
     stopItems = onSnapshot(collection(db, "shops", shop, "items"), (snap) => {
       state.items = new Map(snap.docs.map((d) => [d.id, d.data() as Record<string, unknown>]));
       itemsReady = true;
+      watchClaims();
       emit();
-      watchClaims(); // after first items paint — avoid cold 3-way contention
     }, fail);
   };
 
