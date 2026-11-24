@@ -168,18 +168,33 @@ export const openShop = (n: string, kind: "jimoty" | "line" = "jimoty") =>
 export const getLineUid = () =>
   typeof window === "undefined" ? "" : (hydrate(), stored(UID_KEY));
 
+/** Firestore shop stamped with this LINE uid (shops.*.ownerLineUid). */
+async function shopByOwnerLineUid(uid: string): Promise<string> {
+  if (!uid) return "";
+  try {
+    const { getDb } = await import("./fb");
+    const { collection, getDocs, limit, query, where } = await import("firebase/firestore");
+    const snap = await getDocs(
+      query(collection(getDb(), "shops"), where("ownerLineUid", "==", uid), limit(1)),
+    );
+    const id = snap.docs[0]?.id || "";
+    return isShop(id) ? id : "";
+  } catch { return ""; }
+}
+
 /**
- * Bind LINE OAuth → shop. First bind: soft cur/hint → stamp ownerLineUid.
- * After: umap[uid] only — never re-key ownership by display name.
+ * Bind LINE OAuth → shop. Firestore ownerLineUid stamp wins over stale
+ * ss-shop-id / umap dig5. Else first bind: soft cur/hint → local umap stamp.
  */
-export const bindLineUser = (uid: string, displayName: string, shopHint = "") => {
+export const bindLineUser = (uid: string, displayName: string, shopHint = "", stamped = "") => {
   if (typeof window === "undefined" || !uid.trim()) return "";
   const umap = readUidMap();
   const map = readMap();
   const cur = getId();
   const hint = isShop(shopHint) ? shopHint : "";
+  const stamp = isShop(stamped) ? stamped : "";
   const name = displayName.trim();
-  let id = (isShop(cur) ? cur : "") || hint || umap[uid] || "";
+  let id = stamp || (isShop(cur) ? cur : "") || hint || umap[uid] || "";
   localStorage.setItem(UID_KEY, uid);
   if (!isShop(id)) id = ensureShopId();
   if (name) {
@@ -202,8 +217,9 @@ export const applyLineSession = async () => {
   if (!res.ok) return null;
   const body = await res.json() as { ok?: boolean; uid?: string; name?: string; shop?: string };
   if (!body.ok || !body.uid || !body.name) return null;
-  bindLineUser(body.uid, body.name, body.shop || "");
-  return body;
+  const stamped = await shopByOwnerLineUid(body.uid);
+  const id = bindLineUser(body.uid, body.name, body.shop || "", stamped);
+  return { ...body, shop: id };
 };
 
 /** Clear soft names + shop pointer + optional LINE session (map/known reclaim on next sign-in). */
