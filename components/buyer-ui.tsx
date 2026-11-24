@@ -7,7 +7,7 @@ import { bookShop, joinWaitLive, listenShop } from "@/lib/live";
 import { applyLineSession, getId, getName, openShop, pushBuy, subscribeAuth } from "@/lib/shop";
 import {
   ALLOW_LINE_PHONE_CONTACT, bookableDays, cartAfter, cartRule, itemFlags, shopContact, shopSlots,
-  shopSpots, takenSlots, type PickupSpot, type Store,
+  takenSlots, type Store,
 } from "@/lib/store";
 import { telHref, ytUrl } from "@/lib/sale";
 
@@ -18,13 +18,13 @@ type Item = {
 };
 type State = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
-  days: string[]; slots: string[]; spots: PickupSpot[]; taken: Record<string, string[]>;
+  days: string[]; slots: string[]; taken: Record<string, string[]>;
   waiting?: string[];
   moveOut?: string;
   lineInviteUrl?: string | null; phone?: string | null; items: Item[];
   minItems?: number; minTotal?: number; rule?: string | null;
 };
-type Receipt = { code: string; day: string; slot: string; total?: number; spotName?: string; spotMapsUrl?: string };
+type Receipt = { code: string; day: string; slot: string; total?: number };
 type Method = "jimoty" | "line" | "phone";
 type Props = { shop: string; name: string; /** Flatten padding when embedded on home. */ embed?: boolean };
 const CH = { jimoty: ["ジモティー", "メッセージ済み", "ジモティ名（依頼の識別）"], line: ["LINE", "友だち追加してメッセージ済み", "LINE名"], phone: ["電話", "メッセージ済み", "電話番号"] } as const;
@@ -46,7 +46,7 @@ function toBuyerState(shop: string, s: Store, account: string): State {
     : [];
   return {
     address: s.address, bio: s.bio || "", jimotyUrl: s.jimotyUrl || "", youtubeUrl: s.youtubeUrl || "",
-    days, slots, spots: shopSpots(s), taken, waiting,
+    days, slots, taken, waiting,
     moveOut: s.moveOut || s.pickupTo || "",
     lineInviteUrl: contact.lineInviteUrl || null, phone: contact.phone || null,
     minItems: s.minItems, minTotal: s.minTotal, rule: cartRule(s),
@@ -71,7 +71,6 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [open, setOpen] = useState<Item | null>(null);
   const [checkout, setCheckout] = useState(false);
   const [slot, setSlot] = useState<string | null>(null);
-  const [spotId, setSpotId] = useState<string | null>(null);
   const [method, setMethod] = useState<Method | null>(null);
   const [lineName, setLineName] = useState("");
   const knownName = useSyncExternalStore(subscribeAuth, getName, () => "");
@@ -123,11 +122,6 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, checkout]);
 
-  const spots = state?.spots || [];
-  useEffect(() => {
-    if (spotId && !spots.some((s) => s.id === spotId)) setSpotId(null);
-    if (!spotId && spots.length === 1) setSpotId(spots[0].id);
-  }, [spots, spotId]);
   const gridItems = [...(state?.items || [])].sort(byPrice(priceDir));
   const listItems = showSold ? gridItems : gridItems.filter((i) => !i.sold);
   const pickedItems = (state?.items || []).filter((i) => picked.has(i.id) && !locked(i));
@@ -146,8 +140,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     if (slot && (!(state?.slots || []).includes(slot) || (state?.taken?.[day] || []).includes(slot))) setSlot(null);
   }, [state, day, slot]);
   const cartTotal = pickedItems.reduce((n, i) => n + (i.price ?? 0), 0);
-  const spotOk = !spots.length || !!spotId;
-  const canSend = !!slot && spotOk && !!method && !!contactVal && chanOk && pickedItems.length > 0
+  const canSend = !!slot && !!method && !!contactVal && chanOk && pickedItems.length > 0
     && (method === "jimoty" ? canJimoty : method === "line" ? canLine : canPhone)
     && (!after || day >= after);
   const rule = state?.rule || null;
@@ -190,7 +183,6 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     try {
       const data = await bookShop(shop, {
         day, slot, itemIds, contactMethod: method, contact: contactVal,
-        ...(spotId ? { spotId } : {}),
       });
       if (method === "jimoty" || (method === "line" && !loggedIn)) {
         openShop(contactVal, method === "line" ? "line" : "jimoty");
@@ -200,14 +192,10 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         items: Array.isArray(data.items) ? data.items.map(String) : [],
       });
       setCheckout(false); setOpen(null);
-      setReceipt({
-        code: String(data.code || ""), day, slot, total: data.total,
-        ...(data.spotName ? { spotName: String(data.spotName) } : {}),
-        ...(data.spotMapsUrl ? { spotMapsUrl: String(data.spotMapsUrl) } : {}),
-      });
+      setReceipt({ code: String(data.code || ""), day, slot, total: data.total });
       setPicked(new Set());
       try { localStorage.removeItem(cartKey); } catch { /* ignore */ }
-      setSlot(null); setSpotId(null); setMethod(null); setChanOk(false);
+      setSlot(null); setMethod(null); setChanOk(false);
     } catch (e) { setErr(e instanceof Error ? e.message : "失敗しました"); }
     finally { setBusy(false); }
   }
@@ -216,10 +204,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     return (
       <main className="wrap">
         <h1>ありがとう。依頼を受けました</h1>
-        <p className="hint">コード {receipt.code} · {dayLbl(receipt.day)} {receipt.slot}{receipt.spotName ? ` · ${receipt.spotName}` : ""} · {money(receipt.total ?? 0)}。選んだ連絡方法で、だいたい2日以内に返事します。履歴は下の名前から。</p>
-        {receipt.spotName && receipt.spotMapsUrl ? (
-          <p className="hint"><a className="linelink" href={receipt.spotMapsUrl} target="_blank" rel="noopener noreferrer">{receipt.spotName}（Maps）</a></p>
-        ) : null}
+        <p className="hint">コード {receipt.code} · {dayLbl(receipt.day)} {receipt.slot} · {money(receipt.total ?? 0)}。選んだ連絡方法で、だいたい2日以内に返事します。履歴は下の名前から。</p>
         <button type="button" className="dark" onClick={() => setReceipt(null)}>一覧に戻る</button>
       </main>
     );
@@ -245,7 +230,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
           onClick={() => {
             const n = getName();
             if (n) setLineName(n);
-            setOpen(null); setSlot(null); setSpotId(spots.length === 1 ? spots[0].id : null);
+            setOpen(null); setSlot(null);
             setMethod(canJimoty ? "jimoty" : canLine ? "line" : canPhone ? "phone" : null);
             setChanOk(false); setErr(null); setCheckout(true);
           }}>
@@ -330,22 +315,6 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             ) : null}
             {!days.length ? <p className="sw">予約できる日がありません。</p>
               : !freeSlots.length ? <p className="sw">この日は空きがありません。</p> : null}
-            {spots.length > 0 && (
-              <div className="field"><span>受取場所</span>
-                <div className="slots" role="radiogroup" aria-label="受取場所">
-                  {spots.map((sp) => (
-                    <div key={sp.id} className="spot-opt">
-                      <button type="button" role="radio" aria-checked={spotId === sp.id}
-                        className={spotId === sp.id ? "slot on" : "slot"}
-                        onClick={() => setSpotId(sp.id)}>{sp.name}</button>
-                      {sp.mapsUrl ? (
-                        <a className="maps" href={sp.mapsUrl} target="_blank" rel="noopener noreferrer">Maps</a>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
             <p className="total">現金合計 {money(cartTotal)}</p>
             <ul className="claim-items">{pickedItems.map((i) => (
               <li key={i.id}><span>{i.name?.trim() || "無題"}</span><span>{money(i.price)}</span></li>
