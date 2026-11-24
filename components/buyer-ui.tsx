@@ -6,7 +6,7 @@ import { afterLbl, dayLbl, moveOutLeft, tokyoYmd } from "@/lib/days";
 import { bookShop, joinWaitLive, listenShop } from "@/lib/live";
 import { applyLineSession, getId, getName, openShop, pushBuy, subscribeAuth } from "@/lib/shop";
 import {
-  bookableDays, cartAfter, cartRule, itemFlags, shopContact, shopSlots,
+  bookableDays, cartAfter, cartRule, itemFlags, shopContact, shopMins, shopSlots,
   takenSlots, type Store,
 } from "@/lib/store";
 import { telHref, ytUrl } from "@/lib/sale";
@@ -49,7 +49,7 @@ function toBuyerState(shop: string, s: Store, account: string): State {
     days, slots, taken, waiting,
     moveOut: s.moveOut || s.pickupTo || "",
     lineInviteUrl: contact.lineInviteUrl || null, phone: contact.phone || null,
-    minItems: s.minItems, minTotal: s.minTotal, rule: cartRule(s),
+    ...shopMins(s), rule: cartRule(s),
     items: s.items.filter((i) => !i.paused).map((it) => {
       const { id, name, price, note, photos, availableAfter } = it;
       const after = availableAfter && availableAfter > tokyoYmd() ? afterLbl(availableAfter) : "";
@@ -138,9 +138,11 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     if (slot && (!(state?.slots || []).includes(slot) || (state?.taken?.[day] || []).includes(slot))) setSlot(null);
   }, [state, day, slot]);
   const cartTotal = pickedItems.reduce((n, i) => n + (i.price ?? 0), 0);
+  const minTotal = Number(state?.minTotal) || 0;
+  const underFloor = minTotal > 0 && cartTotal < minTotal;
   const canSend = !!slot && !!method && !!contactVal && chanOk && pickedItems.length > 0
     && (method === "jimoty" ? canJimoty : method === "line" ? canLine : canPhone)
-    && (!after || day >= after);
+    && (!after || day >= after) && !underFloor;
   const rule = state?.rule || null;
 
   function toggle(id: string) {
@@ -320,6 +322,9 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
               <li key={i.id}><span>{i.name?.trim() || "無題"} · キャンセル待ち</span><span>{money(i.price)}</span></li>
             )))}</ul>
             {rule ? <p className="ask">{rule}</p> : null}
+            {underFloor ? (
+              <p className="err">合計¥{minTotal.toLocaleString("ja-JP")}以上で依頼できます</p>
+            ) : null}
             <div className="field contact"><span>連絡方法</span>
               {!methodOpts.length ? (
                 <p className="sw">出品者の連絡先が未設定です。しばらくしてから再度お試しください。</p>

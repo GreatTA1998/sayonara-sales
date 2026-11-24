@@ -11,7 +11,7 @@ import { ensureAuth, getDb } from "./fb";
 import { dayLbl, tokyoYmd } from "./days";
 import {
   applyDates, applyMins, bookableDays, cartAfter, claimFields,
-  ELTON_SHOP, hasBuyerContact, itemFields, normalizeSlots, normalizeSpots, parseShop, shortCode,
+  ELTON_SHOP, hasBuyerContact, itemFields, normalizeSlots, normalizeSpots, parseShop, shortCode, shopMins,
   shopFields, shopSlots, storeFromDocs, takenSlots, uid, type Claim, type Item, type Store,
 } from "./store";
 
@@ -501,6 +501,11 @@ export async function bookShop(shopRaw: string, body: {
     });
     const after = cartAfter(items);
     if (after && day < after) throw new Error(`${dayLbl(after)}以降に受け取れます`);
+    const total = items.reduce((n, it) => n + (it.price ?? 0), 0);
+    const { minTotal } = shopMins(pre);
+    if (minTotal && total < minTotal) {
+      throw new Error(`合計¥${minTotal.toLocaleString("ja-JP")}以上で依頼してください`);
+    }
     // Claims may move under us — re-check status inside the tx.
     const claimCache = new Map<string, string>();
     for (const it of items) {
@@ -527,7 +532,6 @@ export async function bookShop(shopRaw: string, body: {
     for (let i = 0; i < items.length; i++) {
       if (!items[i].claimId) tx.update(doc(db, "shops", shop, "items", itemIds[i]), { claimId });
     }
-    const total = items.reduce((n, it) => n + (it.price ?? 0), 0);
     return {
       code, day, slot, address: String(meta.address || ""), contact: claim.contact!, contactMethod,
       total, items: items.map((it) => it.name),

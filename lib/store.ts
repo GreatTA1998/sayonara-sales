@@ -97,8 +97,6 @@ export function normalizeSlots(raw: unknown): string[] {
   return out;
 }
 
-export const shopSpots = (s: Store) => s.pickupSpots || [];
-
 export function applyDates(s: Store, raw: { pickupFrom?: unknown; pickupTo?: unknown; moveOut?: unknown; leadDays?: unknown }) {
   const from = tokyoYmd();
   const to = asYmd(raw.pickupTo) || asYmd(raw.moveOut);
@@ -120,24 +118,24 @@ const asMin = (v: unknown) => {
   return Number.isFinite(n) && n > 0 ? n : 0;
 };
 type Mins = { minItems?: number; minTotal?: number };
-export const shopMins = (s: Mins) => ({
-  minItems: asMin(s.minItems), minTotal: asMin(s.minTotal),
-});
-/** Soft seller-voiced ask when a cart min is set (optional; not a hard gate). */
+/** Exclusive read: at most one active. Both → keep total (strict). */
+export function shopMins(s: Mins) {
+  let minItems = asMin(s.minItems), minTotal = asMin(s.minTotal);
+  if (minItems && minTotal) minItems = 0;
+  return { minItems, minTotal };
+}
+/** Soft seller-voiced ask — items mode only (total mode is a hard checkout floor). */
 export function cartRule(s: Mins): string | null {
   const { minItems: n, minTotal: y } = shopMins(s);
-  if (!n && !y) return null;
-  const yen = y ? `合計¥${y.toLocaleString("ja-JP")}以上` : "";
-  if (n) {
-    const want = y ? `まとめて${n}点以上（または${yen}）` : `まとめて${n}点以上`;
-    return `出品者は${want}希望（不人気・大型は1点でも歓迎）`;
-  }
-  return `出品者は${yen}希望`;
+  if (y || !n) return null;
+  return `出品者はまとめて${n}点以上希望（不人気・大型は1点でも歓迎）`;
 }
+/** Exclusive write: same rule as shopMins. */
 export function applyMins(s: Store, raw: { minItems?: unknown; minTotal?: unknown }) {
-  s.minItems = asMin(raw.minItems);
-  s.minTotal = asMin(raw.minTotal);
-  return shopMins(s);
+  const out = shopMins({ minItems: asMin(raw.minItems), minTotal: asMin(raw.minTotal) });
+  s.minItems = out.minItems;
+  s.minTotal = out.minTotal;
+  return out;
 }
 
 export const parseShop = (raw: string | null | undefined) => {
