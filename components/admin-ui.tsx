@@ -4,12 +4,16 @@ import { useRouter } from "next/navigation";
 import { DateField, Icon, IconBtn } from "@/components/icons";
 import { byPrice, Listings, ListingTools, Seg, useDense, usePriceDir, useShowSold, type PhotoItem } from "@/components/photo-listing";
 import SquareCam from "@/components/square-cam";
+import { SoftLoginForm } from "@/components/soft-login";
 import { Snack, useBodyScrollLock, useMaskDismiss, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { dayLbl, relativeDay, tokyoYmd } from "@/lib/days";
 import { DECLINE_PRESETS, DEF_LEAD, ELTON_SPOTS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
 import { adminAct, listenShop } from "@/lib/live";
-import { forgetShop, getName, getProfile, openLogin, openShop, saveProfile, subscribeAuth } from "@/lib/shop";
+import {
+  forgetShop, getLoginAnchor, getName, getProfile, openShop, saveProfile, setLogin, subscribeAuth,
+  subscribeLogin,
+} from "@/lib/shop";
 import { ELTON_SHOP, itemFlags, pickupDays, shopMins, shopPublished, uid, type PickupSpot, type Store } from "@/lib/store";
 import { SITE_URL } from "@/lib/site";
 
@@ -761,6 +765,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const busyOpen = open ? deleting === open.id : false;
   useBodyScrollLock(!!openId || !!claimId);
   const editMask = useMaskDismiss(closeEdit, busyOpen);
+  const loginA = useSyncExternalStore(subscribeLogin, getLoginAnchor, () => "" as const);
   const empty = !!data && !items.length;
   const forms = !empty || setup === "manual";
   const areaN = Math.max(2, Array.from(addrDraft).length);
@@ -778,10 +783,17 @@ export default function ShopAdminView({ shop, name }: Props) {
         </label>
         <span className="spacer" aria-hidden="true" />
         {logged && pub === "on" && <button type="button" className="share" onClick={copyUrl}>URLコピー</button>}
-        <button type="button" className="req"
-          onClick={!logged ? openLogin : pub === "on" ? () => router.push(`/s/${shop}`) : publish}>
-          {!logged ? "ログインして保存" : pub === "on" ? "店舗を見る" : "公開する"}
-        </button>
+        <span className="admin-login">
+          <button type="button" className="req"
+            {...(!logged ? { "aria-expanded": loginA === "admin", "aria-haspopup": "dialog" as const } : {})}
+            onClick={!logged ? () => setLogin(loginA === "admin" ? "" : "admin")
+              : pub === "on" ? () => router.push(`/s/${shop}`) : publish}>
+            {!logged ? "ログインして保存" : pub === "on" ? "店舗を見る" : "公開する"}
+          </button>
+          {!logged && loginA === "admin" ? (
+            <SoftLoginForm className="menu-pop pane soft-login" autoFocus slot=".admin-login" />
+          ) : null}
+        </span>
       </header>
 
       {err && <div className="err">{err}</div>}

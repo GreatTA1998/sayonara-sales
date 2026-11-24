@@ -8,7 +8,9 @@ import { useLineOAuthReturn } from "@/components/line-oauth";
 import { SoftLoginForm } from "@/components/soft-login";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { listenPendingRequests } from "@/lib/live";
-import { adminPath, ensureShopId, getId, getName, LOGIN_OPEN_EVT, subscribeAuth } from "@/lib/shop";
+import {
+  adminPath, ensureShopId, getId, getLoginAnchor, getName, setLogin, subscribeAuth, subscribeLogin,
+} from "@/lib/shop";
 
 type Shot = { preview: string; url?: string; err?: string };
 
@@ -37,12 +39,8 @@ export default function AppNav() {
     return listenPendingRequests(shopId, setReqN);
   }, [shopId]);
   useLineOAuthReturn();
-  useEffect(() => { setOpen(""); }, [path]);
-  useEffect(() => {
-    const openLogin = () => setOpen("me");
-    window.addEventListener(LOGIN_OPEN_EVT, openLogin);
-    return () => window.removeEventListener(LOGIN_OPEN_EVT, openLogin);
-  }, []);
+  const loginA = useSyncExternalStore(subscribeLogin, getLoginAnchor, () => "" as const);
+  useEffect(() => { setOpen(""); setLogin(""); }, [path]);
   useEffect(() => {
     if (!open) return;
     const sel = open === "help" ? ".nav-help" : ".nav-me";
@@ -111,6 +109,7 @@ export default function AppNav() {
   const shotBusy = !!shot && !shot.url && !shot.err;
   const canSend = !!body.trim() && !busy && !shotBusy;
   const closeMe = () => setOpen("");
+  const meOpen = name ? open === "me" : loginA === "nav";
 
   return (
     <nav className="app-nav bot" aria-label="アプリ">
@@ -132,7 +131,7 @@ export default function AppNav() {
           <div className="nav-help">
             <button type="button" className={`nav-a${open === "help" ? " on" : ""}`}
               aria-expanded={open === "help"} aria-haspopup="dialog"
-              onClick={() => { setOpen(open === "help" ? "" : "help"); setMsg(""); }}>ヘルプ</button>
+              onClick={() => { setLogin(""); setOpen(open === "help" ? "" : "help"); setMsg(""); }}>ヘルプ</button>
             {open === "help" && (
               <form className="menu-pop up pane help-pane" role="dialog" aria-label="ヘルプ" onSubmit={sendHelp}
                 onPaste={(e) => {
@@ -176,17 +175,19 @@ export default function AppNav() {
             )}
           </div>
           <div className="nav-me">
-            <button type="button" className={`nav-a${open === "me" ? " on" : ""}`}
-              aria-expanded={open === "me"} aria-haspopup="dialog"
-              onClick={() => setOpen(open === "me" ? "" : "me")}>{name || "ログイン"}</button>
-            {open === "me" && (name ? (
+            <button type="button" className={`nav-a${meOpen ? " on" : ""}`}
+              aria-expanded={meOpen} aria-haspopup="dialog"
+              onClick={() => {
+                if (name) { setLogin(""); setOpen(open === "me" ? "" : "me"); }
+                else { setOpen(""); setLogin(loginA === "nav" ? "" : "nav"); }
+              }}>{name || "ログイン"}</button>
+            {name && open === "me" ? (
               <div className="menu-pop up pane help-pane me-pane" role="dialog" aria-label="アカウント">
                 <AccountView onAfterLogout={closeMe} onNav={closeMe} />
               </div>
-            ) : (
-              <SoftLoginForm className="menu-pop up pane soft-login" autoFocus
-                onDone={closeMe} />
-            ))}
+            ) : !name && loginA === "nav" ? (
+              <SoftLoginForm className="menu-pop up pane soft-login" autoFocus slot=".nav-me" />
+            ) : null}
           </div>
         </div>
       </div>
