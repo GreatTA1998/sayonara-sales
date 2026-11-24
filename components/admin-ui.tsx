@@ -117,7 +117,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [slotB, setSlotB] = useState("11:15");
   const [slotOpen, setSlotOpen] = useState(false);
   const [pickupTo, setPickupTo] = useState("");
-  const [leadDays, setLeadDays] = useState(DEF_LEAD);
+  const [leadDays, setLeadDays] = useState<number | "">(DEF_LEAD);
   const [minItems, setMinItems] = useState(0);
   const [minTotal, setMinTotal] = useState(0);
   const [listOpen, setListOpen] = useState(false);
@@ -697,7 +697,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     else if (body) setSpots(next);
   }
 
-  async function saveDates(to: string, lead = leadDays) {
+  async function saveDates(to: string, lead = leadDays === "" ? 0 : leadDays) {
     const body = await act({
       action: "dates", pickupFrom: tokyoYmd(), pickupTo: to, moveOut: to, leadDays: lead,
     }, "保存しました");
@@ -996,8 +996,15 @@ export default function ShopAdminView({ shop, name }: Props) {
             <span className="lead-row">
               <input type="number" min={0} inputMode="numeric" aria-label="最短予約（日前）"
                 value={leadDays}
-                onChange={(e) => setLeadDays(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-                onBlur={() => void saveDates(pickupTo, leadDays)} />
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setLeadDays(v === "" ? "" : Math.max(0, Math.floor(Number(v)) || 0));
+                }}
+                onBlur={() => {
+                  const n = leadDays === "" ? 0 : leadDays;
+                  setLeadDays(n);
+                  void saveDates(pickupTo, n);
+                }} />
               <span aria-hidden="true">日前</span>
             </span>
           </label>
