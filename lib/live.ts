@@ -8,9 +8,9 @@ import {
   writeBatch, type Unsubscribe,
 } from "firebase/firestore";
 import { ensureAuth, getDb } from "./fb";
-import { tokyoYmd } from "./days";
+import { dayLbl, tokyoYmd } from "./days";
 import {
-  ALLOW_LINE_PHONE_CONTACT, applyDates, applyMins, bookableDays, cartMeets, cartRule, claimFields,
+  ALLOW_LINE_PHONE_CONTACT, applyDates, applyMins, bookableDays, cartAfter, cartMeets, cartRule, claimFields,
   ELTON_SHOP, hasBuyerContact, itemFields, normalizeSlots, normalizeSpots, parseShop, shortCode,
   shopFields, shopSlots, shopSpots, storeFromDocs, takenSlots, uid, type Claim, type Item, type Store,
 } from "./store";
@@ -299,6 +299,10 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       if ("price" in body) patch.price = numPrice(body.price);
       if ("note" in body) patch.note = body.note ? String(body.note) : null;
       if ("paused" in body) patch.paused = !!body.paused;
+      if ("availableAfter" in body) {
+        const a = String(body.availableAfter || "").trim();
+        patch.availableAfter = /^\d{4}-\d{2}-\d{2}$/.test(a) ? a : null;
+      }
       if ("photos" in body) {
         patch.photos = Array.isArray(body.photos) ? body.photos.map(String).filter(Boolean) : [];
       }
@@ -495,11 +499,15 @@ export async function bookShop(shopRaw: string, body: {
     const items: Item[] = itemSnaps.map((s, i) => {
       if (!s.exists()) throw new Error("品目が見つかりません");
       const r = s.data();
+      const a = String(r.availableAfter || "").trim();
       return {
         id: itemIds[i], name: String(r.name || ""), price: r.price == null ? null : Number(r.price),
         claimId: r.claimId ? String(r.claimId) : null, paused: !!r.paused,
+        ...( /^\d{4}-\d{2}-\d{2}$/.test(a) ? { availableAfter: a } : {}),
       };
     });
+    const after = cartAfter(items);
+    if (after && day < after) throw new Error(`受取可能日は${dayLbl(after)}以降です`);
     // Claims may move under us — re-check status inside the tx.
     const claimCache = new Map<string, string>();
     for (const it of items) {

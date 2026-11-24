@@ -2,11 +2,11 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { byPrice, Listings, ListingTools, money, Seg, useDense, usePriceDir, useShowSold } from "@/components/photo-listing";
 import { useBodyScrollLock, useMaskDismiss } from "@/components/snack";
-import { dayLbl, moveOutLeft } from "@/lib/days";
+import { afterLbl, dayLbl, moveOutLeft, tokyoYmd } from "@/lib/days";
 import { bookShop, joinWaitLive, listenShop } from "@/lib/live";
 import { applyLineSession, getId, getName, openShop, pushBuy, subscribeAuth } from "@/lib/shop";
 import {
-  ALLOW_LINE_PHONE_CONTACT, bookableDays, cartMeets, cartRule, itemFlags, shopContact, shopSlots,
+  ALLOW_LINE_PHONE_CONTACT, bookableDays, cartAfter, cartMeets, cartRule, itemFlags, shopContact, shopSlots,
   shopSpots, takenSlots, type PickupSpot, type Store,
 } from "@/lib/store";
 import { telHref, ytUrl } from "@/lib/sale";
@@ -14,6 +14,7 @@ import { telHref, ytUrl } from "@/lib/sale";
 type Item = {
   id: string; name: string; price: number | null; note?: string;
   taken: boolean; sold?: boolean; reqN?: number; when?: string; photos?: string[];
+  availableAfter?: string; after?: string;
 };
 type State = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
@@ -50,8 +51,14 @@ function toBuyerState(shop: string, s: Store, account: string): State {
     lineInviteUrl: contact.lineInviteUrl || null, phone: contact.phone || null,
     minItems: s.minItems, minTotal: s.minTotal, rule: cartRule(s),
     items: s.items.filter((i) => !i.paused).map((it) => {
-      const { id, name, price, note, photos } = it;
-      return { id, name, price, note, photos: photos || [], ...itemFlags(s, it) };
+      const { id, name, price, note, photos, availableAfter } = it;
+      const after = availableAfter && availableAfter > tokyoYmd() ? afterLbl(availableAfter) : "";
+      return {
+        id, name, price, note, photos: photos || [],
+        ...(availableAfter ? { availableAfter } : {}),
+        ...(after ? { after } : {}),
+        ...itemFlags(s, it),
+      };
     }),
   };
 }
@@ -116,11 +123,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, checkout]);
 
-  const freeSlots = (state?.slots || []).filter((s) => !(state?.taken?.[day] || []).includes(s));
   const spots = state?.spots || [];
-  useEffect(() => {
-    if (slot && (!(state?.slots || []).includes(slot) || (state?.taken?.[day] || []).includes(slot))) setSlot(null);
-  }, [state, day, slot]);
   useEffect(() => {
     if (spotId && !spots.some((s) => s.id === spotId)) setSpotId(null);
     if (!spotId && spots.length === 1) setSpotId(spots[0].id);
@@ -129,11 +132,25 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const listItems = showSold ? gridItems : gridItems.filter((i) => !i.sold);
   const pickedItems = (state?.items || []).filter((i) => picked.has(i.id) && !locked(i));
   const waitItems = (state?.items || []).filter((i) => state?.waiting?.includes(i.id));
+  const after = cartAfter(pickedItems);
+  const shopDays = state?.days || [];
+  const days = after ? shopDays.filter((d) => d >= after) : shopDays;
+  const afterBlocks = !!(after && shopDays.some((d) => d < after));
+  useEffect(() => {
+    const next = after ? (state?.days || []).filter((d) => d >= after) : (state?.days || []);
+    if (!next.length) { if (day) setDay(""); return; }
+    if (!next.includes(day)) { setDay(next[0]); setSlot(null); }
+  }, [state?.days, after, day]);
+  const freeSlots = (state?.slots || []).filter((s) => !(state?.taken?.[day] || []).includes(s));
+  useEffect(() => {
+    if (slot && (!(state?.slots || []).includes(slot) || (state?.taken?.[day] || []).includes(slot))) setSlot(null);
+  }, [state, day, slot]);
   const cartTotal = pickedItems.reduce((n, i) => n + (i.price ?? 0), 0);
   const minsOk = !state || cartMeets(state, pickedItems.length, cartTotal);
   const spotOk = !spots.length || !!spotId;
   const canSend = !!slot && spotOk && !!method && !!contactVal && chanOk && pickedItems.length > 0 && minsOk
-    && (method === "jimoty" ? canJimoty : method === "line" ? canLine : canPhone);
+    && (method === "jimoty" ? canJimoty : method === "line" ? canLine : canPhone)
+    && (!after || day >= after);
   const rule = state?.rule || null;
 
   function toggle(id: string) {
@@ -261,6 +278,9 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             <div className="sp">{money(open.price)}</div>
             <h2>{open.name}</h2>
             {open.note ? <p className="sn">{open.note}</p> : null}
+            {open.availableAfter && open.availableAfter > tokyoYmd() ? (
+              <p className="hint">受取可能日 {dayLbl(open.availableAfter)}〜</p>
+            ) : null}
             {soldOpen ? (
               <p className="sw sold">引取済</p>
             ) : takenOpen ? (
@@ -296,7 +316,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             <h2>引き取り日程</h2>
             <div className="when">
               <span className="date-ctl"><select value={day} aria-label="日付" onChange={(e) => { setDay(e.target.value); setSlot(null); }}>
-                {(state?.days || []).map((d) => <option key={d} value={d}>{dayLbl(d)}</option>)}
+                {days.map((d) => <option key={d} value={d}>{dayLbl(d)}</option>)}
               </select></span>
               <div className="slots" role="group" aria-label="時間帯">
                 {freeSlots.map((s) => (
@@ -306,7 +326,10 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
                 ))}
               </div>
             </div>
-            {!((state?.days || []).length) ? <p className="sw">予約できる日がありません。</p>
+            {afterBlocks && after ? (
+              <p className="hint">一部の品は{dayLbl(after)}以降に受け取れます</p>
+            ) : null}
+            {!days.length ? <p className="sw">予約できる日がありません。</p>
               : !freeSlots.length ? <p className="sw">この日は空きがありません。</p> : null}
             {spots.length > 0 && (
               <div className="field"><span>受取場所</span>

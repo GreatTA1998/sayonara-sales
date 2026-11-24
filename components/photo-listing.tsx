@@ -3,7 +3,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { byPrice, type PriceDir } from "@/lib/sale";
 import "./photo-layout.css";
 
-export type PhotoItem = { id: string; name: string; price: number | null; note?: string; photos?: string[] };
+export type PhotoItem = { id: string; name: string; price: number | null; note?: string; photos?: string[]; after?: string };
 export { byPrice, type PriceDir };
 
 const PRICE_DIR_KEY = "ss-price-dir";
@@ -110,10 +110,11 @@ function PhotoCard({
   const n = photos.length;
   const aria = n > 1 ? `${name}, ${n} photos` : name;
 
+  const later = !!item.after;
   return (
     <button type="button" disabled={disabled} aria-label={aria} onClick={onClick}
-      className={`xcard${dense ? " dense" : ""}${cls}`}>
-      <div className="xphoto">
+      className={`xcard${dense ? " dense" : ""}${later ? " later" : ""}${cls}`}>
+      <div className="xphoto" data-after={item.after || undefined}>
         <img src={src} alt="" loading="lazy" decoding="async" />
         <MultiPhotoHint count={n} />
       </div>
@@ -134,9 +135,11 @@ function TextTile({
 }) {
   const name = labelName(item.name);
   const cls = className ? ` ${className}` : "";
+  const later = !!item.after;
   return (
     <button type="button" disabled={disabled} aria-label={name} onClick={onClick}
-      className={`xtxt${dense ? " dense" : ""}${cls}`}>
+      className={`xtxt${dense ? " dense" : ""}${later ? " later" : ""}${cls}`}
+      data-after={item.after || undefined}>
       {!dense && item.price != null ? <span className="xprice">{money(item.price)}</span> : null}
       <span className={`xname${!item.name?.trim() ? " empty" : ""}`}>{name}</span>
     </button>

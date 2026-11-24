@@ -12,6 +12,13 @@ export function dayLbl(d: string) {
   return `${m}月${day}日（${youbi(d)}）`;
 }
 
+/** Compact listing cue for availableAfter (e.g. 12/5〜). */
+export function afterLbl(d: string) {
+  if (!YMD.test(d || "")) return "";
+  const [, m, day] = d.split("-").map(Number);
+  return `${m}/${day}〜`;
+}
+
 export function daysBetween(from: string, to: string): string[] {
   if (!YMD.test(from) || !YMD.test(to) || to < from) return [];
   const out: string[] = [];
