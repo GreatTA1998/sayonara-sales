@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { byPrice, Listings, ListingTools, money, Seg, useDense, usePriceDir, useShowSold } from "@/components/photo-listing";
 import { useBodyScrollLock, useMaskDismiss } from "@/components/snack";
 import { afterLbl, dayLbl, moveOutLeft, tokyoYmd } from "@/lib/days";
@@ -15,11 +15,12 @@ type Item = {
   id: string; name: string; price: number | null; note?: string;
   taken: boolean; sold?: boolean; reqN?: number; waitN?: number; when?: string; photos?: string[];
   availableAfter?: string; after?: string;
+  /** Booked claim waiter accounts (FIFO) — match leave/join against live identity keys. */
+  waitAs?: string[];
 };
 type State = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
   days: string[]; slots: string[]; taken: Record<string, string[]>;
-  waiting?: string[];
   moveOut?: string;
   lineInviteUrl?: string | null; phone?: string | null; items: Item[];
   minItems?: number; minTotal?: number; rule?: string | null;
@@ -31,7 +32,9 @@ const CH = { jimoty: ["ジモティー", "メッセージ済み", "ジモティ�
 
 /** Confirmed only — pending is disclaimer + still 依頼可. */
 const locked = (i: Item) => i.taken;
-const mineKeys = () => [getId(), getName()].map((s) => s.trim()).filter(Boolean);
+/** dig5 + Jimoty/LINE name + in-sheet draft — snap-time keys alone missed the draft name. */
+const mineKeys = (...extra: string[]) =>
+  [...new Set([getId(), getName(), ...extra].map((s) => s.trim()).filter(Boolean))];
 
 function toBuyerState(shop: string, s: Store): State {
   const days = bookableDays(s);
@@ -39,16 +42,9 @@ function toBuyerState(shop: string, s: Store): State {
   const contact = shopContact(shop, s);
   const taken: Record<string, string[]> = {};
   for (const d of days) taken[d] = takenSlots(s, d);
-  const keys = mineKeys();
-  const waiting = keys.length
-    ? s.items.filter((it) => {
-        const c = s.claims.find((x) => x.id === it.claimId);
-        return !!c?.waiters?.some((w) => keys.includes(w.account));
-      }).map((it) => it.id)
-    : [];
   return {
     address: s.address, bio: s.bio || "", jimotyUrl: s.jimotyUrl || "", youtubeUrl: s.youtubeUrl || "",
-    days, slots, taken, waiting,
+    days, slots, taken,
     moveOut: s.moveOut || s.pickupTo || "",
     lineInviteUrl: contact.lineInviteUrl || null, phone: contact.phone || null,
     ...shopMins(s), rule: cartRule(s),
@@ -70,11 +66,12 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [day, setDay] = useState("");
   const cartKey = `ss-cart-${shop}`;
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
-  const [open, setOpen] = useState<Item | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
   const [checkout, setCheckout] = useState(false);
   const [slot, setSlot] = useState<string | null>(null);
   const [method, setMethod] = useState<Method | null>(null);
   const [lineName, setLineName] = useState("");
+  const wlNameRef = useRef<HTMLInputElement>(null);
   const knownName = useSyncExternalStore(subscribeAuth, getName, () => "");
   const [chanOk, setChanOk] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -83,6 +80,8 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [priceDir, setPriceDir] = usePriceDir();
   const [dense, setDense] = useDense();
   const [showSold, setShowSold] = useShowSold();
+  const open = (openId && state?.items.find((i) => i.id === openId)) || null;
+  const myKeys = mineKeys(lineName);
   const jimotyUrl = (state?.jimotyUrl || "").trim();
   const lineUrl = (state?.lineInviteUrl || "").trim();
   const phoneDisp = (state?.phone || "").trim();
@@ -101,7 +100,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     const unsub = listenShop(shop, (s) => {
       const next = toBuyerState(shop, s);
       setState(next);
-      setOpen((o) => (o ? next.items.find((i) => i.id === o.id) || o : null));
+      setOpenId((id) => (id && next.items.some((i) => i.id === id) ? id : null));
       setDay((d) => (d && next.days?.includes(d) ? d : (next.days?.[0] || "")));
     }, (e) => setErr(e.message || "読み込みに失敗しました"));
     const n = getName();
@@ -116,7 +115,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
       if (e.key !== "Escape") return;
       e.preventDefault();
       if (checkout) setCheckout(false);
-      else setOpen(null);
+      else setOpenId(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -125,7 +124,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const gridItems = [...(state?.items || [])].sort(byPrice(priceDir));
   const listItems = showSold ? gridItems : gridItems.filter((i) => !i.sold);
   const pickedItems = (state?.items || []).filter((i) => picked.has(i.id) && !locked(i));
-  const waitItems = (state?.items || []).filter((i) => state?.waiting?.includes(i.id));
+  const waitItems = (state?.items || []).filter((i) => i.waitAs?.some((a) => myKeys.includes(a)));
   const after = cartAfter(pickedItems);
   const shopDays = state?.days || [];
   const days = after ? shopDays.filter((d) => d >= after) : shopDays;
@@ -158,20 +157,28 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   }
 
   async function joinWait(id: string) {
-    const n = (getName() || lineName).trim();
+    // Prefer DOM value so JP IME composition isn't truncated mid-input.
+    const typed = (wlNameRef.current?.value || lineName).trim();
+    const n = (getName() || typed).trim();
     if (!n) { setErr("ジモティ名を入力してください"); return; }
     openShop(n);
     setLineName(n); setErr(null); setBusy(true);
     try {
       // Display name = waiter key (admin FIFO); aliases skip dig5/name dupes.
-      await joinWaitLive(shop, id, n, mineKeys());
+      await joinWaitLive(shop, id, n, mineKeys(n, typed));
       setState((prev) => {
         if (!prev) return prev;
-        const was = prev.waiting?.includes(id);
         return {
           ...prev,
-          waiting: [...new Set([...(prev.waiting || []), id])],
-          items: was ? prev.items : prev.items.map((it) => it.id === id ? { ...it, waitN: (it.waitN || 0) + 1 } : it),
+          items: prev.items.map((it) => {
+            if (it.id !== id) return it;
+            const was = it.waitAs?.includes(n);
+            return {
+              ...it,
+              waitN: was ? (it.waitN || 0) : (it.waitN || 0) + 1,
+              waitAs: [...new Set([...(it.waitAs || []), n])],
+            };
+          }),
         };
       });
     } catch (e) { setErr(e instanceof Error ? e.message : "失敗しました"); }
@@ -179,21 +186,24 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   }
 
   async function leaveWait(id: string) {
-    const keys = [...new Set([...mineKeys(), lineName.trim()].filter(Boolean))];
+    const keys = mineKeys(lineName, wlNameRef.current?.value || "");
     if (!keys.length) { setErr("ジモティ名を入力してください"); return; }
     setErr(null); setBusy(true);
     try {
       await leaveWaitLive(shop, id, keys);
       setState((prev) => prev && {
         ...prev,
-        waiting: (prev.waiting || []).filter((x) => x !== id),
-        items: prev.items.map((it) => it.id === id ? { ...it, waitN: Math.max(0, (it.waitN || 1) - 1) } : it),
+        items: prev.items.map((it) => {
+          if (it.id !== id) return it;
+          const nextAs = (it.waitAs || []).filter((a) => !keys.includes(a));
+          return { ...it, waitAs: nextAs, waitN: nextAs.length };
+        }),
       });
     } catch (e) { setErr(e instanceof Error ? e.message : "失敗しました"); }
     finally { setBusy(false); }
   }
 
-  function closeDetail() { setOpen(null); }
+  function closeDetail() { setOpenId(null); }
   const detailMask = useMaskDismiss(closeDetail);
 
   async function book() {
@@ -216,7 +226,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         code: String(data.code || ""), shop, day, slot,
         items: Array.isArray(data.items) ? data.items.map(String) : [],
       });
-      setCheckout(false); setOpen(null);
+      setCheckout(false); setOpenId(null);
       setReceipt({ day, slot, total: data.total });
       setPicked(new Set());
       try { localStorage.removeItem(cartKey); } catch { /* ignore */ }
@@ -238,7 +248,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const soldOpen = !!open?.sold;
   const takenOpen = !!open?.taken && !soldOpen;
   const onOpen = open ? picked.has(open.id) : false;
-  const waiting = !!(open && state?.waiting?.includes(open.id));
+  const waiting = !!open?.waitAs?.some((a) => myKeys.includes(a));
   const openPics = open?.photos || [];
   const needWlName = takenOpen && !waiting && !(getName() || lineName).trim();
   const yt = (state?.youtubeUrl || "").trim() || ytUrl(state?.bio || "");
@@ -255,7 +265,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
           onClick={() => {
             const n = getName();
             if (n) setLineName(n);
-            setOpen(null); setSlot(null);
+            setOpenId(null); setSlot(null);
             setMethod(canJimoty ? "jimoty" : canLine ? "line" : canPhone ? "phone" : null);
             setChanOk(false); setErr(null); setCheckout(true);
           }}>
@@ -277,7 +287,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         <ListingTools dir={priceDir} onDir={setPriceDir} dense={dense} onDense={setDense}
           showSold={showSold} onShowSold={setShowSold} />
       )}
-      <Listings items={listItems} dense={dense} onSelect={(it) => { setErr(null); setOpen(it); }}
+      <Listings items={listItems} dense={dense} onSelect={(it) => { setErr(null); setOpenId(it.id); }}
         classNameFor={(item) => `${picked.has(item.id) ? "on" : ""}${item.sold ? " sold" : item.taken ? " booked" : item.reqN ? " req" : ""}`.trim()} />
       {!state && <p className="text-sm text-muted pad">読み込み中…</p>}
       {open && !checkout && (
@@ -298,7 +308,9 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
                 {open.waitN ? <p className="sw">{open.waitN}人待ち</p> : null}
                 {needWlName && (
                   <label className="float"><span>ジモティ名</span>
-                    <input value={lineName} onChange={(e) => setLineName(e.target.value)}
+                    <input ref={wlNameRef} value={lineName}
+                      onChange={(e) => setLineName(e.target.value)}
+                      onCompositionEnd={(e) => setLineName(e.currentTarget.value)}
                       placeholder="表示名" autoComplete="nickname" enterKeyHint="done" /></label>
                 )}
                 {err && <div className="err">{err}</div>}
