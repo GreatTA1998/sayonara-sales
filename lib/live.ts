@@ -10,7 +10,7 @@ import {
 import { ensureAuth, getDb } from "./fb";
 import { dayLbl, tokyoYmd } from "./days";
 import {
-  ALLOW_LINE_PHONE_CONTACT, applyDates, applyMins, bookableDays, cartAfter, cartMeets, cartRule, claimFields,
+  ALLOW_LINE_PHONE_CONTACT, applyDates, applyMins, bookableDays, cartAfter, claimFields,
   ELTON_SHOP, hasBuyerContact, itemFields, normalizeSlots, normalizeSpots, parseShop, shortCode,
   shopFields, shopSlots, shopSpots, storeFromDocs, takenSlots, uid, type Claim, type Item, type Store,
 } from "./store";
@@ -521,10 +521,6 @@ export async function bookShop(shopRaw: string, body: {
         claimCache.set(cur, st);
       }
       if (st === "booked" || st === "picked_up") throw new Error(`${it.name}: 予約済みです`);
-    }
-    const totalPre = items.reduce((n, it) => n + (it.price ?? 0), 0);
-    if (!cartMeets(pre, items.length, totalPre)) {
-      throw new Error(cartRule(pre) || "引き取り条件を満たしていません");
     }
     const claimId = uid("c");
     const code = shortCode();

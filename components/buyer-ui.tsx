@@ -6,7 +6,7 @@ import { afterLbl, dayLbl, moveOutLeft, tokyoYmd } from "@/lib/days";
 import { bookShop, joinWaitLive, listenShop } from "@/lib/live";
 import { applyLineSession, getId, getName, openShop, pushBuy, subscribeAuth } from "@/lib/shop";
 import {
-  ALLOW_LINE_PHONE_CONTACT, bookableDays, cartAfter, cartMeets, cartRule, itemFlags, shopContact, shopSlots,
+  ALLOW_LINE_PHONE_CONTACT, bookableDays, cartAfter, cartRule, itemFlags, shopContact, shopSlots,
   shopSpots, takenSlots, type PickupSpot, type Store,
 } from "@/lib/store";
 import { telHref, ytUrl } from "@/lib/sale";
@@ -146,9 +146,8 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     if (slot && (!(state?.slots || []).includes(slot) || (state?.taken?.[day] || []).includes(slot))) setSlot(null);
   }, [state, day, slot]);
   const cartTotal = pickedItems.reduce((n, i) => n + (i.price ?? 0), 0);
-  const minsOk = !state || cartMeets(state, pickedItems.length, cartTotal);
   const spotOk = !spots.length || !!spotId;
-  const canSend = !!slot && spotOk && !!method && !!contactVal && chanOk && pickedItems.length > 0 && minsOk
+  const canSend = !!slot && spotOk && !!method && !!contactVal && chanOk && pickedItems.length > 0
     && (method === "jimoty" ? canJimoty : method === "line" ? canLine : canPhone)
     && (!after || day >= after);
   const rule = state?.rule || null;
@@ -181,7 +180,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
 
   async function book() {
     const itemIds = pickedItems.map((i) => i.id);
-    if (!itemIds.length || !slot || !method || !contactVal || busy || !canSend || !minsOk) return;
+    if (!itemIds.length || !slot || !method || !contactVal || busy || !canSend) return;
     setBusy(true); setErr(null);
     setState((prev) => prev && {
       ...prev,
@@ -353,7 +352,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             )).concat(waitItems.map((i) => (
               <li key={i.id}><span>{i.name?.trim() || "無題"} · キャンセル待ち</span><span>{money(i.price)}</span></li>
             )))}</ul>
-            {rule ? <p className={minsOk ? "hint" : "sw"}>{rule}{minsOk ? "" : " — まだ足りません"}</p> : null}
+            {rule ? <p className="hint">{rule}</p> : null}
             <div className="field contact"><span>連絡方法</span>
               {!methodOpts.length ? (
                 <p className="sw">出品者の連絡先が未設定です。しばらくしてから再度お試しください。</p>
