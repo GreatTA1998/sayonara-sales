@@ -1040,35 +1040,39 @@ export default function ShopAdminView({ shop, name }: Props) {
             )}
           </span>
         </div>
-        <div className="spot-edit" aria-label="受取場所">
-          {spots.map((sp) => (
-            <div key={sp.id} className="spot-row">
-              <input aria-label="場所名" value={sp.name} placeholder="場所名"
-                onChange={(e) => setSpots((all) => all.map((x) => x.id === sp.id ? { ...x, name: e.target.value } : x))}
-                onBlur={(e) => {
-                  const next = spots.map((x) => x.id === sp.id ? { ...x, name: e.target.value } : x).filter((x) => x.name.trim());
-                  setSpots(next); void saveSpots(next);
-                }} />
-              <input aria-label="Maps URL" value={sp.mapsUrl} placeholder="Google Maps URL" inputMode="url"
-                onChange={(e) => setSpots((all) => all.map((x) => x.id === sp.id ? { ...x, mapsUrl: e.target.value } : x))}
-                onBlur={(e) => {
-                  const next = spots.map((x) => x.id === sp.id ? { ...x, mapsUrl: e.target.value } : x).filter((x) => x.name.trim());
-                  setSpots(next); void saveSpots(next);
-                }} />
-              <button type="button" className="spot-x" aria-label={`${sp.name || "場所"}を削除`}
-                onClick={() => void saveSpots(spots.filter((x) => x.id !== sp.id))}>×</button>
-            </div>
-          ))}
-          <button type="button" className="slot" onClick={() => setSpots((s) => [...s, { id: uid("p"), name: "", mapsUrl: "" }])}>場所を追加</button>
-          {shop === ELTON_SHOP && (
-            <div className="slot-edit" role="group" aria-label="場所の候補">
-              {ELTON_SPOTS.filter((s) => !spots.some((x) => x.name === s.name)).map((s) => (
-                <button key={s.name} type="button" className="slot"
-                  onClick={() => void saveSpots([...spots.filter((x) => x.name.trim()), { id: uid("p"), name: s.name, mapsUrl: s.mapsUrl }])}>{s.name}</button>
-              ))}
-            </div>
-          )}
-        </div>
+        <details className="opt">
+          {/* Checkout spots deprecated — location negotiated in Jimoty/LINE; data kept. */}
+          <summary>受取場所（非表示）</summary>
+          <div className="spot-edit" aria-label="受取場所">
+            {spots.map((sp) => (
+              <div key={sp.id} className="spot-row">
+                <input aria-label="場所名" value={sp.name} placeholder="場所名"
+                  onChange={(e) => setSpots((all) => all.map((x) => x.id === sp.id ? { ...x, name: e.target.value } : x))}
+                  onBlur={(e) => {
+                    const next = spots.map((x) => x.id === sp.id ? { ...x, name: e.target.value } : x).filter((x) => x.name.trim());
+                    setSpots(next); void saveSpots(next);
+                  }} />
+                <input aria-label="Maps URL" value={sp.mapsUrl} placeholder="Google Maps URL" inputMode="url"
+                  onChange={(e) => setSpots((all) => all.map((x) => x.id === sp.id ? { ...x, mapsUrl: e.target.value } : x))}
+                  onBlur={(e) => {
+                    const next = spots.map((x) => x.id === sp.id ? { ...x, mapsUrl: e.target.value } : x).filter((x) => x.name.trim());
+                    setSpots(next); void saveSpots(next);
+                  }} />
+                <button type="button" className="spot-x" aria-label={`${sp.name || "場所"}を削除`}
+                  onClick={() => void saveSpots(spots.filter((x) => x.id !== sp.id))}>×</button>
+              </div>
+            ))}
+            <button type="button" className="slot" onClick={() => setSpots((s) => [...s, { id: uid("p"), name: "", mapsUrl: "" }])}>場所を追加</button>
+            {shop === ELTON_SHOP && (
+              <div className="slot-edit" role="group" aria-label="場所の候補">
+                {ELTON_SPOTS.filter((s) => !spots.some((x) => x.name === s.name)).map((s) => (
+                  <button key={s.name} type="button" className="slot"
+                    onClick={() => void saveSpots([...spots.filter((x) => x.name.trim()), { id: uid("p"), name: s.name, mapsUrl: s.mapsUrl }])}>{s.name}</button>
+                ))}
+              </div>
+            )}
+          </div>
+        </details>
         <details className="opt">
           <summary>任意</summary>
           <div className="name-price">
