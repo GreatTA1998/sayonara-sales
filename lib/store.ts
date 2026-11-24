@@ -36,9 +36,6 @@ export type Store = {
 export const ELTON_SHOP = "elton";
 export const shopPublished = (shop: string, s: Store) => !!s.published || shop === ELTON_SHOP;
 
-/** Jimoty-appease (SS-314): flip true to restore LINE/電話 admin+checkout. Values stay in store. */
-export const ALLOW_LINE_PHONE_CONTACT = false;
-
 export function shopContact(shop: string, s: Store) {
   const jimotyUrl = (s.jimotyUrl || "").trim();
   const lineInviteUrl = (s.lineInviteUrl || "").trim();
@@ -48,10 +45,10 @@ export function shopContact(shop: string, s: Store) {
   return { jimotyUrl: "", lineInviteUrl: "", phone: "" };
 }
 
+/** Publish needs Jimoty or LINE (phone UI still hidden — SS-341). */
 export const hasBuyerContact = (shop: string, s: Store) => {
   const c = shopContact(shop, s);
-  if (!ALLOW_LINE_PHONE_CONTACT) return !!c.jimotyUrl;
-  return !!(c.jimotyUrl || c.lineInviteUrl || c.phone);
+  return !!(c.jimotyUrl || c.lineInviteUrl);
 };
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
