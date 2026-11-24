@@ -36,7 +36,13 @@ const dig5 = (s: string) => /^\d{5}$/.test(s);
 const isShop = (s: string) => dig5(s) || s === ELTON_ID;
 const newId = () => String(10000 + Math.floor(Math.random() * 90000));
 const norm = (s: string) => s.trim().toLowerCase();
-const knownId = (n: string) => KNOWN[norm(n)] || KNOWN[n.trim()] || "";
+/** Exact or LINE-suffix display → reserved shop (エルトンElton → elton). */
+const knownId = (n: string) => {
+  const k = norm(n);
+  return k
+    ? (Object.entries(KNOWN).find(([l]) => { const x = norm(l); return k === x || k.startsWith(x); }) || [])[1] || ""
+    : "";
+};
 
 export type SaleRow = {
   id: string; name: string; ward: string; href: string; mine: boolean;
@@ -165,20 +171,19 @@ export const getLineUid = () =>
   typeof window === "undefined" ? "" : (hydrate(), stored(UID_KEY));
 
 /**
- * Bind LINE OAuth userId → shop; soft-upgrade LINE display name (keeps Jimoty if set).
- * Soft shop / OAuth hint always win (soft-owner reclaim); name mismatch never spawns a 2nd shop.
+ * Bind LINE OAuth uid → shop. Soft/hint/known|map reclaim beat stale uid→dig5; display ≠ shop key.
  */
 export const bindLineUser = (uid: string, displayName: string, shopHint = "") => {
   if (typeof window === "undefined" || !uid.trim()) return "";
   const umap = readUidMap();
+  const map = readMap();
   const cur = getId();
   const hint = isShop(shopHint) ? shopHint : "";
   const name = displayName.trim();
-  let id = (isShop(cur) ? cur : "") || hint || umap[uid] || knownId(name) || "";
+  let id = (isShop(cur) ? cur : "") || hint || knownId(name) || (name && map[norm(name)]) || umap[uid] || "";
   localStorage.setItem(UID_KEY, uid);
   if (!isShop(id)) id = ensureShopId();
   if (name) {
-    const map = readMap();
     map[norm(name)] = id;
     localStorage.setItem(MAP_KEY, JSON.stringify(map));
     localStorage.setItem(LINE_KEY, name);
