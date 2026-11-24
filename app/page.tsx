@@ -62,8 +62,8 @@ export default function HomePage() {
     <main className="home">
       <h1 className="slogan">非公式ジモティーお助けツール</h1>
       <p className="subhero">受付中かどうかをリアルタイムで確認して受け渡し日時を予約、あとはジモティーで連絡して取引完了</p>
-      <button type="button" className="cta go home-cta"
-        onClick={() => router.push(adminPath(ensureShopId()))}>2クリックで始める</button>
+      <button type="button" className="cta home-cta"
+        onClick={() => router.push(adminPath(ensureShopId()))}>投稿</button>
       <div className="home-browse">
         <div className="shop-tabs" role="tablist" aria-label="ショップ一覧">
           {cards.length ? cards.map((c) => (
