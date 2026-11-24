@@ -208,11 +208,10 @@ export default function ShopAdminView({ shop, name }: Props) {
   const claims = data?.claims || [];
   const claimOpen = useMemo(() => claims.find((c) => c.id === claimId) || null, [claims, claimId]);
   /** Booked claim waiters for the open item — FIFO order for seller. */
-  const openWaiters = useMemo(() => {
-    if (!open?.claimId) return [] as { account: string; at: string }[];
-    const c = claims.find((x) => x.id === open.claimId);
-    return c?.status === "booked" ? (c.waiters || []).filter((w) => w.account) : [];
-  }, [open, claims]);
+  const openWaiters = useMemo(
+    () => (open && data ? itemFlags(data as Store, open).waitAs : []),
+    [open, data],
+  );
   const requests = claims.filter((c) => c.status === "requested");
   const pending = claims.filter((c) => c.status === "booked" || (showDone && c.status === "picked_up"));
   const hasDone = claims.some((c) => c.status === "picked_up");
@@ -1214,7 +1213,7 @@ export default function ShopAdminView({ shop, name }: Props) {
             <DateField label="この日以降" optional value={editAfter}
               onChange={(v) => { if (!busyOpen) patchEdit("after", v); }} />
             {openWaiters.length > 0 ? (
-              <p className="hint">待ち {openWaiters.map((w, i) => `${i + 1}.${w.account}`).join(" → ")}</p>
+              <p className="sw">待ち {openWaiters.map((a, i) => `${i + 1}.${a}`).join(" → ")}</p>
             ) : null}
             <button type="button" className="cta soft" disabled={busyOpen}
               onClick={() => void togglePause(open)}>

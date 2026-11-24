@@ -180,15 +180,17 @@ function claimOf(s: Store, item: Item) {
   return item.claimId ? s.claims.find((c) => c.id === item.claimId) : undefined;
 }
 
-/** taken = locked; sold = 引取済; booked → when + 予約済; reqN = pending 依頼; waitN = FIFO waiters. */
+/** taken = locked; sold = 引取済; booked → when + 予約済; reqN = pending 依頼; waitN/waitAs = FIFO waiters. */
 export function itemFlags(s: Store, item: Item) {
   const c = claimOf(s, item);
   const sold = c?.status === "picked_up";
   const taken = c?.status === "booked" || sold;
+  const waitAs = c?.status === "booked" ? (c.waiters || []).map((w) => w.account).filter(Boolean) : [];
   return {
     taken, sold,
     reqN: taken ? 0 : s.claims.reduce((n, x) => n + (x.status === "requested" && x.itemIds.includes(item.id) ? 1 : 0), 0),
-    waitN: c?.status === "booked" ? (c.waiters?.length || 0) : 0,
+    waitN: waitAs.length,
+    waitAs,
     ...(c?.status === "booked" && c.day ? { when: `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}` } : {}),
   };
 }
