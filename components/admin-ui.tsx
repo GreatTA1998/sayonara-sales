@@ -766,7 +766,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const editMask = useMaskDismiss(closeEdit, busyOpen);
   const empty = !!data && !items.length;
   const forms = !empty || setup === "manual";
-  const areaN = Math.max(2, Array.from(addrDraft || "目黒").length);
+  const areaN = Math.max(2, Array.from(addrDraft).length);
 
   return (
     <main className="buy admin">
@@ -776,7 +776,7 @@ export default function ShopAdminView({ shop, name }: Props) {
             <input value={addrDraft} disabled={!data} size={areaN}
             style={{ width: `${areaN}em` }}
             onChange={(e) => onAddressChange(e.target.value)}
-            placeholder="目黒" autoComplete="address-level2" />
+            autoComplete="address-level2" />
           <span aria-hidden="true">区</span>
         </label>
         <span className="spacer" aria-hidden="true" />
