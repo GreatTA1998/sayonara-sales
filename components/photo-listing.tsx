@@ -3,7 +3,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { byPrice, type PriceDir } from "@/lib/sale";
 import "./photo-layout.css";
 
-export type PhotoItem = { id: string; name: string; price: number | null; note?: string; photos?: string[]; badge?: string };
+export type PhotoItem = { id: string; name: string; price: number | null; note?: string; photos?: string[] };
 export { byPrice, type PriceDir };
 
 const PRICE_DIR_KEY = "ss-price-dir";
@@ -109,12 +109,11 @@ function PhotoCard({
   const name = labelName(item.name);
   const n = photos.length;
   const aria = n > 1 ? `${name}, ${n} photos` : name;
-  const badge = item.badge;
 
   return (
     <button type="button" disabled={disabled} aria-label={aria} onClick={onClick}
       className={`xcard${dense ? " dense" : ""}${cls}`}>
-      <div className="xphoto" {...(badge ? { "data-badge": badge } : {})}>
+      <div className="xphoto">
         <img src={src} alt="" loading="lazy" decoding="async" />
         <MultiPhotoHint count={n} />
       </div>
@@ -135,10 +134,9 @@ function TextTile({
 }) {
   const name = labelName(item.name);
   const cls = className ? ` ${className}` : "";
-  const badge = item.badge;
   return (
     <button type="button" disabled={disabled} aria-label={name} onClick={onClick}
-      className={`xtxt${dense ? " dense" : ""}${cls}`} {...(badge ? { "data-badge": badge } : {})}>
+      className={`xtxt${dense ? " dense" : ""}${cls}`}>
       {!dense && item.price != null ? <span className="xprice">{money(item.price)}</span> : null}
       <span className={`xname${!item.name?.trim() ? " empty" : ""}`}>{name}</span>
     </button>
