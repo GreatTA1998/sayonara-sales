@@ -9,7 +9,7 @@ import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { dayLbl, daysBetween, tokyoYmd } from "@/lib/days";
 import { DECLINE_PRESETS, DEF_LEAD, ELTON_SPOTS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
 import { adminAct, listenShop } from "@/lib/live";
-import { forgetShop, getName, getProfile, openShop, saveProfile, subscribeAuth } from "@/lib/shop";
+import { forgetShop, getName, getProfile, openLogin, openShop, saveProfile, subscribeAuth } from "@/lib/shop";
 import {
   ALLOW_LINE_PHONE_CONTACT, ELTON_SHOP, itemFlags, pickupDays, shopMins, shopPublished, uid,
   type PickupSpot, type Store,
@@ -782,7 +782,7 @@ export default function ShopAdminView({ shop, name }: Props) {
         <span className="spacer" aria-hidden="true" />
         {logged && pub === "on" && <button type="button" className="share" onClick={copyUrl}>URLコピー</button>}
         <button type="button" className="req"
-          onClick={!logged ? () => router.push("/me") : pub === "on" ? () => router.push(`/s/${shop}`) : publish}>
+          onClick={!logged ? openLogin : pub === "on" ? () => router.push(`/s/${shop}`) : publish}>
           {!logged ? "ログインして保存" : pub === "on" ? "店舗を見る" : "公開する"}
         </button>
       </header>

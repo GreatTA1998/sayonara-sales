@@ -8,7 +8,7 @@ import { useLineOAuthReturn } from "@/components/line-oauth";
 import { SoftLoginForm } from "@/components/soft-login";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { listenPendingRequests } from "@/lib/live";
-import { adminPath, ensureShopId, getId, getName, subscribeAuth } from "@/lib/shop";
+import { adminPath, ensureShopId, getId, getName, LOGIN_OPEN_EVT, subscribeAuth } from "@/lib/shop";
 
 type Shot = { preview: string; url?: string; err?: string };
 
@@ -38,6 +38,11 @@ export default function AppNav() {
   }, [shopId]);
   useLineOAuthReturn();
   useEffect(() => { setOpen(""); }, [path]);
+  useEffect(() => {
+    const openLogin = () => setOpen("me");
+    window.addEventListener(LOGIN_OPEN_EVT, openLogin);
+    return () => window.removeEventListener(LOGIN_OPEN_EVT, openLogin);
+  }, []);
   useEffect(() => {
     if (!open) return;
     const sel = open === "help" ? ".nav-help" : ".nav-me";
