@@ -6,7 +6,7 @@ import { byPrice, Listings, ListingTools, Seg, useDense, usePriceDir, useShowSol
 import SquareCam from "@/components/square-cam";
 import { Snack, useBodyScrollLock, useMaskDismiss, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
-import { dayLbl, relativeDay } from "@/lib/days";
+import { dayLbl, relativeDay, tokyoYmd } from "@/lib/days";
 import { DECLINE_PRESETS, DEF_LEAD, ELTON_SPOTS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
 import { adminAct, listenShop } from "@/lib/live";
 import { forgetShop, getName, getProfile, openLogin, openShop, saveProfile, subscribeAuth } from "@/lib/shop";
