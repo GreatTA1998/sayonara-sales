@@ -117,7 +117,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [slotB, setSlotB] = useState("11:15");
   const [slotOpen, setSlotOpen] = useState(false);
   const [pickupTo, setPickupTo] = useState("");
-  const [leadDays, setLeadDays] = useState<number | "">(DEF_LEAD);
+  const [leadDays, setLeadDays] = useState(DEF_LEAD);
   const [minItems, setMinItems] = useState(0);
   const [minTotal, setMinTotal] = useState(0);
   const [listOpen, setListOpen] = useState(false);
@@ -697,7 +697,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     else if (body) setSpots(next);
   }
 
-  async function saveDates(to: string, lead = leadDays === "" ? 0 : leadDays) {
+  async function saveDates(to: string, lead = leadDays) {
     const body = await act({
       action: "dates", pickupFrom: tokyoYmd(), pickupTo: to, moveOut: to, leadDays: lead,
     }, "保存しました");
@@ -994,17 +994,14 @@ export default function ShopAdminView({ shop, name }: Props) {
           <DateField label="退去日" value={pickupTo} onChange={(v) => { setPickupTo(v); void saveDates(v); }} />
           <label className="float lead"><span>最短予約</span>
             <span className="lead-row">
-              <input type="number" min={0} inputMode="numeric" aria-label="最短予約（日前）"
-                value={leadDays}
+              <select aria-label="最短予約（日前）" value={leadDays}
                 onChange={(e) => {
-                  const v = e.target.value;
-                  setLeadDays(v === "" ? "" : Math.max(0, Math.floor(Number(v)) || 0));
-                }}
-                onBlur={() => {
-                  const n = leadDays === "" ? 0 : leadDays;
+                  const n = Number(e.target.value);
                   setLeadDays(n);
                   void saveDates(pickupTo, n);
-                }} />
+                }}>
+                {Array.from({ length: 15 }, (_, i) => <option key={i} value={i}>{i}</option>)}
+              </select>
               <span aria-hidden="true">日前</span>
             </span>
           </label>
