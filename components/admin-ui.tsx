@@ -6,7 +6,7 @@ import { byPrice, Listings, ListingTools, Seg, useDense, usePriceDir, useShowSol
 import SquareCam from "@/components/square-cam";
 import { Snack, useBodyScrollLock, useMaskDismiss, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
-import { dayLbl, daysBetween, tokyoYmd } from "@/lib/days";
+import { dayLbl, relativeDay } from "@/lib/days";
 import { DECLINE_PRESETS, DEF_LEAD, ELTON_SPOTS, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
 import { adminAct, listenShop } from "@/lib/live";
 import { forgetShop, getName, getProfile, openLogin, openShop, saveProfile, subscribeAuth } from "@/lib/shop";
@@ -50,8 +50,7 @@ function claimItems(c: Claim, all: Item[]) {
 }
 const claimWho = (c: Claim) => (c.contact && c.contact !== "LINE" && c.contact !== "ジモティー" ? c.contact : "");
 function ClaimRow({ c, items, onOpen }: { c: Claim; items: Item[]; onOpen: (id: string) => void }) {
-  const its = claimItems(c, items), n = daysBetween(tokyoYmd(), c.day).length - 1;
-  const soon = n === 0 ? "今日" : n === 1 ? "明日" : n > 0 && n <= 3 ? `あと${n}日` : "";
+  const its = claimItems(c, items), soon = relativeDay(c.day, 3);
   const who = claimWho(c);
   const text = its.filter((it) => !it.photos?.[0]).map(itemLabel).join("、");
   return (
@@ -200,7 +199,13 @@ export default function ShopAdminView({ shop, name }: Props) {
     () => [...(data?.items || [])].sort(byPrice(priceDir)),
     [data?.items, priceDir],
   );
-  const listItems = showSold || !data ? items : items.filter((it) => !itemFlags(data as Store, it).sold);
+  const listItems = useMemo(() => {
+    const base = showSold || !data ? items : items.filter((it) => !itemFlags(data as Store, it).sold);
+    return !data ? base : base.map((it) => {
+      const b = itemFlags(data as Store, it).badge;
+      return b ? { ...it, badge: b } : it;
+    });
+  }, [items, showSold, data]);
   const open = useMemo(() => items.find((i) => i.id === openId) || null, [items, openId]);
   const pics = useMemo(() => {
     if (!open) return [] as string[];

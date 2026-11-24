@@ -37,3 +37,12 @@ export function moveOutLeft(days: string[]) {
   const left = daysBetween(tokyoYmd(), days[days.length - 1]);
   return left.length ? `退去まであと${left.length - 1}日` : "";
 }
+
+/** 今日 / 明日; else あとN日 (claim) or N日後 (listing when `later`). `max` caps N. */
+export function relativeDay(day: string, max = 99, later = false) {
+  const n = daysBetween(tokyoYmd(), day).length - 1;
+  if (n === 0) return "今日";
+  if (n === 1) return "明日";
+  if (n > 1 && n <= max) return later ? `${n}日後` : `あと${n}日`;
+  return "";
+}

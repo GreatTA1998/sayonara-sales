@@ -13,7 +13,7 @@ import { telHref, ytUrl } from "@/lib/sale";
 
 type Item = {
   id: string; name: string; price: number | null; note?: string;
-  taken: boolean; sold?: boolean; reqN?: number; when?: string; photos?: string[];
+  taken: boolean; sold?: boolean; reqN?: number; when?: string; badge?: string; photos?: string[];
 };
 type State = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;

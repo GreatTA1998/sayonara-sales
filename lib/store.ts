@@ -1,4 +1,4 @@
-import { addDays, dayLbl, daysBetween, tokyoYmd } from "./days";
+import { addDays, dayLbl, daysBetween, relativeDay, tokyoYmd } from "./days";
 import { CANON_LINE, CANON_PHONE, DEF_LEAD, PICKUP_SLOTS, ytUrl } from "./sale";
 
 export type Item = {
@@ -177,15 +177,19 @@ function claimOf(s: Store, item: Item) {
   return item.claimId ? s.claims.find((c) => c.id === item.claimId) : undefined;
 }
 
-/** taken = locked; sold = 引取済; booked → when + 予約済; reqN = pending 依頼. */
+/** taken = locked; sold = 引取済; booked → when + badge 予約済 N日後; reqN = pending 依頼. */
 export function itemFlags(s: Store, item: Item) {
   const c = claimOf(s, item);
   const sold = c?.status === "picked_up";
   const taken = c?.status === "booked" || sold;
+  const rel = c?.status === "booked" && c.day ? relativeDay(c.day, 99, true) : "";
   return {
     taken, sold,
     reqN: taken ? 0 : s.claims.reduce((n, x) => n + (x.status === "requested" && x.itemIds.includes(item.id) ? 1 : 0), 0),
-    ...(c?.status === "booked" && c.day ? { when: `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}` } : {}),
+    ...(c?.status === "booked" ? {
+      ...(c.day ? { when: `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}` } : {}),
+      badge: rel ? `予約済 ${rel}` : "予約済",
+    } : {}),
   };
 }
 
