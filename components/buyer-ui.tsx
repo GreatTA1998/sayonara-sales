@@ -238,12 +238,19 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
       </header>
       {bioShow ? <p className="hint bio">{bioShow}</p> : null}
       {rule ? <p className="hint rule">{rule}</p> : null}
-      {state?.jimotyUrl ? (
+      {(state?.jimotyUrl || yt) ? (
         <p className="ext-links">
-          <a className="ext-link" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">
-            {name}のジモティープロフィール
-          </a>
-          {/* 内見動画 temporarily hidden (SS-315); admin youtubeUrl kept. */}
+          {state?.jimotyUrl ? (
+            <a className="ext-link" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">
+              {name}のジモティープロフィール
+            </a>
+          ) : null}
+          {yt ? (
+            <a className="ext-link" href={yt} target="_blank" rel="noopener noreferrer">
+              <img className="ext-ico" src="/youtube.svg" alt="" width={16} height={16} />
+              内見動画
+            </a>
+          ) : null}
         </p>
       ) : null}
       {err && !checkout && !open && <div className="err">{err}</div>}
