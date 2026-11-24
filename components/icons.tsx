@@ -47,7 +47,17 @@ export function IconBtn({
     </button>
   );
 }
-export function DateField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  return <label className="float date-field"><span>{label}</span><span className="date-ctl">
-    <input type="date" value={value} aria-label={label} onClick={(e) => { try { e.currentTarget.showPicker?.(); } catch {} }} onChange={(e) => onChange(e.target.value)} /></span></label>;
+export function DateField({ label, value, onChange, optional }: {
+  label: string; value: string; onChange: (v: string) => void; optional?: boolean;
+}) {
+  const title = optional ? `${label}（任意）` : label;
+  return <label className="float date-field"><span>{title}</span>
+    <span className={`date-ctl${optional && value ? " has-x" : ""}`}>
+      <input type="date" value={value} aria-label={title}
+        onClick={(e) => { try { e.currentTarget.showPicker?.(); } catch {} }}
+        onChange={(e) => onChange(e.target.value)} />
+      {optional && value ? <button type="button" className="date-x" aria-label="なしに戻す"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={(e) => { e.preventDefault(); onChange(""); }}>×</button> : null}
+    </span></label>;
 }

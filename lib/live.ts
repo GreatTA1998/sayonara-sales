@@ -503,7 +503,7 @@ export async function bookShop(shopRaw: string, body: {
       };
     });
     const after = cartAfter(items);
-    if (after && day < after) throw new Error(`受取可能日は${dayLbl(after)}以降です`);
+    if (after && day < after) throw new Error(`${dayLbl(after)}以降に受け取れます`);
     // Claims may move under us — re-check status inside the tx.
     const claimCache = new Map<string, string>();
     for (const it of items) {

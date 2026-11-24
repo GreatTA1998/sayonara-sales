@@ -263,7 +263,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             <h2>{open.name}</h2>
             {open.note ? <p className="sn">{open.note}</p> : null}
             {open.availableAfter && open.availableAfter > tokyoYmd() ? (
-              <p className="hint">受取可能日 {dayLbl(open.availableAfter)}〜</p>
+              <p className="hint">{dayLbl(open.availableAfter)}以降受取可</p>
             ) : null}
             {soldOpen ? (
               <p className="sw sold">引取済</p>
