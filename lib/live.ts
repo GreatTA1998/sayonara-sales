@@ -438,10 +438,15 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
   }
 }
 
-/** Buyer waitlist — transactional append (no stale waiters RMW). */
-export async function joinWaitLive(shopRaw: string, itemId: string, account: string) {
+type Waiter = { account?: string; at?: string };
+const waitersOf = (data: Record<string, unknown> | undefined) =>
+  Array.isArray(data?.waiters) ? data!.waiters as Waiter[] : [];
+
+/** Buyer waitlist — transactional append (FIFO; no stale waiters RMW). */
+export async function joinWaitLive(shopRaw: string, itemId: string, account: string, aliases: string[] = []) {
   const shop = parseShop(shopRaw);
   const a = account.trim();
+  const keys = [...new Set([a, ...aliases.map((x) => x.trim())].filter(Boolean))];
   if (!a) throw new Error("アカウントが必要です");
   await ensureAuth();
   const db = getDb();
@@ -454,9 +459,34 @@ export async function joinWaitLive(shopRaw: string, itemId: string, account: str
     const csnap = await tx.get(cref);
     const st = csnap.exists() ? String(csnap.data()!.status || "") : "";
     if (st !== "booked") throw new Error("待機できません");
-    const prev = Array.isArray(csnap.data()!.waiters) ? csnap.data()!.waiters as { account?: string; at?: string }[] : [];
-    if (prev.some((w) => w.account === a)) return { ok: true as const };
+    const prev = waitersOf(csnap.data());
+    if (prev.some((w) => keys.includes(String(w.account || "")))) return { ok: true as const };
     tx.update(cref, { waiters: [...prev, { account: a, at: new Date().toISOString() }] });
+    return { ok: true as const };
+  });
+}
+
+/** Leave waitlist — drop matching accounts (name and/or soft shop id). */
+export async function leaveWaitLive(shopRaw: string, itemId: string, accounts: string[]) {
+  const shop = parseShop(shopRaw);
+  const keys = [...new Set(accounts.map((a) => a.trim()).filter(Boolean))];
+  if (!keys.length) throw new Error("アカウントが必要です");
+  await ensureAuth();
+  const db = getDb();
+  return runTransaction(db, async (tx) => {
+    const itemSnap = await tx.get(doc(db, "shops", shop, "items", itemId));
+    if (!itemSnap.exists()) throw new Error("品目が見つかりません");
+    const claimId = itemSnap.data().claimId ? String(itemSnap.data().claimId) : "";
+    if (!claimId) throw new Error("待機していません");
+    const cref = doc(db, "shops", shop, "claims", claimId);
+    const csnap = await tx.get(cref);
+    if (!csnap.exists() || String(csnap.data()!.status || "") !== "booked") {
+      throw new Error("待機していません");
+    }
+    const prev = waitersOf(csnap.data());
+    const next = prev.filter((w) => !keys.includes(String(w.account || "")));
+    if (next.length === prev.length) return { ok: true as const };
+    tx.update(cref, { waiters: next });
     return { ok: true as const };
   });
 }

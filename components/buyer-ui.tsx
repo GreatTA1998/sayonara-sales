@@ -3,7 +3,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { byPrice, Listings, ListingTools, money, Seg, useDense, usePriceDir, useShowSold } from "@/components/photo-listing";
 import { useBodyScrollLock, useMaskDismiss } from "@/components/snack";
 import { afterLbl, dayLbl, moveOutLeft, tokyoYmd } from "@/lib/days";
-import { bookShop, joinWaitLive, listenShop } from "@/lib/live";
+import { bookShop, joinWaitLive, leaveWaitLive, listenShop } from "@/lib/live";
 import { applyLineSession, getId, getName, openShop, pushBuy, subscribeAuth } from "@/lib/shop";
 import {
   bookableDays, cartAfter, cartRule, itemFlags, shopContact, shopMins, shopSlots,
@@ -13,7 +13,7 @@ import { telHref, ytUrl } from "@/lib/sale";
 
 type Item = {
   id: string; name: string; price: number | null; note?: string;
-  taken: boolean; sold?: boolean; reqN?: number; when?: string; photos?: string[];
+  taken: boolean; sold?: boolean; reqN?: number; waitN?: number; when?: string; photos?: string[];
   availableAfter?: string; after?: string;
 };
 type State = {
@@ -31,17 +31,19 @@ const CH = { jimoty: ["ジモティー", "メッセージ済み", "ジモティ�
 
 /** Confirmed only — pending is disclaimer + still 依頼可. */
 const locked = (i: Item) => i.taken;
+const mineKeys = () => [getId(), getName()].map((s) => s.trim()).filter(Boolean);
 
-function toBuyerState(shop: string, s: Store, account: string): State {
+function toBuyerState(shop: string, s: Store): State {
   const days = bookableDays(s);
   const slots = shopSlots(s);
   const contact = shopContact(shop, s);
   const taken: Record<string, string[]> = {};
   for (const d of days) taken[d] = takenSlots(s, d);
-  const waiting = account
+  const keys = mineKeys();
+  const waiting = keys.length
     ? s.items.filter((it) => {
         const c = s.claims.find((x) => x.id === it.claimId);
-        return !!c?.waiters?.some((w) => w.account === account);
+        return !!c?.waiters?.some((w) => keys.includes(w.account));
       }).map((it) => it.id)
     : [];
   return {
@@ -97,7 +99,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
       if (Array.isArray(raw)) setPicked(new Set(raw.map(String)));
     } catch { /* ignore */ }
     const unsub = listenShop(shop, (s) => {
-      const next = toBuyerState(shop, s, getId());
+      const next = toBuyerState(shop, s);
       setState(next);
       setOpen((o) => (o ? next.items.find((i) => i.id === o.id) || o : null));
       setDay((d) => (d && next.days?.includes(d) ? d : (next.days?.[0] || "")));
@@ -158,12 +160,35 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   async function joinWait(id: string) {
     const n = (getName() || lineName).trim();
     if (!n) { setErr("ジモティ名を入力してください"); return; }
-    const account = openShop(n) || n;
+    openShop(n);
     setLineName(n); setErr(null); setBusy(true);
     try {
-      await joinWaitLive(shop, id, account);
-      setState((prev) => prev && { ...prev, waiting: [...new Set([...(prev.waiting || []), id])] });
-      setOpen(null);
+      // Display name = waiter key (admin FIFO); aliases skip dig5/name dupes.
+      await joinWaitLive(shop, id, n, mineKeys());
+      setState((prev) => {
+        if (!prev) return prev;
+        const was = prev.waiting?.includes(id);
+        return {
+          ...prev,
+          waiting: [...new Set([...(prev.waiting || []), id])],
+          items: was ? prev.items : prev.items.map((it) => it.id === id ? { ...it, waitN: (it.waitN || 0) + 1 } : it),
+        };
+      });
+    } catch (e) { setErr(e instanceof Error ? e.message : "失敗しました"); }
+    finally { setBusy(false); }
+  }
+
+  async function leaveWait(id: string) {
+    const keys = [...new Set([...mineKeys(), lineName.trim()].filter(Boolean))];
+    if (!keys.length) { setErr("ジモティ名を入力してください"); return; }
+    setErr(null); setBusy(true);
+    try {
+      await leaveWaitLive(shop, id, keys);
+      setState((prev) => prev && {
+        ...prev,
+        waiting: (prev.waiting || []).filter((x) => x !== id),
+        items: prev.items.map((it) => it.id === id ? { ...it, waitN: Math.max(0, (it.waitN || 1) - 1) } : it),
+      });
     } catch (e) { setErr(e instanceof Error ? e.message : "失敗しました"); }
     finally { setBusy(false); }
   }
@@ -270,15 +295,16 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             ) : takenOpen ? (
               <>
                 <p className="sw sold">予約済{open.when ? ` — ${open.when}` : ""}</p>
+                {open.waitN ? <p className="sw">{open.waitN}人待ち</p> : null}
                 {needWlName && (
                   <label className="float"><span>ジモティ名</span>
                     <input value={lineName} onChange={(e) => setLineName(e.target.value)}
                       placeholder="表示名" autoComplete="nickname" enterKeyHint="done" /></label>
                 )}
                 {err && <div className="err">{err}</div>}
-                <button type="button" className={`cta${waiting ? " soft" : " go"}`} disabled={waiting || busy}
-                  onClick={() => void joinWait(open.id)}>
-                  {waiting ? "キャンセル待ち中" : "キャンセル待ち"}
+                <button type="button" className={`cta${waiting ? " soft" : " go"}`} disabled={busy}
+                  onClick={() => void (waiting ? leaveWait(open.id) : joinWait(open.id))}>
+                  {waiting ? "順番をやめる" : "キャンセル待ち"}
                 </button>
               </>
             ) : (
