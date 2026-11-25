@@ -848,7 +848,7 @@ export default function ShopAdminView({ shop, name }: Props) {
       {empty && (
         <div className="prof-block">
           <Seg label="設定" value={setup} onPick={(v) => setSetup(v as "one" | "manual")}
-            opts={[["one", "ワンクリック設定"], ["manual", "手動設定"]]} />
+            opts={[["one", "ジモティーから取り込む"], ["manual", "最初から出品"]]} />
         </div>
       )}
       {forms && (
@@ -873,13 +873,11 @@ export default function ShopAdminView({ shop, name }: Props) {
         </section>
       )}
 
-      {empty && (setup === "one" || contactMode === "jimoty") && (
+      {empty && setup === "one" && (
         <div className="jm-hero">
           {!jmPrev && !jmCands.length && (
             <>
-              {setup === "one" && (
-                <p className="jm-who">ジモティー名を入力すると、ボットが出品を自動で取り込みます</p>
-              )}
+              <p className="jm-who">ジモティー名を入力すると、ボットが出品を自動で取り込みます</p>
               <div className="jm-row">
                 <input value={jmDraft} disabled={jmBusy || !data}
                   placeholder="ジモティー名" aria-label="ジモティー名"
@@ -960,13 +958,14 @@ export default function ShopAdminView({ shop, name }: Props) {
         </div>
       )}
 
-      {empty && shop !== ELTON_SHOP && data && (setup === "manual" || !!jimoty.trim()) && (
-        <p className="hint">
+      {/* Empty Jimoty-import phantoms only — never 最初から出品 / local ss-profile bleed (SS-379). */}
+      {empty && shop !== ELTON_SHOP && !!data?.jimotyUrl?.trim() && (
+        <div className="prof-block">
           <button type="button" className="share" disabled={delShopBusy}
             onClick={() => void deleteEmptyShop()}>
             {delShopBusy ? "削除中…" : "このショップを削除"}
           </button>
-        </p>
+        </div>
       )}
 
       {!empty && (
