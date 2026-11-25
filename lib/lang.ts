@@ -33,7 +33,7 @@ const S: Record<string, [string, string]> = {
   "login.hint": ["任意：あとでLINEでアカウントを保護できます", "Optional: secure this account with LINE later"],
   "home.slogan": ["非公式ジモティーお助けツール", "Unofficial Jimoty helper"],
   "home.sub": ["受付中かどうかをリアルタイムで確認して受け渡し日時を予約、あとはジモティーで連絡して取引完了", "Check live availability, book a pickup time, then finish on Jimoty"],
-  "home.cta": ["2クリックで始める", "Start in 2 clicks"],
+  "home.cta": ["出品を始める", "Start listing"],
   "home.tabs": ["ショップ一覧", "Shops"],
   "home.copy": ["URLコピー", "Copy URL"],
   "home.copied": ["コピーしました", "Copied"],
