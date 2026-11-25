@@ -24,7 +24,13 @@ const dig5 = (s: string) => /^\d{5}$/.test(s);
 const isShop = (s: string) => dig5(s) || s === ELTON_ID;
 const newId = () => String(10000 + Math.floor(Math.random() * 90000));
 const norm = (s: string) => s.trim().toLowerCase();
-const knownId = (n: string) => KNOWN[norm(n)] || KNOWN[n.trim()] || "";
+/** Exact or LINE-suffix display → reserved shop (エルトンElton → elton). */
+const knownId = (n: string) => {
+  const k = norm(n);
+  return k
+    ? (Object.entries(KNOWN).find(([l]) => { const x = norm(l); return k === x || k.startsWith(x); }) || [])[1] || ""
+    : "";
+};
 
 export type SaleRow = {
   id: string; name: string; ward: string; href: string; mine: boolean;
@@ -156,21 +162,36 @@ export const openShop = (n: string, kind: "jimoty" | "line" | "facebook" = "jimo
 export const getLineUid = () =>
   typeof window === "undefined" ? "" : (hydrate(), stored(UID_KEY));
 
+/** Firestore shop stamped with this LINE uid (shops.*.ownerLineUid). */
+async function shopByOwnerLineUid(uid: string): Promise<string> {
+  if (!uid) return "";
+  try {
+    const { getDb } = await import("./fb");
+    const { collection, getDocs, limit, query, where } = await import("firebase/firestore");
+    const snap = await getDocs(
+      query(collection(getDb(), "shops"), where("ownerLineUid", "==", uid), limit(1)),
+    );
+    const id = snap.docs[0]?.id || "";
+    return isShop(id) ? id : "";
+  } catch { return ""; }
+}
+
 /**
- * Bind LINE OAuth userId → shop; soft-upgrade LINE display name (keeps Jimoty if set).
- * Soft shop / OAuth hint always win (soft-owner reclaim); name mismatch never spawns a 2nd shop.
+ * Bind LINE OAuth → shop. Firestore ownerLineUid stamp wins over stale
+ * ss-shop-id / umap dig5. Else first bind: soft cur/hint → local umap.
  */
-export const bindLineUser = (uid: string, displayName: string, shopHint = "") => {
+export const bindLineUser = (uid: string, displayName: string, shopHint = "", stamped = "") => {
   if (typeof window === "undefined" || !uid.trim()) return "";
   const umap = readUidMap();
+  const map = readMap();
   const cur = getId();
   const hint = isShop(shopHint) ? shopHint : "";
+  const stamp = isShop(stamped) ? stamped : "";
   const name = displayName.trim();
-  let id = (isShop(cur) ? cur : "") || hint || umap[uid] || knownId(name) || "";
+  let id = stamp || (isShop(cur) ? cur : "") || hint || umap[uid] || knownId(name) || "";
   localStorage.setItem(UID_KEY, uid);
   if (!isShop(id)) id = ensureShopId();
   if (name) {
-    const map = readMap();
     map[norm(name)] = id;
     localStorage.setItem(MAP_KEY, JSON.stringify(map));
     localStorage.setItem(LINE_KEY, name);
@@ -190,8 +211,9 @@ export const applyLineSession = async () => {
   if (!res.ok) return null;
   const body = await res.json() as { ok?: boolean; uid?: string; name?: string; shop?: string };
   if (!body.ok || !body.uid || !body.name) return null;
-  bindLineUser(body.uid, body.name, body.shop || "");
-  return body;
+  const stamped = await shopByOwnerLineUid(body.uid);
+  const id = bindLineUser(body.uid, body.name, body.shop || "", stamped);
+  return { ...body, shop: id };
 };
 
 /** Clear soft names + shop pointer + optional LINE session (map/known reclaim on next sign-in). */

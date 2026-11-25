@@ -16,8 +16,15 @@ export function useLineOAuthReturn(onDone?: () => void) {
   useEffect(() => {
     const u = new URL(window.location.href);
     const dirty = u.searchParams.has("line_ok") || u.searchParams.has("line_err");
-    void applyLineSession().finally(() => {
+    void applyLineSession().then((s) => {
       if (dirty) cleanUrl();
+      // Stale dig5 path after LINE → stamped shop (ownerLineUid).
+      const id = s?.shop || getId();
+      const m = window.location.pathname.match(/^\/s\/([^/]+)(\/admin)?/);
+      if (id && m?.[1] && m[1] !== id && (dirty || m[2])) {
+        window.location.replace(m[2] ? `/s/${id}/admin` : `/s/${id}`);
+        return;
+      }
       onDone?.();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
