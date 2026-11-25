@@ -6,6 +6,7 @@
 .seg button:has(svg){display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;min-width:32px;padding:0}
 .seg button.on{background:#fff;color:var(--c);box-shadow:0 1px 2px rgba(0,0,0,.12)}
 .xgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr));gap:8px;padding:0 var(--page-px) 8px}
+.xgrid.skel .xcard{aspect-ratio:1;pointer-events:none;border:0;background:#eee}
 .xmore{position:absolute;right:5px;bottom:5px;z-index:1;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;background:rgba(0,0,0,.42);color:#fff;pointer-events:none}
 .xcard{display:flex;flex-direction:column;height:100%;width:100%;min-width:0;padding:0;border:1px solid #e5e5e5;border-radius:16px;background:#fff;overflow:hidden;cursor:pointer;font:inherit;color:inherit;text-align:left}
 .xcard.dense{border-radius:6px}

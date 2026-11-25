@@ -341,9 +341,9 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         <ListingTools dir={priceDir} onDir={setPriceDir} dense={dense} onDense={setDense}
           showSold={showSold} onShowSold={setShowSold} />
       )}
-      <Listings items={listItems} dense={dense} onSelect={(it) => { setErr(null); setOpenId(it.id); }}
+      <Listings items={listItems} dense={dense} loading={!state}
+        onSelect={(it) => { setErr(null); setOpenId(it.id); }}
         classNameFor={(item) => `${picked.has(item.id) ? "on" : ""}${item.sold ? " sold" : item.taken ? " booked" : item.reqN ? " req" : ""}`.trim()} />
-      {!state && <p className="text-sm text-muted pad">読み込み中…</p>}
       {open && !checkout && (
         <div className="mask drawer" role="dialog" aria-modal="true" aria-label={open.name} {...detailMask}>
           <div className="sheet drawer" onClick={(e) => e.stopPropagation()}>
