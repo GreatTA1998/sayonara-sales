@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, type ReactNode } from "react";
+import { t, useLang } from "@/lib/lang";
 import { byPrice, type PriceDir } from "@/lib/sale";
 import "./photo-layout.css";
 
@@ -64,15 +65,16 @@ export function ListingTools({
   dense: boolean; onDense: (on: boolean) => void;
   showSold: boolean; onShowSold: (on: boolean) => void;
 }) {
+  const lang = useLang();
   return (
     <div className="psort-row">
-      <Seg label="表示" value={dense ? "1" : "0"} onPick={(v) => onDense(v === "1")}
-        opts={[["0", <DensIco />, "通常"], ["1", <DensIco dense />, "密集"]]} />
-      <Seg label="価格順" value={dir} onPick={(v) => onDir(v as PriceDir)}
-        opts={[["asc", "安い順"], ["desc", "高い順"]]} />
+      <Seg label={t("sort.layout", lang)} value={dense ? "1" : "0"} onPick={(v) => onDense(v === "1")}
+        opts={[["0", <DensIco />, t("sort.spacious", lang)], ["1", <DensIco dense />, t("sort.dense", lang)]]} />
+      <Seg label={t("sort.price", lang)} value={dir} onPick={(v) => onDir(v as PriceDir)}
+        opts={[["asc", t("sort.asc", lang)], ["desc", t("sort.desc", lang)]]} />
       <label className="sold-tog">
         <input type="checkbox" checked={showSold} onChange={(e) => onShowSold(e.target.checked)} />
-        引取済
+        {t("filter.sold", lang)}
       </label>
     </div>
   );
