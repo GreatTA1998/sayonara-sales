@@ -383,15 +383,15 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
         </button>
       </header>
       {bioShow ? <p className="hint bio">{bioShow}</p> : null}
-      {rule ? <p className="ask">{rule}</p> : null}
-      {(state?.jimotyUrl || state?.facebookUrl) ? (
+      {(state?.jimotyUrl || state?.facebookUrl || rule) ? (
         <p className="ext-links">
-          {state.jimotyUrl ? (
+          {state?.jimotyUrl ? (
             <a className="ext-link" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">
               ジモティー
             </a>
           ) : null}
-          {state.facebookUrl ? (
+          {rule ? <span className="ask">{rule}</span> : null}
+          {state?.facebookUrl ? (
             <a className="ext-link fb" href={state.facebookUrl} target="_blank" rel="noopener noreferrer">
               Facebook Marketplace
             </a>
