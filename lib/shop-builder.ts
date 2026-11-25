@@ -4,12 +4,12 @@ import {
   type Firestore, type Transaction,
 } from "firebase/firestore";
 import { BlobPhotoError, isStoredPhoto, storeShopPhoto, storeShopPhotoFromUrl } from "./blob-photo";
-import { DEF_LEAD, DEF_MIN } from "./sale";
+import { DEF_LEAD, DEF_OFF } from "./sale";
 import { LIMITS } from "./shop-limits";
 import { SITE_URL } from "./site";
 import {
   ITEM_WRITE_KEYS, PICKUP_SPOT_KEYS, SHOP_SETTING_KEYS, applyShopSettings, asYmd, itemFields,
-  itemFlags, priceOf, settingsUpdate, shopFields, shopMins, shopSlots, storeFromDocs,
+  itemFlags, priceOf, settingsUpdate, shopFields, shopItemOff, shopSlots, storeFromDocs,
   unclaimedShopWrite, type Item, type Store,
 } from "./store";
 
@@ -99,7 +99,7 @@ function addSeconds(iso: string, seconds: number) {
   return new Date(Date.parse(iso) + seconds * 1000).toISOString();
 }
 function baseStore(): Store {
-  return { address: "", items: [], claims: [], leadDays: DEF_LEAD, minItems: DEF_MIN, published: false };
+  return { address: "", items: [], claims: [], leadDays: DEF_LEAD, itemOff: DEF_OFF, published: false };
 }
 function unknown(obj: Record<string, unknown>, allowed: readonly string[], path: string) {
   const extra = Object.keys(obj).filter((k) => !allowed.includes(k));
@@ -225,7 +225,7 @@ function parseSettings(raw: unknown) {
   for (const k of ["address", "bio", "jimotyUrl", "youtubeUrl", "facebookUrl", "lineInviteUrl", "phone"] as const) {
     if (k in o && typeof o[k] !== "string") throw bad(400, `settings.${k} must be a string`, { code: "validation" });
   }
-  for (const k of ["leadDays", "minItems", "minTotal"] as const) {
+  for (const k of ["leadDays", "itemOff"] as const) {
     if (k in o && (typeof o[k] !== "number" || !Number.isFinite(o[k] as number))) {
       throw bad(400, `settings.${k} must be a number`, { code: "validation" });
     }
@@ -295,7 +295,6 @@ function parseUpsert(body: unknown): UpsertIn {
 }
 
 function settingsOf(s: Store) {
-  const mins = shopMins(s);
   return {
     address: s.address || "",
     bio: s.bio || "",
@@ -310,8 +309,7 @@ function settingsOf(s: Store) {
     pickupTo: s.pickupTo || "",
     moveOut: s.moveOut || "",
     leadDays: s.leadDays ?? DEF_LEAD,
-    minItems: mins.minItems,
-    minTotal: mins.minTotal,
+    itemOff: shopItemOff(s),
   };
 }
 function itemJson(store: Store, it: Item): ItemJson {

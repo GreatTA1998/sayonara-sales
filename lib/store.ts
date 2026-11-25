@@ -1,5 +1,5 @@
 import { addDays, dayLbl, daysBetween, tokyoYmd } from "./days";
-import { CANON_LINE, CANON_PHONE, DEF_LEAD, PICKUP_SLOTS, ytUrl } from "./sale";
+import { CANON_LINE, CANON_PHONE, DEF_LEAD, DEF_OFF, PICKUP_SLOTS, ytUrl } from "./sale";
 
 export type Item = {
   id: string; name: string; price: number | null; note?: string; claimId?: string | null;
@@ -32,8 +32,8 @@ export type Store = {
   pickupSpots?: PickupSpot[];
   pickupFrom?: string; pickupTo?: string; moveOut?: string;
   leadDays?: number;
-  /** 0 = off. Both set → count OR ¥ total. */
-  minItems?: number; minTotal?: number;
+  /** Yen off per cart item. unset → DEF_OFF; 0 = off. Legacy minItems/minTotal ignored. */
+  itemOff?: number;
   published?: boolean;
   ownerUid?: string;
   /** Bound on claim — LINE Login userId for one-shop / owner match. */
@@ -53,7 +53,7 @@ export type Store = {
 export const SHOP_SETTING_KEYS = [
   "address", "bio", "jimotyUrl", "youtubeUrl", "facebookUrl",
   "lineInviteUrl", "phone", "slots", "pickupSpots",
-  "pickupTo", "leadDays", "minItems", "minTotal",
+  "pickupTo", "leadDays", "itemOff",
 ] as const;
 
 /** Derived by applyDates; readable, not a separate editor input. */
@@ -166,29 +166,23 @@ export function applyDates(s: Store, raw: { pickupFrom?: unknown; pickupTo?: unk
   return { pickupFrom: s.pickupFrom, pickupTo: s.pickupTo, moveOut: s.moveOut, leadDays: shopLeadDays(s) };
 }
 
-const asMin = (v: unknown) => {
-  const n = Math.floor(Number(v));
-  return Number.isFinite(n) && n > 0 ? n : 0;
-};
-type Mins = { minItems?: number; minTotal?: number };
-/** Exclusive read: at most one active. Both → keep total (strict). */
-export function shopMins(s: Mins) {
-  let minItems = asMin(s.minItems), minTotal = asMin(s.minTotal);
-  if (minItems && minTotal) minItems = 0;
-  return { minItems, minTotal };
+/** unset/invalid → DEF_OFF; explicit 0 stays off. */
+export function shopItemOff(s: { itemOff?: unknown }) {
+  if (s.itemOff == null || s.itemOff === "") return DEF_OFF;
+  const n = Math.floor(Number(s.itemOff));
+  return Number.isFinite(n) && n >= 0 ? n : DEF_OFF;
 }
-/** Soft seller-voiced ask — items mode only (total mode is a hard checkout floor). */
-export function cartRule(s: Mins): string | null {
-  const { minItems: n, minTotal: y } = shopMins(s);
-  if (y || !n) return null;
-  return `出品者はまとめて${n}点以上希望（不人気・大型は1点でも歓迎）`;
+export const cartDiscount = (n: number, off: number) => (off > 0 && n > 0 ? off * n : 0);
+/** Soft encourage when discount is on. */
+export function cartRule(off: number): string | null {
+  return off > 0 ? `まとめ買い：1点あたり¥${off.toLocaleString("ja-JP")}引き` : null;
 }
-/** Exclusive write: same rule as shopMins. */
-export function applyMins(s: Store, raw: { minItems?: unknown; minTotal?: unknown }) {
-  const out = shopMins({ minItems: asMin(raw.minItems), minTotal: asMin(raw.minTotal) });
-  s.minItems = out.minItems;
-  s.minTotal = out.minTotal;
-  return out;
+/** Persist seller rate; clears legacy min floors. Blank/NaN → 0 (off). */
+export function applyItemOff(s: Store, raw: { itemOff?: unknown }) {
+  const n = Math.floor(Number(raw.itemOff));
+  const v = Number.isFinite(n) && n > 0 ? n : 0;
+  s.itemOff = v;
+  return { itemOff: v, minItems: 0, minTotal: 0 };
 }
 
 /** Apply editor settings onto a copy. Throws the same errors as the admin actions. */
@@ -212,12 +206,7 @@ export function applyShopSettings(current: Store, raw: Record<string, unknown>):
       leadDays: "leadDays" in raw ? raw.leadDays : next.leadDays,
     });
   }
-  if ("minItems" in raw || "minTotal" in raw) {
-    applyMins(next, {
-      minItems: "minItems" in raw ? raw.minItems : 0,
-      minTotal: "minTotal" in raw ? raw.minTotal : 0,
-    });
-  }
+  if ("itemOff" in raw) applyItemOff(next, { itemOff: raw.itemOff });
   return next;
 }
 
@@ -238,10 +227,11 @@ export function settingsUpdate(current: Store, raw: Record<string, unknown>): Re
     patch.moveOut = next.moveOut || "";
     patch.leadDays = next.leadDays ?? DEF_LEAD;
   }
-  if ("minItems" in raw || "minTotal" in raw) {
-    const mins = shopMins(next);
-    patch.minItems = mins.minItems;
-    patch.minTotal = mins.minTotal;
+  if ("itemOff" in raw) {
+    const out = applyItemOff(next, { itemOff: raw.itemOff });
+    patch.itemOff = out.itemOff;
+    patch.minItems = 0;
+    patch.minTotal = 0;
   }
   return patch;
 }
@@ -318,7 +308,8 @@ export function shopFields(s: Store): Record<string, unknown> {
     pickupTo: s.pickupTo || "",
     moveOut: s.moveOut || "",
     leadDays: shopLeadDays(s),
-    ...shopMins(s),
+    itemOff: shopItemOff(s),
+    minItems: 0, minTotal: 0,
     published: !!s.published,
     ...(s.ownerUid ? { ownerUid: s.ownerUid } : {}),
     ...(s.rev != null ? { rev: s.rev } : {}),
@@ -412,8 +403,10 @@ export function storeFromDocs(
   if (shop.pickupTo) s.pickupTo = String(shop.pickupTo);
   if (shop.moveOut) s.moveOut = String(shop.moveOut);
   if (shop.leadDays != null && Number.isFinite(Number(shop.leadDays))) s.leadDays = Number(shop.leadDays);
-  { const n = asMin(shop.minItems); if (n) s.minItems = n; }
-  { const n = asMin(shop.minTotal); if (n) s.minTotal = n; }
+  if (shop.itemOff != null && shop.itemOff !== "") {
+    const n = Math.floor(Number(shop.itemOff));
+    if (Number.isFinite(n) && n >= 0) s.itemOff = n;
+  }
   if (shop.published) s.published = true;
   if (shop.ownerUid) s.ownerUid = String(shop.ownerUid);
   if (shop.ownerLineUid) s.ownerLineUid = String(shop.ownerLineUid);

@@ -7,7 +7,7 @@ import SquareCam from "@/components/square-cam";
 import { Snack, useBodyScrollLock, useMaskDismiss, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { dayLbl, daysBetween, tokyoYmd } from "@/lib/days";
-import { DECLINE_PRESETS, DEF_LEAD, DEF_MIN, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
+import { DECLINE_PRESETS, DEF_LEAD, DEF_OFF, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
 import { SoftLoginForm } from "@/components/soft-login";
 import { CLAIM_KEY } from "@/components/line-oauth";
 import { adminAct, claimShop, listenShop } from "@/lib/live";
@@ -17,7 +17,7 @@ import {
   adoptShop, forgetShop, getLineUid, getName, getProfile, openShop, saveProfile, subscribeAuth,
 } from "@/lib/shop";
 import {
-  ELTON_SHOP, itemFlags, pickupDays, shopMins, shopPublished, uid,
+  ELTON_SHOP, itemFlags, pickupDays, shopItemOff, shopPublished, uid,
   wardAddress as kuFull, wardStem as kuStem,
   type Store,
 } from "@/lib/store";
@@ -34,17 +34,15 @@ type AdminState = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string; facebookUrl?: string;
   lineInviteUrl?: string; phone?: string; slots?: string[];
   pickupFrom?: string; pickupTo?: string; moveOut?: string; leadDays?: number;
-  minItems?: number; minTotal?: number; published?: boolean; ownerUid?: string; ownerLineUid?: string;
+  itemOff?: number; published?: boolean; ownerUid?: string; ownerLineUid?: string;
   items: Item[]; claims: Claim[];
 };
 type Props = { shop: string; name: string };
 const fmtSlot = (a: string, b: string) => `${a}–${b}`;
 type ContactMode = "jimoty" | "line" | "phone" | "facebook";
-type MinMode = "items" | "total";
 const CONTACT_OPTS: [string, string][] = [
   ["jimoty", "ジモティー"], ["facebook", "Facebook"], ["line", "LINE"], ["phone", "電話"],
 ];
-const MIN_OPTS: [string, string][] = [["items", "最低点数"], ["total", "最低合計"]];
 const methodJa = (m?: string) =>
   (m === "jimoty" ? "ジモティー" : m === "phone" ? "電話" : m === "line" ? "LINE" : m === "facebook" ? "Facebook" : m || "");
 const CONTACT_FIELD: Record<ContactMode, { span: string; ph: string; mode: "url" | "tel"; ac: string }> = {
@@ -161,9 +159,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [slotOpen, setSlotOpen] = useState(false);
   const [pickupTo, setPickupTo] = useState("");
   const [leadDays, setLeadDays] = useState(DEF_LEAD);
-  const [minMode, setMinMode] = useState<MinMode>("items");
-  const [minItems, setMinItems] = useState(DEF_MIN);
-  const [minTotal, setMinTotal] = useState(0);
+  const [itemOff, setItemOff] = useState(DEF_OFF);
   const [listOpen, setListOpen] = useState(false);
   const [listDraft, setListDraft] = useState("");
   const [jmDraft, setJmDraft] = useState("");
@@ -223,9 +219,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     setSlots(body.slots?.length ? body.slots : [...PICKUP_SLOTS]);
     setPickupTo(body.pickupTo || body.moveOut || "");
     setLeadDays(body.leadDays ?? DEF_LEAD);
-    const m = shopMins(body);
-    setMinItems(m.minItems); setMinTotal(m.minTotal);
-    setMinMode((prev) => (m.minTotal ? "total" : m.minItems ? "items" : prev));
+    setItemOff(shopItemOff(body));
     if (shopPublished(shop, body)) setPub("on");
   }, [shop]);
 
@@ -792,17 +786,10 @@ export default function ShopAdminView({ shop, name }: Props) {
     setPickupTo(String(body.pickupTo || body.moveOut || ""));
     if (body.leadDays != null) setLeadDays(Number(body.leadDays));
   }
-  /** Exclusive: persist active mode only (other → 0). */
-  async function saveMins(mode = minMode, n = minItems, y = minTotal) {
-    const body = await act({
-      action: "mins",
-      minItems: mode === "items" ? Math.min(5, Math.max(0, n)) : 0,
-      minTotal: mode === "total" ? y : 0,
-    }, "保存しました");
+  async function saveItemOff(n = itemOff) {
+    const body = await act({ action: "itemOff", itemOff: Math.max(0, Math.floor(n) || 0) }, "保存しました");
     if (!body) return;
-    setMinMode(mode);
-    setMinItems(Number(body.minItems) || 0);
-    setMinTotal(Number(body.minTotal) || 0);
+    setItemOff(Number(body.itemOff) || 0);
   }
   function openClaim(id: string) {
     const c = (data?.claims || []).find((x) => x.id === id);
@@ -1147,34 +1134,13 @@ export default function ShopAdminView({ shop, name }: Props) {
           <DateField label="退去日" value={pickupTo} onChange={(v) => { setPickupTo(v); void saveDates(v); }} />
         </div>
         <div className="slot-add">
-          <div className="min-col">
-            <Seg label="カート条件" value={minMode} onPick={(v) => {
-              const mode = v as MinMode;
-              setMinMode(mode);
-              void saveMins(mode);
-            }} opts={MIN_OPTS} />
-            <p className="hint">{minMode === "items"
-              ? "点数＝おすすめ（下回っても依頼可・不人気・大型は例外）"
-              : "合計＝必須（この金額未満は依頼できません）"}</p>
-          </div>
-          <label className="float lead"><span>{minMode === "items" ? "最低点数" : "最低合計"}</span>
+          <label className="float lead"><span>1点割引</span>
             <span className="lead-row">
-              {minMode === "items" ? (
-                <select aria-label="最低点数（0でなし）" value={Math.min(5, minItems)}
-                  onChange={(e) => {
-                    const n = Number(e.target.value);
-                    setMinItems(n);
-                    void saveMins("items", n);
-                  }}>
-                  {Array.from({ length: 6 }, (_, i) => <option key={i} value={i}>{i}</option>)}
-                </select>
-              ) : (
-                <input type="number" min={0} inputMode="numeric"
-                  aria-label="最低合計円（0でなし）" value={minTotal}
-                  onChange={(e) => setMinTotal(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-                  onBlur={() => void saveMins("total")} />
-              )}
-              <span aria-hidden="true">{minMode === "items" ? "点" : "円"}</span>
+              <input type="number" min={0} step={50} inputMode="numeric"
+                aria-label="1点あたり割引円（0でオフ）" value={itemOff}
+                onChange={(e) => setItemOff(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+                onBlur={() => void saveItemOff()} />
+              <span aria-hidden="true">円</span>
             </span>
           </label>
           <label className="float lead"><span>最短予約</span>
@@ -1191,6 +1157,7 @@ export default function ShopAdminView({ shop, name }: Props) {
             </span>
           </label>
         </div>
+        <p className="hint">まとめ買いほどお得：カート点数×円を現金合計から引きます（0でオフ）</p>
         <div className="slot-edit" role="list" aria-label="受取時間">
           {slots.map((s) => (
             <button key={s} type="button" className="slot" role="listitem"

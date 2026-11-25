@@ -9,14 +9,14 @@ import {
 } from "firebase/firestore";
 import { ensureAuth, getDb } from "./fb";
 import { dayLbl, tokyoYmd } from "./days";
-import { DEF_LEAD, DEF_MIN } from "./sale";
+import { DEF_LEAD, DEF_OFF } from "./sale";
 import {
   getFacebookName, getJimotyName, getLineName, getLineUid, getName,
 } from "./shop";
 import {
-  applyDates, applyMins, bookableDays, cartAfter, claimFields, priceOf,
-  ELTON_SHOP, hasBuyerContact, itemFields, normalizeSlots, normalizeSpots, parseShop, shortCode, shopMins,
-  shopFields, shopSlots, storeFromDocs, takenSlots, uid, type Claim, type Item, type Store,
+  applyDates, applyItemOff, bookableDays, cartAfter, cartDiscount, claimFields, priceOf,
+  ELTON_SHOP, hasBuyerContact, itemFields, normalizeSlots, normalizeSpots, parseShop, shortCode,
+  shopFields, shopItemOff, shopSlots, storeFromDocs, takenSlots, uid, type Claim, type Item, type Store,
 } from "./store";
 
 const asClaim = (id: string, data: Record<string, unknown>): Claim =>
@@ -39,8 +39,8 @@ function assemble(s: ShopSnap): Store {
 
 const emptySeed = (id: string): Store =>
   id === ELTON_SHOP
-    ? { address: "目黒区", lineInviteUrl: "", phone: "", items: [], claims: [], published: true, leadDays: DEF_LEAD, minItems: DEF_MIN }
-    : { address: "", items: [], claims: [], leadDays: DEF_LEAD, minItems: DEF_MIN };
+    ? { address: "目黒区", lineInviteUrl: "", phone: "", items: [], claims: [], published: true, leadDays: DEF_LEAD, itemOff: DEF_OFF }
+    : { address: "", items: [], claims: [], leadDays: DEF_LEAD, itemOff: DEF_OFF };
 
 const denied = (e: unknown) => String((e as { code?: string })?.code || "").endsWith("permission-denied");
 const NO_EDIT = "このショップの編集権限がありません";
@@ -471,10 +471,11 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       await updateDoc(shopRef, { ...out, updatedAt: new Date().toISOString() });
       return out;
     }
+    case "itemOff":
     case "mins": {
       const meta = (await getDoc(shopRef)).data() || {};
       const s = storeFromDocs(meta as Record<string, unknown>, [], []);
-      const out = applyMins(s, body);
+      const out = applyItemOff(s, body);
       await updateDoc(shopRef, { ...out, updatedAt: new Date().toISOString() });
       return out;
     }
@@ -666,11 +667,8 @@ export async function bookShop(shopRaw: string, body: {
     });
     const after = cartAfter(items);
     if (after && day < after) throw new Error(`${dayLbl(after)}以降に受け取れます`);
-    const total = items.reduce((n, it) => n + (it.price ?? 0), 0);
-    const { minTotal } = shopMins(pre);
-    if (minTotal && total < minTotal) {
-      throw new Error(`合計¥${minTotal.toLocaleString("ja-JP")}以上で依頼してください`);
-    }
+    const sub = items.reduce((n, it) => n + (it.price ?? 0), 0);
+    const total = Math.max(0, sub - cartDiscount(items.length, shopItemOff(pre)));
     // Claims may move under us — re-check status inside the tx.
     const claimCache = new Map<string, string>();
     for (const it of items) {
