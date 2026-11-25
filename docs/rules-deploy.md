@@ -1,6 +1,8 @@
 # Firestore rules deploy
 
-A push to `main` that changes `firestore.rules` publishes the rules. No key is stored in GitHub or Vercel. You can also run it by hand: [Actions → deploy-firebase-rules → Run workflow](https://github.com/GreatTA1998/sayonara-sales/actions/workflows/deploy-firebase-rules.yml) (branch `main`).
+A push to `main` that changes `firestore.rules` or `.github/workflows/deploy-firebase-rules.yml` publishes the rules. No key is stored in GitHub or Vercel. You can also run it by hand: [Actions → deploy-firebase-rules → Run workflow](https://github.com/GreatTA1998/sayonara-sales/actions/workflows/deploy-firebase-rules.yml) (branch `main`).
+
+The job calls the Firebase Rules API directly (`rulesets` then the `cloud.firestore` release). It does not use the Firebase CLI, so **Firebase Rules Admin** is the only role required.
 
 If Workload Identity is not set up, the job stops with `Workload Identity is not set up` and does not publish rules.
 
