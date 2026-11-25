@@ -86,6 +86,14 @@ function musePrompt(shop: string, bio: string, items: { name?: string; price?: n
   return `Sayonaraの出品をジモティ向けに整えて（簡潔・日本語・コピペ用）。約24時間ごとにSayonaraを見なおしてジモティへ同期して：\n\n【招待】\n${memo}\n\n【出品一覧】\n${list || "（なし）"}\n`;
 }
 
+type ImportSrc = "jimoty" | "facebook" | "other";
+const IMPORT_OPTS: [string, string][] = [["jimoty", "ジモティー"], ["facebook", "Facebook"], ["other", "その他"]];
+/** Muse/Grok seeds — FB Marketplace / generic → Sayonara (no scrape API). */
+const IMPORT_PROMPTS: Record<Exclude<ImportSrc, "jimoty">, string> = {
+  facebook: `Sayonara Salesに Facebook Marketplace から取り込む。\nプロフィール説明→ショップメモ。受付中の出品ごとに品名・価格（円・不明は無料）・説明を簡潔な日本語の箇条書きで。写真URLがあれば添えて。Marketplaceの自分の出品／プロフィールを見て進めて。`,
+  other: `Sayonara Salesに出品を取り込む。\nこれから渡す元データ（他サイト・メモ・スクショ説明など）からショップメモと出品一覧（品名・価格円・説明）を抽出し、コピペ用の日本語リストで返して。Muse AI か Grok Bot 向け。`,
+};
+
 export default function ShopAdminView({ shop, name }: Props) {
   const router = useRouter();
   const [data, setData] = useState<AdminState | null>(null);
@@ -137,8 +145,9 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [listDraft, setListDraft] = useState("");
   const [jmDraft, setJmDraft] = useState("");
   const [jmBusy, setJmBusy] = useState(false);
-  /** Empty-shop create: one-click Jimoty import vs full manual forms. */
+  /** Empty-shop create: one-click import vs full manual forms. */
   const [setup, setSetup] = useState<"one" | "manual">("one");
+  const [importSrc, setImportSrc] = useState<ImportSrc>("jimoty");
   type JmPrev = { id: string; name: string; url: string; samples: { name: string; price: number; photo?: string; url?: string }[] };
   const [jmPrev, setJmPrev] = useState<JmPrev | null>(null);
   const [jmCands, setJmCands] = useState<JmPrev[]>([]);
@@ -806,7 +815,12 @@ export default function ShopAdminView({ shop, name }: Props) {
   const editMask = useMaskDismiss(closeEdit, busyOpen);
   const empty = !!data && !items.length;
   const forms = !empty || setup === "manual";
+  const showJm = importSrc === "jimoty";
   const areaN = Math.max(2, Array.from(addrDraft || "目黒").length);
+  const copyText = (t: string) => {
+    void navigator.clipboard?.writeText(t).catch(() => undefined);
+    show("コピーしました", "ok");
+  };
 
   return (
     <main className="buy admin">
@@ -848,7 +862,7 @@ export default function ShopAdminView({ shop, name }: Props) {
       {empty && (
         <div className="prof-block">
           <Seg label="設定" value={setup} onPick={(v) => setSetup(v as "one" | "manual")}
-            opts={[["one", "ジモティーから取り込む"], ["manual", "最初から出品"]]} />
+            opts={[["one", "取り込む"], ["manual", "最初から出品"]]} />
         </div>
       )}
       {forms && (
@@ -875,23 +889,25 @@ export default function ShopAdminView({ shop, name }: Props) {
 
       {empty && setup === "one" && (
         <div className="jm-hero">
-          {!jmPrev && !jmCands.length && (
-            <>
-              <p className="jm-who">ジモティー名を入力すると、ボットが出品を自動で取り込みます</p>
-              <div className="jm-row">
-                <input value={jmDraft} disabled={jmBusy || !data}
-                  placeholder="ジモティー名" aria-label="ジモティー名"
-                  onChange={(e) => setJmDraft(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void lookupJimoty(); } }}
-                  autoComplete="nickname" />
-                <button type="button" className="cta" disabled={jmBusy || !data}
-                  onClick={() => void lookupJimoty()}>
-                  {jmBusy ? "検索中…" : "ジモティーから取り込む"}
-                </button>
-              </div>
-            </>
+          <div className="field"><span>取り込む</span>
+            <Seg label="import from" value={importSrc}
+              onPick={(v) => { setImportSrc(v as ImportSrc); setJmPrev(null); setJmCands([]); }}
+              opts={IMPORT_OPTS} />
+          </div>
+          {showJm && !jmPrev && !jmCands.length && (
+            <div className="jm-row">
+              <input value={jmDraft} disabled={jmBusy || !data}
+                placeholder="ジモティー名" aria-label="ジモティー名"
+                onChange={(e) => setJmDraft(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void lookupJimoty(); } }}
+                autoComplete="nickname" />
+              <button type="button" className="cta" disabled={jmBusy || !data}
+                onClick={() => void lookupJimoty()}>
+                {jmBusy ? "検索中…" : "ジモティーから取り込む"}
+              </button>
+            </div>
           )}
-          {jmCands.length > 0 && (
+          {showJm && jmCands.length > 0 && (
             <div className="jm-prev">
               <p className="hint">どれですか？</p>
               {jmCands.map((c) => (
@@ -905,7 +921,7 @@ export default function ShopAdminView({ shop, name }: Props) {
                 onClick={() => setJmCands([])}>もどる</button>
             </div>
           )}
-          {jmPrev && (
+          {showJm && jmPrev && (
             <div className="jm-prev">
               <p className="jm-who"><b>{jmPrev.name}さん</b> — 本人確認用のサンプル</p>
               <p className="hint">これは全件ではありません。確認後に受付中の出品をまとめて取り込みます。</p>
@@ -924,6 +940,16 @@ export default function ShopAdminView({ shop, name }: Props) {
               <button type="button" className="share" disabled={jmBusy}
                 onClick={() => setJmPrev(null)}>もどる</button>
             </div>
+          )}
+          {importSrc !== "jimoty" && (
+            <>
+              <p className="hint">{importSrc === "facebook"
+                ? "Marketplace の自動取得は重い認証が要るため、Muse / Grok 用プロンプトで取り込んで。"
+                : "Muse AI か Grok Bot に貼って、続けて元データを渡して。"}</p>
+              <button type="button" className="share" onClick={() => copyText(IMPORT_PROMPTS[importSrc])}>
+                {importSrc === "facebook" ? "Facebook" : "その他"}取込プロンプトをコピー
+              </button>
+            </>
           )}
         </div>
       )}
@@ -973,10 +999,8 @@ export default function ShopAdminView({ shop, name }: Props) {
           無料だから、僕は
           <a href="https://muse.ai" target="_blank" rel="noopener noreferrer">Muse AI</a>
           をおすすめ。ジモティへ自動掲載・定期同期・メッセージ返信もできるよ。
-          <button type="button" className="share" onClick={() => {
-            void navigator.clipboard?.writeText(musePrompt(shop, bio, items)).catch(() => undefined);
-            show("コピーしました", "ok");
-          }}>ジモティー横断投稿プロンプトをコピー</button>
+          <button type="button" className="share"
+            onClick={() => copyText(musePrompt(shop, bio, items))}>ジモティー横断投稿プロンプトをコピー</button>
           <span className="save-more">
             <IconBtn name="more" label="その他" size={20}
               onClick={() => { setJmMore((v) => !v); setWipeTyped(null); }} />
