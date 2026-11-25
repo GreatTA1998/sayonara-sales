@@ -4,7 +4,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test:rules": "npx firebase-tools emulators:exec --only firestore --project demo-sayonara \"node scripts/firestore-rules.test.mjs\""
   },
   "dependencies": {
     "@vercel/blob": "^2.9.0",
@@ -15,6 +16,7 @@
     "sharp": "^0.35.5"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "typescript": "^5.7.0"

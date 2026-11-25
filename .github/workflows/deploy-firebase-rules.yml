@@ -1,0 +1,40 @@
+# Publish Firestore rules when firestore.rules changes on main.
+# Keyless: GitHub OIDC impersonates github-rules-deploy via Workload Identity.
+# No JSON keys and no GitHub secrets. One-time setup: docs/rules-deploy.md
+# Photos are Vercel Blob. Indexes are not deployed.
+name: deploy-firebase-rules
+on:
+  push:
+    branches: [main]
+    paths:
+      - firestore.rules
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  WORKLOAD_IDENTITY_PROVIDER: projects/1046734127142/locations/global/workloadIdentityPools/github/providers/github
+  SERVICE_ACCOUNT: github-rules-deploy@sayonara-sales.iam.gserviceaccount.com
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: auth
+        continue-on-error: true
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.SERVICE_ACCOUNT }}
+      - name: Workload Identity is not configured
+        if: steps.auth.outcome == 'failure'
+        run: |
+          echo "::error title=Rules not deployed::Workload Identity is not set up for ${SERVICE_ACCOUNT} (${WORKLOAD_IDENTITY_PROVIDER}). One-time setup, browser only: docs/rules-deploy.md. No GitHub secret is used. Until then, paste firestore.rules in the Firebase console."
+          exit 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npx -y firebase-tools@15.37.0 deploy --only firestore:rules --project sayonara-sales --non-interactive
