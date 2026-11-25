@@ -438,12 +438,14 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
   }
 }
 
-type Waiter = { account?: string; at?: string };
+type Waiter = { account?: string; at?: string; lineUid?: string };
 const waitersOf = (data: Record<string, unknown> | undefined) =>
   Array.isArray(data?.waiters) ? data!.waiters as Waiter[] : [];
 
 /** Buyer waitlist — transactional append (FIFO; no stale waiters RMW). */
-export async function joinWaitLive(shopRaw: string, itemId: string, account: string, aliases: string[] = []) {
+export async function joinWaitLive(
+  shopRaw: string, itemId: string, account: string, aliases: string[] = [], lineUid = "",
+) {
   const shop = parseShop(shopRaw);
   const a = account.trim();
   const keys = [...new Set([a, ...aliases.map((x) => x.trim())].filter(Boolean))];
@@ -461,7 +463,9 @@ export async function joinWaitLive(shopRaw: string, itemId: string, account: str
     if (st !== "booked") throw new Error("待機できません");
     const prev = waitersOf(csnap.data());
     if (prev.some((w) => keys.includes(String(w.account || "")))) return { ok: true as const };
-    tx.update(cref, { waiters: [...prev, { account: a, at: new Date().toISOString() }] });
+    const row: Waiter = { account: a, at: new Date().toISOString() };
+    if (lineUid) row.lineUid = lineUid;
+    tx.update(cref, { waiters: [...prev, row] });
     return { ok: true as const };
   });
 }
@@ -494,11 +498,13 @@ export async function leaveWaitLive(shopRaw: string, itemId: string, accounts: s
 /** Buyer book — creates requested claim; snapshot reconciles. */
 export async function bookShop(shopRaw: string, body: {
   day: string; slot: string; itemIds: string[]; contact: string; contactMethod: "jimoty" | "line" | "phone";
+  lineUid?: string;
 }): Promise<{ code: string; day: string; slot: string; address: string; contact: string; contactMethod: string; total: number; items: string[] }> {
   const shop = parseShop(shopRaw);
   const user = await ensureAuth();
   const db = getDb();
   const { day, slot, itemIds, contact, contactMethod } = body;
+  const lineUid = (body.lineUid || "").trim();
   if (!day || !slot || !itemIds.length || !contactMethod || !contact.trim()) {
     throw new Error("日付・時間・連絡先・連絡方法・品目を確認してください");
   }
@@ -556,6 +562,7 @@ export async function bookShop(shopRaw: string, body: {
       id: claimId, code, day, slot, itemIds: [...itemIds],
       contactMethod, contact: contact.trim(),
       status: "requested", createdAt: new Date().toISOString(), buyerUid: user.uid, waiters: [],
+      ...(lineUid ? { lineUid } : {}),
     };
     tx.set(doc(db, "shops", shop, "claims", claimId), claimFields(claim));
     // Only bind free items. Pending/orphan keep pointer; confirm() rebinds on 予約済.

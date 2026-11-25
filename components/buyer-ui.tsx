@@ -1,10 +1,12 @@
 "use client";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { byPrice, Listings, ListingTools, money, Seg, useDense, usePriceDir, useShowSold } from "@/components/photo-listing";
 import { useBodyScrollLock, useMaskDismiss } from "@/components/snack";
 import { afterLbl, dayLbl, moveOutLeft, tokyoYmd } from "@/lib/days";
+import { lineLoginHref, WL_KEY } from "@/components/line-oauth";
 import { bookShop, joinWaitLive, leaveWaitLive, listenShop } from "@/lib/live";
-import { applyLineSession, getId, getName, openShop, pushBuy, subscribeAuth } from "@/lib/shop";
+import { notifyLine } from "@/lib/notify";
+import { applyLineSession, getId, getLineUid, getName, openShop, pushBuy, subscribeAuth } from "@/lib/shop";
 import {
   bookableDays, cartAfter, cartRule, itemFlags, shopContact, shopMins, shopSlots,
   takenSlots, type Store,
@@ -71,8 +73,8 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [slot, setSlot] = useState<string | null>(null);
   const [method, setMethod] = useState<Method | null>(null);
   const [lineName, setLineName] = useState("");
-  const wlNameRef = useRef<HTMLInputElement>(null);
   const knownName = useSyncExternalStore(subscribeAuth, getName, () => "");
+  const lineUid = useSyncExternalStore(subscribeAuth, getLineUid, () => "");
   const [chanOk, setChanOk] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -90,7 +92,10 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     .filter(([, ok]) => ok).map(([id]) => [id, CH[id][0]] as [Method, string]);
   const barMove = moveOutLeft(state?.moveOut ? [state.moveOut] : []);
   const loggedIn = !!knownName;
-  const contactVal = (method === "jimoty" && loggedIn ? knownName : lineName).trim();
+  const hardLine = !!lineUid;
+  const contactVal = (
+    (method === "jimoty" && loggedIn) || (method === "line" && hardLine) ? knownName : lineName
+  ).trim();
 
   useEffect(() => {
     try {
@@ -108,6 +113,39 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     else void applyLineSession().then((s) => { if (s?.name) setLineName(s.name); });
     return unsub;
   }, [shop, cartKey]);
+
+  /** After「LINEでログインして並ぶ」OAuth — join once, then clear. */
+  useEffect(() => {
+    let raw = "";
+    try { raw = sessionStorage.getItem(WL_KEY) || ""; } catch { return; }
+    if (!raw.startsWith(`${shop}|`)) return;
+    const itemId = raw.slice(shop.length + 1);
+    if (!itemId || !lineUid) return;
+    const n = getName();
+    if (!n) return;
+    try { sessionStorage.removeItem(WL_KEY); } catch { /* ignore */ }
+    void (async () => {
+      setBusy(true); setErr(null); setOpenId(itemId);
+      try {
+        await joinWaitLive(shop, itemId, n, mineKeys(n), lineUid);
+        notifyLine(lineUid, "waitlist");
+        setState((prev) => prev && {
+          ...prev,
+          items: prev.items.map((it) => {
+            if (it.id !== itemId) return it;
+            const was = it.waitAs?.includes(n);
+            return {
+              ...it,
+              waitN: was ? (it.waitN || 0) : (it.waitN || 0) + 1,
+              waitAs: [...new Set([...(it.waitAs || []), n])],
+            };
+          }),
+        });
+      } catch (e) { setErr(e instanceof Error ? e.message : "失敗しました"); }
+      finally { setBusy(false); }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shop, knownName, lineUid]);
   useBodyScrollLock(!!open || checkout);
   useEffect(() => {
     if (!open && !checkout) return;
@@ -157,15 +195,13 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   }
 
   async function joinWait(id: string) {
-    // Prefer DOM value so JP IME composition isn't truncated mid-input.
-    const typed = (wlNameRef.current?.value || lineName).trim();
-    const n = (getName() || typed).trim();
-    if (!n) { setErr("ジモティ名を入力してください"); return; }
-    openShop(n);
+    const n = (getName() || lineName).trim();
+    if (!n) { setErr("ログインしてください"); return; }
+    if (!lineUid) openShop(n);
     setLineName(n); setErr(null); setBusy(true);
     try {
-      // Display name = waiter key (admin FIFO); aliases skip dig5/name dupes.
-      await joinWaitLive(shop, id, n, mineKeys(n, typed));
+      await joinWaitLive(shop, id, n, mineKeys(n), lineUid);
+      if (lineUid) notifyLine(lineUid, "waitlist");
       setState((prev) => {
         if (!prev) return prev;
         return {
@@ -186,8 +222,8 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   }
 
   async function leaveWait(id: string) {
-    const keys = mineKeys(lineName, wlNameRef.current?.value || "");
-    if (!keys.length) { setErr("ジモティ名を入力してください"); return; }
+    const keys = mineKeys(lineName);
+    if (!keys.length) { setErr("ログインしてください"); return; }
     setErr(null); setBusy(true);
     try {
       await leaveWaitLive(shop, id, keys);
@@ -218,8 +254,9 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     try {
       const data = await bookShop(shop, {
         day, slot, itemIds, contactMethod: method, contact: contactVal,
+        lineUid: lineUid || undefined,
       });
-      if (method === "jimoty" || (method === "line" && !loggedIn)) {
+      if (method === "jimoty" || (method === "line" && !hardLine)) {
         openShop(contactVal, method === "line" ? "line" : "jimoty");
       }
       pushBuy({
@@ -250,7 +287,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const onOpen = open ? picked.has(open.id) : false;
   const waiting = !!open?.waitAs?.some((a) => myKeys.includes(a));
   const openPics = open?.photos || [];
-  const needWlName = takenOpen && !waiting && !(getName() || lineName).trim();
+  const canWaitSoft = !!(getName() || lineName).trim() || hardLine;
   const yt = (state?.youtubeUrl || "").trim() || ytUrl(state?.bio || "");
   const bioShow = yt && state?.bio
     ? state.bio.replace(yt, "").replace(/[：:]\s*$/m, "").trimEnd()
@@ -306,18 +343,19 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
               <>
                 <p className="sw sold">予約済{open.when ? ` — ${open.when}` : ""}</p>
                 {open.waitN ? <p className="sw">{open.waitN}人待ち</p> : null}
-                {needWlName && (
-                  <label className="float"><span>ジモティ名</span>
-                    <input ref={wlNameRef} value={lineName}
-                      onChange={(e) => setLineName(e.target.value)}
-                      onCompositionEnd={(e) => setLineName(e.currentTarget.value)}
-                      placeholder="表示名" autoComplete="nickname" enterKeyHint="done" /></label>
-                )}
                 {err && <div className="err">{err}</div>}
-                <button type="button" className={`cta${waiting ? " soft" : " go"}`} disabled={busy}
-                  onClick={() => void (waiting ? leaveWait(open.id) : joinWait(open.id))}>
-                  {waiting ? "順番をやめる" : "キャンセル待ち"}
-                </button>
+                {waiting ? (
+                  <button type="button" className="cta soft" disabled={busy}
+                    onClick={() => void leaveWait(open.id)}>順番をやめる</button>
+                ) : canWaitSoft ? (
+                  <button type="button" className="cta go" disabled={busy}
+                    onClick={() => void joinWait(open.id)}>キャンセル待ち</button>
+                ) : (
+                  <a className="cta line" href={lineLoginHref()}
+                    onClick={() => { try { sessionStorage.setItem(WL_KEY, `${shop}|${open.id}`); } catch { /* */ } }}>
+                    LINEでログインして並ぶ
+                  </a>
+                )}
               </>
             ) : (
               <>
@@ -384,7 +422,13 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
                     ) : method === "line" ? (
                       <p className="hint">ジモティーのアカウントをお持ちでない方向けです。</p>
                     ) : null}
-                    {!(loggedIn && method === "jimoty") && (
+                    {method !== "jimoty" && !hardLine && (
+                      <>
+                        <p className="hint">依頼・ステータス・キャンセル待ちの通知はLINEログインで受け取れます。</p>
+                        <a className="cta line" href={lineLoginHref()}>LINEでログイン</a>
+                      </>
+                    )}
+                    {!(loggedIn && method === "jimoty") && !(hardLine && method === "line") && (
                       <label className="float"><span>{CH[method][2]}</span>
                         <input value={lineName} onChange={(e) => setLineName(e.target.value)}
                           placeholder={method === "phone" ? "080-0000-0000" : "表示名"}

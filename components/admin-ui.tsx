@@ -9,6 +9,7 @@ import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { dayLbl, daysBetween, tokyoYmd } from "@/lib/days";
 import { DECLINE_PRESETS, DEF_LEAD, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
 import { adminAct, listenShop } from "@/lib/live";
+import { notifyLine } from "@/lib/notify";
 import { forgetShop, getName, getProfile, openShop, saveProfile, subscribeAuth } from "@/lib/shop";
 import {
   ELTON_SHOP, itemFlags, pickupDays, shopMins, shopPublished, uid,
@@ -20,7 +21,8 @@ type Item = PhotoItem & { claimId?: string | null; note?: string; paused?: boole
 type Claim = {
   id: string; code: string; day: string; slot?: string; contact?: string; contactMethod?: string;
   itemIds: string[]; status: string; spotName?: string; spotMapsUrl?: string;
-  waiters?: { account: string; at: string }[];
+  lineUid?: string;
+  waiters?: { account: string; at: string; lineUid?: string }[];
 };
 type AdminState = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
@@ -737,6 +739,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   /** Like publish / photo-delete: dismiss + snack first; local patch then snap. */
   function claimAct(payload: Record<string, unknown>, okMsg: string) {
     const id = String(payload.id || "");
+    const snap = claimOpen;
     const prev = data;
     const nextIds = Array.isArray(payload.itemIds) ? payload.itemIds.map(String) : null;
     if (payload.action === "reschedule") {
@@ -759,7 +762,24 @@ export default function ShopAdminView({ shop, name }: Props) {
       });
     }
     closeClaim(); show(okMsg, "ok");
-    void adminAct(shop, payload).catch((e) => {
+    void adminAct(shop, payload).then(() => {
+      if (!snap) return;
+      const day = String(payload.day || snap.day || "");
+      const slot = String(payload.slot || snap.slot || "");
+      const act = String(payload.action || "");
+      if (snap.lineUid && act === "confirm") {
+        notifyLine(snap.lineUid, "confirm", { day, slot, code: snap.code });
+      } else if (snap.lineUid && act === "reschedule") {
+        notifyLine(snap.lineUid, "reschedule", { day, slot });
+      } else if (snap.lineUid && act === "cancel") {
+        notifyLine(snap.lineUid, "decline", { reason: String(payload.reason || "") });
+      }
+      if (act === "cancel" && snap.status === "booked") {
+        for (const w of snap.waiters || []) {
+          if (w.lineUid) notifyLine(w.lineUid, "wait_open");
+        }
+      }
+    }).catch((e) => {
       const msg = e instanceof Error ? e.message : "失敗しました";
       setErr(msg); show(msg, "err"); if (prev) setData(prev);
     });
