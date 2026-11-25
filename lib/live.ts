@@ -222,6 +222,56 @@ export async function peekShop(shopRaw: string): Promise<{ address: string; coun
   };
 }
 
+export type UnclaimedShop = {
+  id: string; address: string; published: boolean; updatedAt: string;
+  facebookUrl?: string; jimotyUrl?: string;
+};
+
+/** Elton /admin — dig5 shops with no ownerUid (claimable handoffs / Muse imports). */
+export async function listUnclaimedShops(): Promise<UnclaimedShop[]> {
+  const snap = await getDocs(collection(getDb(), "shops"));
+  return snap.docs
+    .filter((d) => /^\d{5}$/.test(d.id) && !d.data()?.ownerUid)
+    .map((d) => {
+      const x = d.data() || {};
+      const fb = String(x.facebookUrl || "").trim();
+      const jm = String(x.jimotyUrl || "").trim();
+      return {
+        id: d.id,
+        address: String(x.address || "").trim(),
+        published: !!x.published,
+        updatedAt: String(x.updatedAt || ""),
+        ...(fb ? { facebookUrl: fb } : {}),
+        ...(jm ? { jimotyUrl: jm } : {}),
+      };
+    })
+    .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || "") || a.id.localeCompare(b.id));
+}
+
+/** Wipe unclaimed dig5 (items + claims + shop). UI must gate with exact "OK". */
+export async function deleteUnclaimedShop(shopRaw: string): Promise<void> {
+  const shop = parseShop(shopRaw);
+  if (shop === ELTON_SHOP || !/^\d{5}$/.test(shop)) throw new Error("削除できません");
+  await ensureAuth();
+  const db = getDb();
+  const shopRef = doc(db, "shops", shop);
+  const meta = await getDoc(shopRef);
+  if (!meta.exists()) return;
+  if (meta.data()?.ownerUid) throw new Error("クレーム済みです");
+  const [items, claims] = await Promise.all([
+    getDocs(collection(db, "shops", shop, "items")),
+    getDocs(collection(db, "shops", shop, "claims")),
+  ]);
+  for (const docs of [claims.docs, items.docs]) {
+    for (let i = 0; i < docs.length; i += 400) {
+      const b = writeBatch(db);
+      docs.slice(i, i + 400).forEach((d) => b.delete(d.ref));
+      await b.commit();
+    }
+  }
+  await deleteDoc(shopRef);
+}
+
 /** Missing/blank → null (unset → 要相談). Explicit 0 stays ¥0 — never coerce unset to free. */
 const numPrice = (v: unknown) => {
   if (v === "" || v == null || Number.isNaN(Number(v))) return null;

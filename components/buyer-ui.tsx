@@ -382,7 +382,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             </a>
           ) : null}
           {state.facebookUrl ? (
-            <a className="ext-link" href={state.facebookUrl} target="_blank" rel="noopener noreferrer">
+            <a className="ext-link fb" href={state.facebookUrl} target="_blank" rel="noopener noreferrer">
               Facebook Marketplace
             </a>
           ) : null}
@@ -501,7 +501,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
                     opts={methodOpts} />
                   {method && <>
                     <div className="linebox">
-                      <a className="linelink" target="_blank" rel="noopener noreferrer"
+                      <a className={`linelink${method === "facebook" ? " fb" : ""}`} target="_blank" rel="noopener noreferrer"
                         href={method === "jimoty" ? jimotyUrl : method === "line" ? lineUrl
                           : method === "facebook" ? facebookUrl : telHref(phoneDisp)}>
                         {method === "jimoty" ? "出品者のジモティー" : method === "line" ? "LINE招待リンク"

@@ -12,6 +12,10 @@ service cloud.firestore {
     function canAdmin(shopId) {
       return signedIn() && (shopId == 'elton' || isOwner(shopId));
     }
+    // Claimable dig5s (no ownerUid) — /admin wipe after typing OK.
+    function unclaimed(shopId) {
+      return shopId != 'elton' && !('ownerUid' in shopDoc(shopId));
+    }
 
     // One shop per Firebase uid — written in the same claim transaction as ownerUid.
     match /uids/{uid} {
@@ -38,12 +42,13 @@ service cloud.firestore {
             && request.resource.data.ownerUid == request.auth.uid
             && get(/databases/$(database)/documents/uids/$(request.auth.uid)).data.shopId == shopId);
 
-      // Empty-shop cleanup (SS-288); client refuses delete when items remain.
-      allow delete: if canAdmin(shopId);
+      // Empty-shop cleanup (SS-288); unclaimed dig5 wipe from /admin (OK confirm).
+      allow delete: if canAdmin(shopId) || (signedIn() && unclaimed(shopId));
 
       match /items/{itemId} {
         allow read: if true;
-        allow create, delete: if canAdmin(shopId);
+        allow create: if canAdmin(shopId);
+        allow delete: if canAdmin(shopId) || (signedIn() && unclaimed(shopId));
         allow update: if canAdmin(shopId) || (
           signedIn()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['claimId'])
@@ -61,7 +66,7 @@ service cloud.firestore {
           signedIn()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['waiters'])
         );
-        allow delete: if canAdmin(shopId);
+        allow delete: if canAdmin(shopId) || (signedIn() && unclaimed(shopId));
       }
     }
   }
