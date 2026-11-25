@@ -958,11 +958,11 @@ export default function ShopAdminView({ shop, name }: Props) {
         <p className="hint jm-muse">
           無料だから、僕は
           <a href="https://muse.ai" target="_blank" rel="noopener noreferrer">Muse AI</a>
-          をおすすめ。ジモティへ自動掲載・定期同期・メッセージ返信もできるよ。開始プロンプトをコピーして貼り付けて。
+          をおすすめ。ジモティへ自動掲載・定期同期・メッセージ返信もできるよ。
           <button type="button" className="share" onClick={() => {
             void navigator.clipboard?.writeText(musePrompt(shop, bio, items)).catch(() => undefined);
             show("コピーしました", "ok");
-          }}>コピー</button>
+          }}>ジモティー横断投稿プロンプトをコピー</button>
           <span className="save-more">
             <IconBtn name="more" label="その他" size={20}
               onClick={() => { setJmMore((v) => !v); setWipeTyped(null); }} />
