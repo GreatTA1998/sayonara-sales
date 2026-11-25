@@ -8,9 +8,14 @@ import { Snack, useBodyScrollLock, useMaskDismiss, useSnack } from "@/components
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { dayLbl, daysBetween, tokyoYmd } from "@/lib/days";
 import { DECLINE_PRESETS, DEF_LEAD, DEF_MIN, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
+import { SoftLoginForm } from "@/components/soft-login";
+import { CLAIM_KEY } from "@/components/line-oauth";
 import { adminAct, claimShop, listenShop } from "@/lib/live";
 import { notifyLine } from "@/lib/notify";
-import { forgetShop, getLineUid, getName, getProfile, openShop, saveProfile, subscribeAuth } from "@/lib/shop";
+import { t, useLang } from "@/lib/lang";
+import {
+  adoptShop, forgetShop, getLineUid, getName, getProfile, openShop, saveProfile, subscribeAuth,
+} from "@/lib/shop";
 import {
   ELTON_SHOP, itemFlags, pickupDays, shopMins, shopPublished, uid,
   type Store,
@@ -28,7 +33,7 @@ type AdminState = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string; facebookUrl?: string;
   lineInviteUrl?: string; phone?: string; slots?: string[];
   pickupFrom?: string; pickupTo?: string; moveOut?: string; leadDays?: number;
-  minItems?: number; minTotal?: number; published?: boolean;
+  minItems?: number; minTotal?: number; published?: boolean; ownerUid?: string;
   items: Item[]; claims: Claim[];
 };
 type Props = { shop: string; name: string };
@@ -138,7 +143,10 @@ export default function ShopAdminView({ shop, name }: Props) {
   const softName = useSyncExternalStore(subscribeAuth, getName, () => "");
   const lineUid = useSyncExternalStore(subscribeAuth, getLineUid, () => "");
   const logged = !!(softName || lineUid);
+  const lang = useLang();
   const label = softName || (/^\d{5}$/.test(name) ? "" : name);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const [ownBusy, setOwnBusy] = useState(false);
   const [camOpen, setCamOpen] = useState(false);
   const [camItemId, setCamItemId] = useState<string | null>(null);
   const [bio, setBio] = useState("");
@@ -226,21 +234,42 @@ export default function ShopAdminView({ shop, name }: Props) {
     const unsub = listenShop(shop, applySnap, (e) => {
       setErr(e.message || "読み込みに失敗しました");
       show(e.message || "読み込みに失敗しました", "err");
-    }, { claimOwner: true });
+    }, { seed: true });
     return unsub;
   }, [shop, applySnap, show]);
-  /** Soft/LINE login while on admin → claim (create may precede login). */
-  useEffect(() => {
-    if (!logged || shop === ELTON_SHOP) return;
-    void claimShop(shop).catch((e) => {
-      const msg = e instanceof Error ? e.message : "クレームに失敗しました";
-      setErr(msg); show(msg, "err");
-    });
-  }, [logged, shop, show]);
   useEffect(() => () => {
     if (addrTimer.current) clearTimeout(addrTimer.current);
     if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
   }, []);
+
+  const claimable = !!data && !data.ownerUid && shop !== ELTON_SHOP;
+  async function doClaim() {
+    setOwnBusy(true); setErr(null);
+    try {
+      adoptShop(shop);
+      const r = await claimShop(shop);
+      if (r === "taken") {
+        const msg = t("claim.taken", lang);
+        setErr(msg); show(msg, "err");
+      } else {
+        setOwnOpen(false);
+        setData((d) => d && { ...d, ownerUid: "me" });
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "クレームに失敗しました";
+      setErr(msg); show(msg, "err");
+    } finally { setOwnBusy(false); }
+  }
+  /** After claim-banner LINE OAuth — adopt + claim once. */
+  useEffect(() => {
+    let raw = "";
+    try { raw = sessionStorage.getItem(CLAIM_KEY) || ""; } catch { return; }
+    if (raw !== shop) return;
+    if (!logged) return;
+    try { sessionStorage.removeItem(CLAIM_KEY); } catch { /* ignore */ }
+    void doClaim();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shop, logged]);
 
   const items = useMemo(
     () => [...(data?.items || [])].sort(byPrice(priceDir)),
@@ -870,6 +899,22 @@ export default function ShopAdminView({ shop, name }: Props) {
 
       {err && <div className="err">{err}</div>}
       {!data && !err && <p className="text-sm text-muted pad">読み込み中…</p>}
+      {claimable && (
+        <div className="claim-banner">
+          {ownOpen ? (
+            <SoftLoginForm className="soft-login claim-login" claimShopId={shop}
+              onDone={() => { void doClaim(); }} />
+          ) : (
+            <button type="button" className="cta go" disabled={ownBusy}
+              onClick={() => {
+                if (logged) void doClaim();
+                else setOwnOpen(true);
+              }}>
+              {ownBusy ? t("claim.busy", lang) : t("claim.cta", lang)}
+            </button>
+          )}
+        </div>
+      )}
 
       {([["依頼", requests], ["引き取り予定", pending]] as const).map(([title, list]) => (list.length > 0 || (title === "引き取り予定" && hasDone)) && (
         <section key={title} className="claims">

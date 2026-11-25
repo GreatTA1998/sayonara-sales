@@ -8,7 +8,7 @@ import { useLineOAuthReturn } from "@/components/line-oauth";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { listenPendingRequests } from "@/lib/live";
 import { t, useLang } from "@/lib/lang";
-import { adminPath, ensureShopId, getId, getName, subscribeAuth } from "@/lib/shop";
+import { adminPath, ensureShopId, getId, getLineUid, getName, subscribeAuth } from "@/lib/shop";
 
 type Shot = { preview: string; url?: string; err?: string };
 
@@ -19,8 +19,10 @@ export default function AppNav() {
   const router = useRouter();
   const path = usePathname() || "";
   const name = useSyncExternalStore(subscribeAuth, getName, () => "");
+  const lineUid = useSyncExternalStore(subscribeAuth, getLineUid, () => "");
   const shopId = useSyncExternalStore(subscribeAuth, getId, () => "");
   const lang = useLang();
+  const signedIn = !!(name || lineUid);
   const [open, setOpen] = useState<"help" | "me" | "">("");
   const [body, setBody] = useState("");
   const [shot, setShot] = useState<Shot | null>(null);
@@ -174,7 +176,9 @@ export default function AppNav() {
           <div className="nav-me">
             <button type="button" className={`nav-a${open === "me" ? " on" : ""}`}
               aria-expanded={open === "me"} aria-haspopup="dialog"
-              onClick={() => setOpen(open === "me" ? "" : "me")}>{name || t("nav.login", lang)}</button>
+              onClick={() => setOpen(open === "me" ? "" : "me")}>
+              {name || (signedIn ? t("me.title", lang) : t("nav.login", lang))}
+            </button>
             {open === "me" && (
               <div className="menu-pop up pane help-pane me-pane" role="dialog" aria-label={t("me.title", lang)}>
                 <AccountView onAfterLogout={closeMe} onLoginDone={closeMe} onNav={closeMe} />
