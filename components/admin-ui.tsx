@@ -7,7 +7,7 @@ import SquareCam from "@/components/square-cam";
 import { Snack, useBodyScrollLock, useMaskDismiss, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { dayLbl, daysBetween, tokyoYmd } from "@/lib/days";
-import { DECLINE_PRESETS, DEF_LEAD, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
+import { DECLINE_PRESETS, DEF_LEAD, DEF_MIN, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
 import { adminAct, listenShop } from "@/lib/live";
 import { notifyLine } from "@/lib/notify";
 import { forgetShop, getName, getProfile, openShop, saveProfile, subscribeAuth } from "@/lib/shop";
@@ -140,7 +140,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [pickupTo, setPickupTo] = useState("");
   const [leadDays, setLeadDays] = useState(DEF_LEAD);
   const [minMode, setMinMode] = useState<MinMode>("items");
-  const [minItems, setMinItems] = useState(0);
+  const [minItems, setMinItems] = useState(DEF_MIN);
   const [minTotal, setMinTotal] = useState(0);
   const [listOpen, setListOpen] = useState(false);
   const [listDraft, setListDraft] = useState("");
@@ -1081,11 +1081,16 @@ export default function ShopAdminView({ shop, name }: Props) {
           <DateField label="退去日" value={pickupTo} onChange={(v) => { setPickupTo(v); void saveDates(v); }} />
         </div>
         <div className="slot-add">
-          <Seg label="カート条件" value={minMode} onPick={(v) => {
-            const mode = v as MinMode;
-            setMinMode(mode);
-            void saveMins(mode);
-          }} opts={MIN_OPTS} />
+          <div className="min-col">
+            <Seg label="カート条件" value={minMode} onPick={(v) => {
+              const mode = v as MinMode;
+              setMinMode(mode);
+              void saveMins(mode);
+            }} opts={MIN_OPTS} />
+            <p className="hint">{minMode === "items"
+              ? "点数＝おすすめ（下回っても依頼可・不人気・大型は例外）"
+              : "合計＝必須（この金額未満は依頼できません）"}</p>
+          </div>
           <label className="float lead"><span>{minMode === "items" ? "最低点数" : "最低合計"}</span>
             <span className="lead-row">
               <input type="number" min={0} inputMode="numeric"
@@ -1113,9 +1118,6 @@ export default function ShopAdminView({ shop, name }: Props) {
             </span>
           </label>
         </div>
-        <p className="hint">{minMode === "items"
-          ? "点数＝おすすめ（下回っても依頼可・不人気・大型は例外）"
-          : "合計＝必須（この金額未満は依頼できません）"}</p>
         <div className="slot-edit" role="list" aria-label="受取時間">
           {slots.map((s) => (
             <button key={s} type="button" className="slot" role="listitem"
