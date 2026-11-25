@@ -78,7 +78,9 @@ export function useSnack() {
 
 export function Snack({ snack }: { snack: SnackState }) {
   if (!snack) return null;
-  const [title, sub] = snack.msg.split("\n");
+  const i = snack.msg.indexOf("\n");
+  const title = i < 0 ? snack.msg : snack.msg.slice(0, i);
+  const sub = i < 0 ? "" : snack.msg.slice(i + 1);
   return (
     <div role="status" className="snack text-base" data-k={snack.kind}>
       <span className="snack-body">{title}{sub ? <span className="snack-sub">{sub}</span> : null}</span>

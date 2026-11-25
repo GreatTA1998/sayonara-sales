@@ -822,7 +822,8 @@ export default function ShopAdminView({ shop, name }: Props) {
   const areaN = Math.max(2, Array.from(addrDraft || "目黒").length);
   const copyText = (t: string) => {
     void navigator.clipboard?.writeText(t).catch(() => undefined);
-    show("コピーしました", "ok");
+    const p = t.split("\n").filter((l) => l.trim()).slice(0, 3).join("\n").slice(0, 160);
+    show(`コピーしました\n${p}${p.length < t.length ? "…" : ""}`, "ok");
   };
 
   return (
