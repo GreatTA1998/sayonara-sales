@@ -89,8 +89,9 @@ function musePrompt(shop: string, bio: string, items: { name?: string; price?: n
 type ImportSrc = "jimoty" | "facebook" | "other";
 const IMPORT_OPTS: [string, string][] = [["jimoty", "ジモティー"], ["facebook", "Facebook"], ["other", "その他"]];
 /** Muse/Grok seeds — FB Marketplace / generic → Sayonara (no scrape API). */
-const IMPORT_PROMPTS: Record<Exclude<ImportSrc, "jimoty">, string> = {
-  facebook: `Sayonara Salesに Facebook Marketplace から取り込む。\nプロフィール説明→ショップメモ。受付中の出品ごとに品名・価格（円・不明は無料）・説明を簡潔な日本語の箇条書きで。写真URLがあれば添えて。Marketplaceの自分の出品／プロフィールを見て進めて。`,
+const IMPORT_PROMPTS = {
+  facebook: (url: string) =>
+    `Sayonara Salesに Facebook Marketplace から取り込む。\n元URL: ${url}\nプロフィール説明→ショップメモ。受付中の出品ごとに品名・価格（円・不明は無料）・説明を簡潔な日本語の箇条書きで。写真URLがあれば添えて。このURLの出品／プロフィールを見て進めて。`,
   other: `Sayonara Salesに出品を取り込む。\nこれから渡す元データ（他サイト・メモ・スクショ説明など）からショップメモと出品一覧（品名・価格円・説明）を抽出し、コピペ用の日本語リストで返して。Muse AI か Grok Bot 向け。`,
 };
 
@@ -947,13 +948,23 @@ export default function ShopAdminView({ shop, name }: Props) {
                 onClick={() => setJmPrev(null)}>もどる</button>
             </div>
           )}
-          {importSrc !== "jimoty" && (
+          {importSrc === "facebook" && (
             <>
-              <p className="hint">{importSrc === "facebook"
-                ? "Marketplace の自動取得は重い認証が要るため、Muse / Grok 用プロンプトで取り込んで。"
-                : "Muse AI か Grok Bot に貼って、続けて元データを渡して。"}</p>
-              <button type="button" className="share" onClick={() => copyText(IMPORT_PROMPTS[importSrc])}>
-                {importSrc === "facebook" ? "Facebook" : "その他"}取込プロンプトをコピー
+              <input value={facebook} disabled={!data}
+                placeholder="Marketplace URL" aria-label="Marketplace URL"
+                onChange={(e) => setFacebook(e.target.value)}
+                autoComplete="url" inputMode="url" />
+              <button type="button" className="share" disabled={!facebook.trim()}
+                onClick={() => copyText(IMPORT_PROMPTS.facebook(facebook.trim()))}>
+                Facebook取込プロンプトをコピー
+              </button>
+            </>
+          )}
+          {importSrc === "other" && (
+            <>
+              <p className="hint">Muse AI か Grok Bot に貼って、続けて元データを渡して。</p>
+              <button type="button" className="share" onClick={() => copyText(IMPORT_PROMPTS.other)}>
+                その他取込プロンプトをコピー
               </button>
             </>
           )}
