@@ -1,5 +1,6 @@
 export const PICKUP_SLOTS = ["10:00–10:15", "14:00–14:15", "20:00–20:15"];
 export const DEF_LEAD = 2;
+export const DEF_MIN = 2;
 
 /** Seller polite-decline presets (requested claims). */
 export const DECLINE_PRESETS = [
