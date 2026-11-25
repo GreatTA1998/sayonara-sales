@@ -42,10 +42,11 @@ export function SoftLoginForm({
         onChange={(e) => setNames((n) => ({ ...n, [mode]: e.target.value }))}
         placeholder={label} autoComplete="nickname" autoFocus={autoFocus} />
       <button type="submit" className="cta go" disabled={!ok}>{t("login.signIn", lang)}</button>
-      {err ? <p className="sw">{err}</p> : <p className="hint">{t("login.hint", lang)}</p>}
+      {err ? <p className="sw">{err}</p> : null}
       <LineLoginLink onNavigate={claimShopId ? () => {
         try { sessionStorage.setItem(CLAIM_KEY, claimShopId); } catch { /* ignore */ }
       } : undefined} />
+      <p className="hint">{t("login.hint", lang)}</p>
     </form>
   );
 }
