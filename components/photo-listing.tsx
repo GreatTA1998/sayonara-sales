@@ -78,7 +78,7 @@ export function ListingTools({
   );
 }
 
-export const money = (p: number | null) => (p == null ? "無料" : `¥${p.toLocaleString()}`);
+export const money = (p: number | null) => (p == null ? "未設定" : `¥${p.toLocaleString()}`);
 
 function labelName(name: string) {
   const t = (name || "").trim();
