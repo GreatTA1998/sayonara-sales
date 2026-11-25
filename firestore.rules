@@ -12,21 +12,10 @@ service cloud.firestore {
     function canAdmin(shopId) {
       return signedIn() && (shopId == 'elton' || isOwner(shopId));
     }
-    function shopOpen(shopId) {
-      let d = shopDoc(shopId);
-      return d.published == true || shopId == 'elton' || isOwner(shopId)
-        || !('ownerUid' in d);
-    }
 
     match /shops/{shopId} {
-      // Browse: published / elton / unclaimed — no auth. Owner draft needs auth.
-      // `resource == null` first: a missing shop has no resource.data, and that
-      // denial is what blocked first-time create (existence check before set).
-      allow read: if resource == null
-        || resource.data.published == true
-        || shopId == 'elton'
-        || (signedIn() && resource.data.ownerUid == request.auth.uid)
-        || !('ownerUid' in resource.data);
+      // Public reads: unpublished = private link preview; home filters published client-side.
+      allow read: if true;
 
       allow create: if signedIn()
         && request.resource.data.ownerUid == request.auth.uid;
@@ -39,7 +28,7 @@ service cloud.firestore {
       allow delete: if canAdmin(shopId);
 
       match /items/{itemId} {
-        allow read: if shopOpen(shopId);
+        allow read: if true;
         allow create, delete: if canAdmin(shopId);
         allow update: if canAdmin(shopId) || (
           signedIn()
@@ -50,10 +39,7 @@ service cloud.firestore {
       }
 
       match /claims/{claimId} {
-        // Open-shop claim reads are public (same data anon auth already exposed).
-        allow read: if canAdmin(shopId)
-          || shopOpen(shopId)
-          || (signedIn() && resource.data.buyerUid == request.auth.uid);
+        allow read: if true;
         allow create: if signedIn()
           && request.resource.data.buyerUid == request.auth.uid
           && request.resource.data.status == 'requested';

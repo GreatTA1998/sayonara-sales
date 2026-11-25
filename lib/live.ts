@@ -131,7 +131,6 @@ export function listenPendingRequests(shopRaw: string, onN: (n: number) => void)
   const shop = parseShop(shopRaw);
   let stop: Unsubscribe | null = null;
   let dead = false;
-  // Auth so unpublished owner shops can still read claims.
   void ensureAuth().then(() => {
     if (dead) return;
     stop = onSnapshot(collection(getDb(), "shops", shop, "claims"), (snap) => {
@@ -141,7 +140,7 @@ export function listenPendingRequests(shopRaw: string, onN: (n: number) => void)
   return () => { dead = true; stop?.(); };
 }
 
-/** Home tabs — public shop+items. Unpublished drafts stay private. */
+/** Home tabs — caller filters published; drafts stay off `/`. */
 export async function peekShop(shopRaw: string): Promise<{ address: string; count: number; published: boolean }> {
   const shop = parseShop(shopRaw);
   const db = getDb();
