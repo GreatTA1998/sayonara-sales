@@ -368,7 +368,9 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             setMethod(canJimoty ? "jimoty" : canFb ? "facebook" : canLine ? "line" : canPhone ? "phone" : null);
             setChanOk(false); setErr(null); setCheckout(true);
           }}>
-          {pickedItems.length ? `引き取りを依頼 (${pickedItems.length})` : "引き取りを依頼"}
+          {pickedItems.length
+            ? t("buy.ctaN", lang, { n: pickedItems.length })
+            : t("buy.cta", lang)}
         </button>
       </header>
       {bioShow ? <p className="hint bio">{bioShow}</p> : null}
@@ -428,10 +430,10 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
               <p className="hint">{dayLbl(open.availableAfter)}以降受取可</p>
             ) : null}
             {soldOpen ? (
-              <p className="sw sold">引取済</p>
+              <p className="sw sold">{t("badge.sold", lang)}</p>
             ) : takenOpen ? (
               <>
-                <p className="sw sold">予約済{open.when ? ` — ${open.when}` : ""}</p>
+                <p className="sw sold">{t("badge.booked", lang)}{open.when ? ` — ${open.when}` : ""}</p>
                 {open.waitN ? <p className="sw">{open.waitN}人待ち</p> : null}
                 {err && <div className="err">{err}</div>}
                 {waiting ? (
@@ -449,7 +451,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
               </>
             ) : (
               <>
-                {open.reqN ? <p className="sw">{open.reqN}人依頼中</p> : null}
+                {open.reqN ? <p className="sw">{t("badge.reqN", lang, { n: open.reqN })}</p> : null}
                 <button type="button" className={`cta${onOpen ? " soft" : " go"}`}
                   onClick={() => { toggle(open.id); closeDetail(); }}>
                   {onOpen ? "外す" : open.reqN ? "次に並ぶ" : "追加"}

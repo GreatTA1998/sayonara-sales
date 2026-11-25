@@ -48,6 +48,19 @@ const S: Record<string, [string, string]> = {
   "splash.note": ["アカウント設定でいつでも変更できます。", "You can change this anytime in account settings."],
   "lang.ja": ["日本語", "日本語"],
   "lang.en": ["英語", "English"],
+  "buy.cta": ["引き取りを依頼", "Request pickup"],
+  "buy.ctaN": ["引き取りを依頼 ({n})", "Request pickup ({n})"],
+  "badge.req": ["依頼中", "Requested"],
+  "badge.booked": ["予約済", "Reserved"],
+  "badge.sold": ["引取済", "Picked up"],
+  "badge.reqN": ["{n}人依頼中", "{n} requesting"],
+  "sort.layout": ["表示", "Layout"],
+  "sort.price": ["価格順", "Price"],
+  "sort.asc": ["安い順", "Low to high"],
+  "sort.desc": ["高い順", "High to low"],
+  "sort.spacious": ["通常", "Spacious"],
+  "sort.dense": ["密集", "Dense"],
+  "filter.sold": ["引取済", "Picked up"],
 };
 
 export function detectBrowserLang(): string {
@@ -79,10 +92,24 @@ export function offerLang(detected = detectBrowserLang()): string {
   return "en";
 }
 
+/** Sync <html lang> + CSS ::after badge vars (--b-req/booked/sold). */
+export function applyLangDom(lang: string) {
+  if (typeof document === "undefined") return;
+  const r = document.documentElement;
+  r.lang = isJa(lang) ? "ja" : lang;
+  for (const [css, key] of [
+    ["--b-req", "badge.req"],
+    ["--b-booked", "badge.booked"],
+    ["--b-sold", "badge.sold"],
+  ] as const) {
+    r.style.setProperty(css, JSON.stringify(t(key, lang)));
+  }
+}
+
 export function setLang(tag: string) {
   const v = (tag || "ja").trim() || "ja";
   try { localStorage.setItem(LANG_KEY, v); } catch { /* ignore */ }
-  if (typeof document !== "undefined") document.documentElement.lang = isJa(v) ? "ja" : v;
+  applyLangDom(v);
   if (typeof window !== "undefined") window.dispatchEvent(new Event(EVT));
 }
 
