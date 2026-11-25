@@ -4,8 +4,8 @@
  * Writes hit Firestore; UI follows snap (SDK local cache is already optimistic).
  */
 import {
-  arrayRemove, arrayUnion, collection, doc, getDoc, getDocs, onSnapshot, runTransaction, setDoc, updateDoc, deleteDoc,
-  writeBatch, type Unsubscribe,
+  arrayRemove, arrayUnion, collection, doc, getDoc, getDocs, limit, onSnapshot, query, runTransaction, setDoc, updateDoc, deleteDoc,
+  where, writeBatch, type Unsubscribe,
 } from "firebase/firestore";
 import { ensureAuth, getDb } from "./fb";
 import { dayLbl, tokyoYmd } from "./days";
@@ -75,18 +75,62 @@ async function ensureShopDoc(shop: string) {
   }
 }
 
-/** Bind ownership. Soft/LINE required. First wins; later = mine / taken. */
-export async function claimShop(shopRaw: string): Promise<"ok" | "mine" | "taken"> {
+/** Shop already bound to this Firebase uid or LINE uid (empty = none). */
+export async function findOwnedShop(): Promise<string> {
+  const user = await ensureAuth();
+  const db = getDb();
+  const uref = doc(db, "uids", user.uid);
+  const usnap = await getDoc(uref);
+  if (usnap.exists()) return String(usnap.data()?.shopId || "");
+  const byUid = await getDocs(query(collection(db, "shops"), where("ownerUid", "==", user.uid), limit(1)));
+  if (!byUid.empty) {
+    const id = byUid.docs[0].id;
+    // Lazy-migrate pre-uids claims so rules can block a second shop.
+    try { await setDoc(uref, { shopId: id }); } catch { /* race / offline */ }
+    return id;
+  }
+  const lu = getLineUid();
+  if (!lu) return "";
+  const byLine = await getDocs(query(collection(db, "shops"), where("ownerLineUid", "==", lu), limit(1)));
+  return byLine.empty ? "" : byLine.docs[0].id;
+}
+
+/**
+ * Bind ownership. Soft/LINE required.
+ * ok = first claim; mine = already this shop; taken = other owner; other = this account already owns a different shop.
+ */
+export async function claimShop(shopRaw: string): Promise<"ok" | "mine" | "taken" | "other"> {
   const shop = parseShop(shopRaw);
   if (shop === ELTON_SHOP) return "mine";
   if (!softLogged()) throw new Error(NEED_LOGIN);
   const user = await ensureAuth();
+  const owned = await findOwnedShop();
+  if (owned && owned !== shop) return "other";
   await ensureShopDoc(shop);
-  const ref = doc(getDb(), "shops", shop);
-  const prev = String((await getDoc(ref)).data()?.ownerUid || "");
-  if (prev && prev !== user.uid) return "taken";
-  await updateDoc(ref, claimPatch(user.uid));
-  return prev === user.uid ? "mine" : "ok";
+  const db = getDb();
+  const ref = doc(db, "shops", shop);
+  const uref = doc(db, "uids", user.uid);
+  let result: "ok" | "mine" | "taken" | "other" = "ok";
+  try {
+    await runTransaction(db, async (tx) => {
+      const [ssnap, usnap] = await Promise.all([tx.get(ref), tx.get(uref)]);
+      const prev = String(ssnap.data()?.ownerUid || "");
+      if (prev && prev !== user.uid) { result = "taken"; return; }
+      const bound = usnap.exists() ? String(usnap.data()?.shopId || "") : "";
+      if (bound && bound !== shop) { result = "other"; return; }
+      if (!usnap.exists()) tx.set(uref, { shopId: shop });
+      tx.update(ref, claimPatch(user.uid));
+      result = prev === user.uid ? "mine" : "ok";
+    });
+  } catch (e) {
+    // uids rules not deployed yet → shop-only claim (client findOwnedShop still gates).
+    if (!denied(e)) throw e;
+    const prev = String((await getDoc(ref)).data()?.ownerUid || "");
+    if (prev && prev !== user.uid) return "taken";
+    await updateDoc(ref, claimPatch(user.uid));
+    return prev === user.uid ? "mine" : "ok";
+  }
+  return result;
 }
 
 /** Live shop: public onSnapshot (no auth). Admin may seed doc; never auto-claim. */

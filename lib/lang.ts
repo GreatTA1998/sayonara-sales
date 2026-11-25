@@ -40,6 +40,7 @@ const S: Record<string, [string, string]> = {
   "claim.cta": ["このショップをクレーム", "Claim this shop"],
   "claim.busy": ["クレーム中…", "Claiming…"],
   "claim.taken": ["すでに他の人がクレーム済みです", "Someone else already claimed this shop"],
+  "claim.other": ["すでに別のショップをクレーム済みです（1アカウント1ショップ）", "You already claimed another shop (one shop per account)"],
   "claim.manage": ["出品を管理", "Manage listings"],
   "splash.msg": ["このストアは日本語です。{lang}に翻訳しますか？", "This store is in Japanese. Translate to {lang}?"],
   "splash.yes": ["{lang}に翻訳", "Translate to {lang}"],

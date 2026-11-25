@@ -10,7 +10,7 @@ import { dayLbl, daysBetween, tokyoYmd } from "@/lib/days";
 import { DECLINE_PRESETS, DEF_LEAD, DEF_MIN, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
 import { SoftLoginForm } from "@/components/soft-login";
 import { CLAIM_KEY } from "@/components/line-oauth";
-import { adminAct, claimShop, listenShop } from "@/lib/live";
+import { adminAct, claimShop, findOwnedShop, listenShop } from "@/lib/live";
 import { notifyLine } from "@/lib/notify";
 import { t, useLang } from "@/lib/lang";
 import {
@@ -33,7 +33,7 @@ type AdminState = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string; facebookUrl?: string;
   lineInviteUrl?: string; phone?: string; slots?: string[];
   pickupFrom?: string; pickupTo?: string; moveOut?: string; leadDays?: number;
-  minItems?: number; minTotal?: number; published?: boolean; ownerUid?: string;
+  minItems?: number; minTotal?: number; published?: boolean; ownerUid?: string; ownerLineUid?: string;
   items: Item[]; claims: Claim[];
 };
 type Props = { shop: string; name: string };
@@ -147,6 +147,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const label = softName || (/^\d{5}$/.test(name) ? "" : name);
   const [ownOpen, setOwnOpen] = useState(false);
   const [ownBusy, setOwnBusy] = useState(false);
+  const [ownedId, setOwnedId] = useState("");
   const [camOpen, setCamOpen] = useState(false);
   const [camItemId, setCamItemId] = useState<string | null>(null);
   const [bio, setBio] = useState("");
@@ -242,16 +243,24 @@ export default function ShopAdminView({ shop, name }: Props) {
     if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
   }, []);
 
-  const claimable = !!data && !data.ownerUid && shop !== ELTON_SHOP;
+  const ownsOther = !!ownedId && ownedId !== shop;
+  const claimable = !!data && !data.ownerUid && !ownsOther && shop !== ELTON_SHOP;
+  useEffect(() => {
+    if (!logged) { setOwnedId(""); return; }
+    let dead = false;
+    void findOwnedShop().then((id) => { if (!dead) setOwnedId(id); }).catch(() => { if (!dead) setOwnedId(""); });
+    return () => { dead = true; };
+  }, [logged, lineUid, softName]);
   async function doClaim() {
     setOwnBusy(true); setErr(null);
     try {
-      adoptShop(shop);
       const r = await claimShop(shop);
-      if (r === "taken") {
-        const msg = t("claim.taken", lang);
+      if (r === "taken" || r === "other") {
+        const msg = t(r === "taken" ? "claim.taken" : "claim.other", lang);
         setErr(msg); show(msg, "err");
       } else {
+        adoptShop(shop);
+        setOwnedId(shop);
         setOwnOpen(false);
         setData((d) => d && { ...d, ownerUid: "me" });
       }

@@ -34,6 +34,8 @@ export type Store = {
   minItems?: number; minTotal?: number;
   published?: boolean;
   ownerUid?: string;
+  /** Bound on claim — LINE Login userId for one-shop / owner match. */
+  ownerLineUid?: string;
   items: Item[]; claims: Claim[];
 };
 
@@ -304,6 +306,7 @@ export function storeFromDocs(
   { const n = asMin(shop.minTotal); if (n) s.minTotal = n; }
   if (shop.published) s.published = true;
   if (shop.ownerUid) s.ownerUid = String(shop.ownerUid);
+  if (shop.ownerLineUid) s.ownerLineUid = String(shop.ownerLineUid);
   if (!(s.youtubeUrl || "").trim()) {
     const y = ytUrl(s.bio || "");
     if (y) s.youtubeUrl = y;

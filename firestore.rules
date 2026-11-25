@@ -13,6 +13,15 @@ service cloud.firestore {
       return signedIn() && (shopId == 'elton' || isOwner(shopId));
     }
 
+    // One shop per Firebase uid — written in the same claim transaction as ownerUid.
+    match /uids/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['shopId'])
+        && request.resource.data.shopId is string;
+      allow update, delete: if false;
+    }
+
     match /shops/{shopId} {
       // Public reads: unpublished = private link preview; home filters published client-side.
       allow read: if true;
@@ -23,9 +32,11 @@ service cloud.firestore {
             || request.resource.data.ownerUid == request.auth.uid);
 
       // Owner edits, or first claim: no ownerUid yet → stamp self (+ soft name labels).
+      // First claim also requires uids/{uid}.shopId == this shop (one shop per account).
       allow update: if canAdmin(shopId)
         || (signedIn() && !('ownerUid' in resource.data)
-            && request.resource.data.ownerUid == request.auth.uid);
+            && request.resource.data.ownerUid == request.auth.uid
+            && get(/databases/$(database)/documents/uids/$(request.auth.uid)).data.shopId == shopId);
 
       // Empty-shop cleanup (SS-288); client refuses delete when items remain.
       allow delete: if canAdmin(shopId);
