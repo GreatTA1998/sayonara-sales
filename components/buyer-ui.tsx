@@ -358,9 +358,9 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   return (
     <main className={`buy${embed ? " embed" : ""}`}>
       <header className="bar">
-        <span className="area text-base font-semibold">{(state?.address || "").trim() || "区"}</span>
-        <span className="span text-sm">{barMove}</span>
-        <button type="button" className="req text-base"
+        <span className="area">{(state?.address || "").trim() || "区"}</span>
+        <span className="span">{barMove}</span>
+        <button type="button" className="req"
           onClick={() => {
             const n = getName();
             if (n) setLineName(n);
@@ -373,17 +373,17 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             : t("buy.cta", lang)}
         </button>
       </header>
-      {bioShow ? <p className="hint bio text-sm">{bioShow}</p> : null}
-      {rule ? <p className="ask text-base font-semibold">{rule}</p> : null}
+      {bioShow ? <p className="hint bio">{bioShow}</p> : null}
+      {rule ? <p className="ask">{rule}</p> : null}
       {(state?.jimotyUrl || state?.facebookUrl) ? (
         <p className="ext-links">
           {state.jimotyUrl ? (
-            <a className="ext-link text-base font-semibold" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">
+            <a className="ext-link" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">
               {name}のジモティープロフィール
             </a>
           ) : null}
           {state.facebookUrl ? (
-            <a className="ext-link fb text-base font-semibold" href={state.facebookUrl} target="_blank" rel="noopener noreferrer">
+            <a className="ext-link fb" href={state.facebookUrl} target="_blank" rel="noopener noreferrer">
               Facebook Marketplace
             </a>
           ) : null}
