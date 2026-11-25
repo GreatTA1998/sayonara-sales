@@ -27,6 +27,7 @@ uids/{firebaseUid}                # shopId — one shop per account (claim trans
 | `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | prod | Sender id |
 | `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | prod | Storage bucket |
 | `BLOB_READ_WRITE_TOKEN` | prod | Photo uploads only |
+| `SHOP_BUILDER_API_TOKEN` | optional | Bearer for `/api/shop-builder` (404 if unset). See `docs/api/README.md` |
 | `LINE_CHANNEL_ID` / `LINE_CHANNEL_SECRET` | optional | Hard LINE OAuth (see store `docs/line-login-setup.md`) |
 | `LINE_CHANNEL_ACCESS_TOKEN` | optional | Messaging API push (`/v2/bot/message/push`); no-op if unset |
 | `NEXT_PUBLIC_SITE_URL` | optional | prod default `https://sayonara.tokyo`; Preview/`beta` → `https://beta.sayonara.tokyo` |

@@ -8,6 +8,8 @@ export type Item = {
   availableAfter?: string;
   /** Set on Jimoty magic-import rows — wipeImport deletes these only. */
   jimoty?: boolean;
+  /** Shop-builder idempotency key. Editor rows omit it. */
+  externalKey?: string;
 };
 export type PickupSpot = { id: string; name: string; mapsUrl: string };
 export type Claim = {
@@ -36,8 +38,52 @@ export type Store = {
   ownerUid?: string;
   /** Bound on claim — LINE Login userId for one-shop / owner match. */
   ownerLineUid?: string;
+  /** Shop-builder bookkeeping. Editor writes do not set these. */
+  rev?: number;
+  externalKey?: string;
+  source?: string;
+  sellerId?: string;
+  leaseAgentId?: string | null;
+  leaseExpiresAt?: string | null;
+  lastAgentId?: string;
   items: Item[]; claims: Claim[];
 };
+
+/** Keys the shop editor persists. The shop-builder contract uses this list. */
+export const SHOP_SETTING_KEYS = [
+  "address", "bio", "jimotyUrl", "youtubeUrl", "facebookUrl",
+  "lineInviteUrl", "phone", "slots", "pickupSpots",
+  "pickupTo", "leadDays", "minItems", "minTotal",
+] as const;
+
+/** Derived by applyDates; readable, not a separate editor input. */
+export const SHOP_SETTING_READ_KEYS = ["pickupFrom", "moveOut"] as const;
+
+export const ITEM_WRITE_KEYS = [
+  "externalKey", "name", "price", "note", "photos", "paused", "availableAfter",
+] as const;
+
+export const PICKUP_SPOT_KEYS = ["id", "name", "mapsUrl"] as const;
+
+/** Missing/blank → null (unset → 要相談). Explicit 0 stays ¥0. */
+export function priceOf(v: unknown): number | null {
+  if (v === "" || v == null || Number.isNaN(Number(v))) return null;
+  return Math.max(0, Number(v));
+}
+
+export const wardStem = (v: string) => v.replace(/区$/, "");
+/** Ward label as the editor stores it (trailing 区). */
+export function wardAddress(v: unknown) {
+  const s = wardStem(String(v || "")).trim();
+  return s ? `${s}区` : "";
+}
+
+/** Strip owner fields and force unpublished. Shop-builder writes go through this. */
+export function unclaimedShopWrite(data: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...data, published: false };
+  for (const k of Object.keys(out)) if (k === "ownerUid" || k.startsWith("owner")) delete out[k];
+  return out;
+}
 
 export const ELTON_SHOP = "elton";
 export const shopPublished = (shop: string, s: Store) => !!s.published || shop === ELTON_SHOP;
@@ -57,7 +103,10 @@ export const hasBuyerContact = (shop: string, s: Store) => {
 };
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
-const asYmd = (v: unknown) => { const s = String(v || "").trim(); return YMD.test(s) ? s : ""; };
+export function asYmd(v: unknown) {
+  const s = String(v || "").trim();
+  return YMD.test(s) ? s : "";
+}
 export const shopSlots = (s: Store) => (s.slots?.length ? s.slots : [...PICKUP_SLOTS]);
 
 /** Shop pickup window (no lead) — seller 日程変更. Open ~30d when 退去日 unset. */
@@ -142,6 +191,61 @@ export function applyMins(s: Store, raw: { minItems?: unknown; minTotal?: unknow
   return out;
 }
 
+/** Apply editor settings onto a copy. Throws the same errors as the admin actions. */
+export function applyShopSettings(current: Store, raw: Record<string, unknown>): Store {
+  const next: Store = {
+    ...current,
+    slots: current.slots?.slice(),
+    pickupSpots: current.pickupSpots?.map((s) => ({ ...s })),
+  };
+  if ("address" in raw) next.address = wardAddress(raw.address);
+  if ("bio" in raw) next.bio = String(raw.bio || "").trim();
+  for (const k of ["jimotyUrl", "youtubeUrl", "facebookUrl", "lineInviteUrl", "phone"] as const) {
+    if (k in raw) next[k] = String(raw[k] || "").trim();
+  }
+  if ("slots" in raw) next.slots = normalizeSlots(raw.slots);
+  if ("pickupSpots" in raw) next.pickupSpots = normalizeSpots(raw.pickupSpots);
+  if ("pickupTo" in raw || "leadDays" in raw) {
+    applyDates(next, {
+      pickupTo: "pickupTo" in raw ? raw.pickupTo : next.pickupTo,
+      moveOut: "pickupTo" in raw ? raw.pickupTo : next.moveOut,
+      leadDays: "leadDays" in raw ? raw.leadDays : next.leadDays,
+    });
+  }
+  if ("minItems" in raw || "minTotal" in raw) {
+    applyMins(next, {
+      minItems: "minItems" in raw ? raw.minItems : 0,
+      minTotal: "minTotal" in raw ? raw.minTotal : 0,
+    });
+  }
+  return next;
+}
+
+/** Firestore patch for the setting keys present in `raw` (editor field names). */
+export function settingsUpdate(current: Store, raw: Record<string, unknown>): Record<string, unknown> {
+  const next = applyShopSettings(current, raw);
+  const patch: Record<string, unknown> = {};
+  if ("address" in raw) patch.address = next.address;
+  if ("bio" in raw) patch.bio = next.bio || "";
+  for (const k of ["jimotyUrl", "youtubeUrl", "facebookUrl", "lineInviteUrl", "phone"] as const) {
+    if (k in raw) patch[k] = next[k] || "";
+  }
+  if ("slots" in raw) patch.slots = next.slots || [];
+  if ("pickupSpots" in raw) patch.pickupSpots = next.pickupSpots || [];
+  if ("pickupTo" in raw || "leadDays" in raw) {
+    patch.pickupFrom = next.pickupFrom || "";
+    patch.pickupTo = next.pickupTo || "";
+    patch.moveOut = next.moveOut || "";
+    patch.leadDays = next.leadDays ?? DEF_LEAD;
+  }
+  if ("minItems" in raw || "minTotal" in raw) {
+    const mins = shopMins(next);
+    patch.minItems = mins.minItems;
+    patch.minTotal = mins.minTotal;
+  }
+  return patch;
+}
+
 export const parseShop = (raw: string | null | undefined) => {
   const s = (raw || "").trim().toLowerCase();
   if (!s || s === ELTON_SHOP) return ELTON_SHOP;
@@ -217,6 +321,10 @@ export function shopFields(s: Store): Record<string, unknown> {
     ...shopMins(s),
     published: !!s.published,
     ...(s.ownerUid ? { ownerUid: s.ownerUid } : {}),
+    ...(s.rev != null ? { rev: s.rev } : {}),
+    ...(s.externalKey ? { externalKey: s.externalKey, source: s.source || "", sellerId: s.sellerId || "" } : {}),
+    ...(s.leaseAgentId ? { leaseAgentId: s.leaseAgentId, leaseExpiresAt: s.leaseExpiresAt || "" } : {}),
+    ...(s.lastAgentId ? { lastAgentId: s.lastAgentId } : {}),
   };
 }
 
@@ -226,6 +334,7 @@ export function itemFields(it: Item, pos: number): Record<string, unknown> {
     photos: it.photos || [], paused: !!it.paused, pos,
     availableAfter: asYmd(it.availableAfter) || null,
     ...(it.jimoty ? { jimoty: true } : {}),
+    ...(it.externalKey ? { externalKey: it.externalKey } : {}),
   };
 }
 
@@ -257,6 +366,7 @@ export function storeFromDocs(
       if (r.paused) it.paused = true;
       { const a = asYmd(r.availableAfter); if (a) it.availableAfter = a; }
       if (r.jimoty) it.jimoty = true;
+      if (r.externalKey) it.externalKey = String(r.externalKey);
       return it;
     }),
     claims: [...claims]
@@ -307,6 +417,13 @@ export function storeFromDocs(
   if (shop.published) s.published = true;
   if (shop.ownerUid) s.ownerUid = String(shop.ownerUid);
   if (shop.ownerLineUid) s.ownerLineUid = String(shop.ownerLineUid);
+  if (shop.rev != null && Number.isFinite(Number(shop.rev))) s.rev = Number(shop.rev);
+  if (shop.externalKey) s.externalKey = String(shop.externalKey);
+  if (shop.source) s.source = String(shop.source);
+  if (shop.sellerId) s.sellerId = String(shop.sellerId);
+  if (shop.leaseAgentId) s.leaseAgentId = String(shop.leaseAgentId);
+  if (shop.leaseExpiresAt) s.leaseExpiresAt = String(shop.leaseExpiresAt);
+  if (shop.lastAgentId) s.lastAgentId = String(shop.lastAgentId);
   if (!(s.youtubeUrl || "").trim()) {
     const y = ytUrl(s.bio || "");
     if (y) s.youtubeUrl = y;

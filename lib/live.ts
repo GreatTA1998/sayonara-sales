@@ -14,7 +14,7 @@ import {
   getFacebookName, getJimotyName, getLineName, getLineUid, getName,
 } from "./shop";
 import {
-  applyDates, applyMins, bookableDays, cartAfter, claimFields,
+  applyDates, applyMins, bookableDays, cartAfter, claimFields, priceOf,
   ELTON_SHOP, hasBuyerContact, itemFields, normalizeSlots, normalizeSpots, parseShop, shortCode, shopMins,
   shopFields, shopSlots, storeFromDocs, takenSlots, uid, type Claim, type Item, type Store,
 } from "./store";
@@ -280,12 +280,6 @@ export async function deleteUnclaimedShop(shopRaw: string): Promise<void> {
   await deleteDoc(shopRef);
 }
 
-/** Missing/blank → null (unset → 要相談). Explicit 0 stays ¥0 — never coerce unset to free. */
-const numPrice = (v: unknown) => {
-  if (v === "" || v == null || Number.isNaN(Number(v))) return null;
-  return Math.max(0, Number(v));
-};
-
 /**
  * Keep ⊂ claim.itemIds (≥1). Drops clear item.claimId when bound here.
  * `keepRaw` null = keep current list. `from` gates status transitions.
@@ -345,7 +339,7 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       const raw = typeof body.id === "string" ? body.id.trim() : "";
       const id = /^i[a-z0-9]+$/i.test(raw) ? raw : uid("i");
       const photos = Array.isArray(body.photos) ? body.photos.map(String).filter(Boolean) : [];
-      const item: Item = { id, name: String(body.name || "").trim(), price: numPrice(body.price) };
+      const item: Item = { id, name: String(body.name || "").trim(), price: priceOf(body.price) };
       if (photos.length) item.photos = photos;
       const ref = doc(db, "shops", shop, "items", id);
       if ((await getDoc(ref)).exists()) {
@@ -379,7 +373,7 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
           spotFromItems.push({ name: spotName, mapsUrl: typeof r.spotMapsUrl === "string" ? r.spotMapsUrl.trim() : "" });
         }
         batch.set(doc(db, "shops", shop, "items", id), itemFields({
-          id, name: String(r.name || "").trim(), price: numPrice(r.price),
+          id, name: String(r.name || "").trim(), price: priceOf(r.price),
           jimoty: true, ...(photos.length ? { photos } : {}), ...(note ? { note } : {}),
         }, base + i));
       });
@@ -432,7 +426,7 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       }
       const patch: Record<string, unknown> = {};
       if (body.name != null) patch.name = String(body.name).trim();
-      if ("price" in body) patch.price = numPrice(body.price);
+      if ("price" in body) patch.price = priceOf(body.price);
       if ("note" in body) patch.note = body.note ? String(body.note) : null;
       if ("paused" in body) patch.paused = !!body.paused;
       if ("availableAfter" in body) {

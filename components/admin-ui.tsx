@@ -18,6 +18,7 @@ import {
 } from "@/lib/shop";
 import {
   ELTON_SHOP, itemFlags, pickupDays, shopMins, shopPublished, uid,
+  wardAddress as kuFull, wardStem as kuStem,
   type Store,
 } from "@/lib/store";
 import { SITE_URL } from "@/lib/site";
@@ -52,8 +53,6 @@ const CONTACT_FIELD: Record<ContactMode, { span: string; ph: string; mode: "url"
   phone: { span: "電話番号", ph: "080-0000-0000", mode: "tel", ac: "tel" },
   facebook: { span: "Facebook Marketplace", ph: "投稿またはプロフィールURL", mode: "url", ac: "url" },
 };
-const kuStem = (v: string) => v.replace(/区$/, "");
-const kuFull = (v: string) => { const s = kuStem(v).trim(); return s ? `${s}区` : ""; };
 const itemLabel = (it?: Item | null) => it?.name?.trim() || "無題";
 const isRemote = (u: string) => /^https?:\/\//i.test(u);
 type PicStatus = "uploading" | "error";

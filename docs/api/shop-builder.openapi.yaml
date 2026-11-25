@@ -1,0 +1,799 @@
+openapi: 3.1.0
+info:
+  title: Shop builder
+  version: "1.0.0"
+  summary: Create and fill an unclaimed shop over HTTP.
+  description: |
+    One contract for an automation to create and fill an unclaimed shop.
+    Callers send a bearer token and a self-describing body. There is no browser
+    session, cookie, localStorage, or Firebase uid.
+
+    The shop URL is `url` (`https://sayonara.tokyo/s/{id}` in production). The
+    editor is `editorUrl` (`/s/{id}/admin`).
+
+    Settings use the shop editor's field names. There is no stored display name
+    or language (language is a viewer preference). Pickup notes and availability
+    notes belong in `bio`. `address` is the ward, stored with a trailing 区.
+    Items have no separate condition field; put that text in `note`. `paused`
+    is the seller hold. `sold` is read-only and comes from a pickup claim.
+
+    `published` and every `owner*` field are rejected. A claimed shop returns 409.
+    The response `rev` is also the ETag. Item, batch, lease, and photo-attach
+    writes require `If-Match` and return 412 when it does not match. Omit
+    `If-Match` only on the converge upsert.
+
+    Two agents with the same `externalSource` share one shop. The binding doc id
+    is a hash of that key, created inside a transaction. Pass `lease: true` (or
+    `POST .../lease`) so a second agent gets 423 instead of writing. Use a
+    distinct `X-Agent-Id` per worker.
+  x-limits:
+    itemsPerRequest: 40
+    photosPerItem: 12
+    leaseSeconds: 900
+    listLimit: 50
+    photoBytes: 12582912
+servers:
+  - url: https://sayonara.tokyo
+    description: Production
+  - url: https://beta.sayonara.tokyo
+    description: Beta
+security:
+  - bearerAuth: []
+tags:
+  - name: shops
+  - name: items
+  - name: photos
+paths:
+  /api/shop-builder/shops:
+    post:
+      tags: [shops]
+      operationId: upsertShop
+      summary: Create or update the shop for an external seller
+      description: |
+        Idempotent on `externalSource`. Re-running converges on the same shop.
+        When `items` is present it is the full set of externally keyed items
+        (at most 40). Items without an external key, and externally keyed items
+        that already have a pickup claim, are left in place (`kept`). Omit
+        `items` to leave the catalog alone. `lease: true` takes a 15 minute
+        build lease in the same transaction.
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+        - $ref: "#/components/parameters/IfMatch"
+        - $ref: "#/components/parameters/DryRunQuery"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShopUpsert"
+            example:
+              externalSource:
+                source: facebook_marketplace
+                sellerId: https://www.facebook.com/marketplace/profile/100
+              lease: true
+              settings:
+                address: 目黒
+                bio: 駅前で引き渡し。家具の解体可。
+                facebookUrl: https://www.facebook.com/marketplace/profile/100
+              items:
+                - externalKey: listing-1
+                  name: 椅子
+                  price: 1500
+                  note: 脚に小さな傷
+                  photos:
+                    - https://example.com/chair.jpg
+      responses:
+        "200":
+          description: Current shop. `ETag` is the revision.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shop"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Disabled"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/Precondition"
+        "423":
+          $ref: "#/components/responses/Locked"
+    get:
+      tags: [shops]
+      operationId: listShops
+      summary: List unclaimed shops by source and lease
+      description: |
+        Shops this API has bound to an `externalSource`. Claimed shops are
+        omitted. `lease=free` is unassigned work. `limit` caps the page
+        (max 50).
+      parameters:
+        - name: source
+          in: query
+          schema: { type: string }
+        - name: sellerId
+          in: query
+          description: Requires `source`. Returns at most one shop.
+          schema: { type: string }
+        - name: lease
+          in: query
+          schema:
+            type: string
+            enum: [any, free, held]
+            default: any
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        "200":
+          description: Matching unclaimed shops, without item rows.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [shops]
+                properties:
+                  shops:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Shop"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Disabled"
+  /api/shop-builder/shops/{shopId}:
+    get:
+      tags: [shops]
+      operationId: getShop
+      summary: Read one shop
+      parameters:
+        - $ref: "#/components/parameters/ShopId"
+      responses:
+        "200":
+          description: Shop state. `ETag` is `rev`.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shop"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Disabled"
+  /api/shop-builder/shops/{shopId}/lease:
+    post:
+      tags: [shops]
+      operationId: acquireLease
+      summary: Take or renew the build lease
+      description: 15 minutes by default, at most 900 seconds. The holder may renew. Another agent gets 423.
+      parameters:
+        - $ref: "#/components/parameters/ShopId"
+        - $ref: "#/components/parameters/AgentId"
+        - $ref: "#/components/parameters/IfMatchRequired"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                seconds:
+                  type: integer
+                  minimum: 60
+                  maximum: 900
+                dryRun:
+                  type: boolean
+      responses:
+        "200":
+          description: Shop with the lease held by this agent.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shop"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Disabled"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/Precondition"
+        "423":
+          $ref: "#/components/responses/Locked"
+        "428":
+          $ref: "#/components/responses/IfMatchRequired"
+    delete:
+      tags: [shops]
+      operationId: releaseLease
+      summary: Release the build lease
+      description: Only the holder can release a live lease. Releasing when none is held is a no-op.
+      parameters:
+        - $ref: "#/components/parameters/ShopId"
+        - $ref: "#/components/parameters/AgentId"
+        - $ref: "#/components/parameters/IfMatchRequired"
+        - $ref: "#/components/parameters/DryRunQuery"
+      responses:
+        "200":
+          description: Shop after release.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shop"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Disabled"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/Precondition"
+        "423":
+          $ref: "#/components/responses/Locked"
+        "428":
+          $ref: "#/components/responses/IfMatchRequired"
+  /api/shop-builder/shops/{shopId}/items:
+    post:
+      tags: [items]
+      operationId: batchItems
+      summary: Add, update, or delete items by external key
+      description: At most 40 ops, applied in one transaction. Does not rewrite items omitted from `ops`.
+      parameters:
+        - $ref: "#/components/parameters/ShopId"
+        - $ref: "#/components/parameters/AgentId"
+        - $ref: "#/components/parameters/IfMatchRequired"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ItemBatch"
+      responses:
+        "200":
+          description: Shop after the batch.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shop"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Disabled"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/Precondition"
+        "423":
+          $ref: "#/components/responses/Locked"
+        "428":
+          $ref: "#/components/responses/IfMatchRequired"
+  /api/shop-builder/shops/{shopId}/items/{itemKey}:
+    put:
+      tags: [items]
+      operationId: putItem
+      summary: Add or update one item
+      description: "`itemKey` is the external item key. Omitted fields stay as they are. At most 12 photos."
+      parameters:
+        - $ref: "#/components/parameters/ShopId"
+        - $ref: "#/components/parameters/ItemKey"
+        - $ref: "#/components/parameters/AgentId"
+        - $ref: "#/components/parameters/IfMatchRequired"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ItemPatch"
+      responses:
+        "200":
+          description: Shop after the item write.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shop"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Disabled"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/Precondition"
+        "423":
+          $ref: "#/components/responses/Locked"
+        "428":
+          $ref: "#/components/responses/IfMatchRequired"
+    delete:
+      tags: [items]
+      operationId: deleteItem
+      summary: Delete one externally keyed item
+      description: Refused with 409 when the item has a pickup claim.
+      parameters:
+        - $ref: "#/components/parameters/ShopId"
+        - $ref: "#/components/parameters/ItemKey"
+        - $ref: "#/components/parameters/AgentId"
+        - $ref: "#/components/parameters/IfMatchRequired"
+      responses:
+        "200":
+          description: Shop after the delete.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shop"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Disabled"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/Precondition"
+        "423":
+          $ref: "#/components/responses/Locked"
+        "428":
+          $ref: "#/components/responses/IfMatchRequired"
+  /api/shop-builder/shops/{shopId}/photos:
+    post:
+      tags: [photos]
+      operationId: uploadPhoto
+      summary: Store a photo on Vercel Blob
+      description: |
+        Multipart field `file` (a local image) or JSON `{ "url" }` (https).
+        The bytes are resized the same way as the shop editor and stored on
+        Vercel Blob. Without `itemKey` the call only returns the blob URL and
+        does not change `rev`. With `itemKey` the URL is appended to that item
+        and `If-Match` is required.
+      parameters:
+        - $ref: "#/components/parameters/ShopId"
+        - $ref: "#/components/parameters/AgentId"
+        - $ref: "#/components/parameters/IfMatch"
+        - $ref: "#/components/parameters/DryRunQuery"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                itemKey:
+                  type: string
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  format: uri
+                itemKey:
+                  type: string
+                dryRun:
+                  type: boolean
+      responses:
+        "200":
+          description: Blob URL, and the shop when `itemKey` was set.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhotoResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Disabled"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/Precondition"
+        "423":
+          $ref: "#/components/responses/Locked"
+        "428":
+          $ref: "#/components/responses/IfMatchRequired"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Value of the `SHOP_BUILDER_API_TOKEN` environment variable.
+  parameters:
+    ShopId:
+      name: shopId
+      in: path
+      required: true
+      schema: { type: string, pattern: "^[0-9]{5}$" }
+    ItemKey:
+      name: itemKey
+      in: path
+      required: true
+      description: External item key. Percent-encode it. Allowed characters are `[A-Za-z0-9._:~-]`.
+      schema: { type: string }
+    AgentId:
+      name: X-Agent-Id
+      in: header
+      required: true
+      description: Caller identity for the lease and `lastAgentId`. Unique per worker.
+      schema: { type: string, pattern: "^[A-Za-z0-9._:-]{1,80}$" }
+    IfMatch:
+      name: If-Match
+      in: header
+      required: false
+      description: Revision from `ETag` or `rev`. Wrong value is 412.
+      schema: { type: string }
+    IfMatchRequired:
+      name: If-Match
+      in: header
+      required: true
+      description: Revision from `ETag` or `rev`. Missing is 428. Wrong value is 412.
+      schema: { type: string }
+    DryRunQuery:
+      name: dryRun
+      in: query
+      schema: { type: boolean }
+      description: Validate only. No Firestore or Blob writes.
+  headers:
+    ETag:
+      description: Quoted shop revision, for example `"3"`.
+      schema: { type: string }
+  responses:
+    BadRequest:
+      description: The body does not match the editor fields.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Missing or wrong bearer token.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Disabled:
+      description: "SHOP_BUILDER_API_TOKEN is unset, or the shop does not exist."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: The shop is claimed, or the id and externalSource do not agree.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Precondition:
+      description: "If-Match is not the current revision."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    IfMatchRequired:
+      description: "This write needs If-Match."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Locked:
+      description: Another agent holds the build lease.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+        code:
+          type: string
+          enum: [validation, unauthorized, not_found, claimed, conflict, revision_mismatch, precondition_required, lease_held, item_claimed, rules, unavailable, internal]
+        id: { type: string }
+        rev: { type: integer }
+        url: { type: string }
+        editorUrl: { type: string }
+        claimed: { type: boolean }
+        lease:
+          $ref: "#/components/schemas/Lease"
+    ExternalSource:
+      type: object
+      additionalProperties: false
+      required: [source, sellerId]
+      properties:
+        source:
+          type: string
+          description: Stable origin, for example `facebook_marketplace`.
+          pattern: "^[a-z0-9][a-z0-9._:-]{0,63}$"
+        sellerId:
+          type: string
+          description: Stable seller id or profile URL. The same value always selects the same shop.
+          minLength: 1
+          maxLength: 500
+    ShopSettings:
+      type: object
+      additionalProperties: false
+      description: Editor shop settings. Omitted keys are left unchanged.
+      properties:
+        address:
+          type: string
+          description: Ward or area. Stored with a trailing 区, same as the editor.
+        bio:
+          type: string
+          description: Shop memo. Pickup notes, why they are selling, delivery, negotiable prices.
+        jimotyUrl: { type: string }
+        youtubeUrl: { type: string }
+        facebookUrl: { type: string }
+        lineInviteUrl: { type: string }
+        phone: { type: string }
+        slots:
+          type: array
+          items: { type: string }
+          description: Pickup time ranges. Empty uses the editor defaults.
+        pickupSpots:
+          type: array
+          items:
+            $ref: "#/components/schemas/PickupSpot"
+        pickupTo:
+          type: string
+          description: Last pickup day / move-out date (`YYYY-MM-DD`).
+        leadDays:
+          type: integer
+          minimum: 0
+          description: Soonest a buyer may book, in days from today.
+        minItems:
+          type: integer
+          minimum: 0
+          description: Soft minimum item count. Sending this clears `minTotal`.
+        minTotal:
+          type: integer
+          minimum: 0
+          description: Hard minimum yen total. Sending this clears `minItems`.
+    PickupSpot:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        mapsUrl: { type: string }
+    ItemWrite:
+      type: object
+      additionalProperties: false
+      required: [externalKey]
+      properties:
+        externalKey:
+          type: string
+          pattern: "^[A-Za-z0-9._:~-]{1,120}$"
+        name:
+          type: string
+          description: Item title (editor 品名).
+        price:
+          type: [integer, "null"]
+          minimum: 0
+          description: Yen. Null means price unset (要相談). 0 is free.
+        note:
+          type: [string, "null"]
+          description: Description. The editor has no condition field; put condition here.
+        photos:
+          type: array
+          maxItems: 12
+          items: { type: string, format: uri }
+          description: https URLs. The server copies them onto Vercel Blob.
+        paused:
+          type: boolean
+          description: Seller hold (一時停止). Not the sold flag.
+        availableAfter:
+          type: [string, "null"]
+          description: First pickup day (`YYYY-MM-DD`).
+    ItemPatch:
+      type: object
+      additionalProperties: false
+      description: Partial item. The external key is the path.
+      properties:
+        name: { type: string }
+        price:
+          type: [integer, "null"]
+          minimum: 0
+        note:
+          type: [string, "null"]
+        photos:
+          type: array
+          maxItems: 12
+          items: { type: string }
+        paused: { type: boolean }
+        availableAfter:
+          type: [string, "null"]
+        externalKey:
+          type: string
+          description: Optional. Must equal the path key.
+    ItemBatch:
+      type: object
+      additionalProperties: false
+      required: [ops]
+      properties:
+        dryRun: { type: boolean }
+        ops:
+          type: array
+          maxItems: 40
+          items:
+            oneOf:
+              - type: object
+                additionalProperties: false
+                required: [op, externalKey]
+                properties:
+                  op: { const: "upsert" }
+                  externalKey: { type: string }
+                  name: { type: string }
+                  price:
+                    type: [integer, "null"]
+                  note:
+                    type: [string, "null"]
+                  photos:
+                    type: array
+                    items: { type: string }
+                  paused: { type: boolean }
+                  availableAfter:
+                    type: [string, "null"]
+              - type: object
+                additionalProperties: false
+                required: [op, externalKey]
+                properties:
+                  op: { const: "delete" }
+                  externalKey: { type: string }
+    ShopUpsert:
+      type: object
+      additionalProperties: false
+      required: [externalSource]
+      properties:
+        externalSource:
+          $ref: "#/components/schemas/ExternalSource"
+        id:
+          type: string
+          pattern: "^[0-9]{5}$"
+          description: Adopt this unclaimed shop id on first bind.
+        settings:
+          $ref: "#/components/schemas/ShopSettings"
+        items:
+          type: array
+          maxItems: 40
+          items:
+            $ref: "#/components/schemas/ItemWrite"
+        lease:
+          type: boolean
+          description: Take or renew the build lease while writing.
+        leaseSeconds:
+          type: integer
+          minimum: 60
+          maximum: 900
+        dryRun:
+          type: boolean
+    Lease:
+      type: object
+      additionalProperties: false
+      required: [agentId, expiresAt]
+      properties:
+        agentId: { type: string }
+        expiresAt: { type: string, format: date-time }
+    Item:
+      type: object
+      additionalProperties: false
+      required: [id, externalKey, name, price, note, photos, paused, availableAfter, sold]
+      properties:
+        id: { type: [string, "null"] }
+        externalKey: { type: [string, "null"] }
+        name: { type: string }
+        price: { type: [integer, "null"] }
+        note: { type: string }
+        photos:
+          type: array
+          items: { type: string }
+        paused: { type: boolean }
+        availableAfter: { type: [string, "null"] }
+        sold:
+          type: boolean
+          description: Read-only. True when a pickup claim is marked picked up.
+    Shop:
+      type: object
+      required: [id, rev, url, editorUrl, claimed, published, externalSource, lease, settings, items]
+      properties:
+        id: { type: [string, "null"] }
+        rev: { type: integer }
+        url:
+          type: [string, "null"]
+          description: Public shop, `https://sayonara.tokyo/s/{id}` in production.
+          examples: ["https://sayonara.tokyo/s/48291"]
+        editorUrl:
+          type: [string, "null"]
+          description: Editor, `/s/{id}/admin`.
+          examples: ["https://sayonara.tokyo/s/48291/admin"]
+        path: { type: [string, "null"] }
+        editorPath: { type: [string, "null"] }
+        claimed: { type: boolean }
+        published: { type: boolean }
+        externalSource:
+          oneOf:
+            - $ref: "#/components/schemas/ExternalSource"
+            - type: "null"
+        lease:
+          oneOf:
+            - $ref: "#/components/schemas/Lease"
+            - type: "null"
+        lastAgentId: { type: [string, "null"] }
+        settings:
+          allOf:
+            - $ref: "#/components/schemas/ShopSettings"
+            - type: object
+              properties:
+                pickupFrom: { type: string, readOnly: true }
+                moveOut: { type: string, readOnly: true }
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Item"
+        dryRun: { type: boolean }
+        created: { type: boolean }
+        kept:
+          type: array
+          items: { type: string }
+          description: External item keys that were not deleted because a buyer has a claim.
+        photo:
+          type: object
+          properties:
+            url: { type: string }
+            bytesIn: { type: integer }
+            bytesOut: { type: integer }
+    PhotoResult:
+      type: object
+      properties:
+        dryRun: { type: boolean }
+        url: { type: string }
+        itemKey: { type: [string, "null"] }
+        bytesIn: { type: integer }
+        bytesOut: { type: integer }
+        id: { type: string }
+        rev: { type: integer }
+        editorUrl: { type: string }
+        photo:
+          type: object
+          properties:
+            url: { type: string }
+            bytesIn: { type: integer }
+            bytesOut: { type: integer }

@@ -92,5 +92,25 @@ service cloud.firestore {
         allow delete: if canAdmin(shopId) || (signedIn() && unclaimed(shopId));
       }
     }
+
+    // Shop-builder idempotency lock. Doc id is the hash of source + seller.
+    // Not a claim: no ownerUid. shopId is fixed unless that shop doc is gone.
+    match /shopSources/{keyId} {
+      allow get: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['shopId', 'source', 'sellerId'])
+        && request.resource.data.shopId.matches('^[0-9][0-9][0-9][0-9][0-9]$')
+        && request.resource.data.source is string
+        && request.resource.data.source.size() > 0
+        && request.resource.data.source.size() <= 64
+        && request.resource.data.sellerId is string
+        && request.resource.data.sellerId.size() > 0
+        && request.resource.data.sellerId.size() <= 500;
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['shopId'])
+        && request.resource.data.shopId.matches('^[0-9][0-9][0-9][0-9][0-9]$')
+        && !exists(/databases/$(database)/documents/shops/$(resource.data.shopId));
+      allow delete: if false;
+    }
   }
 }
