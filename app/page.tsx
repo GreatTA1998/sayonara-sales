@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import ShopBuyerView from "@/components/buyer-ui";
 import { Snack, useSnack } from "@/components/snack";
 import { peekShop } from "@/lib/live";
+import { t, useLang } from "@/lib/lang";
 import {
   AUTH_EVT, ELTON_ID, ELTON_LABEL, adminPath, ensureShopId, listSales, type SaleRow,
 } from "@/lib/shop";
@@ -13,6 +14,7 @@ type Card = SaleRow & { count: number };
 
 export default function HomePage() {
   const router = useRouter();
+  const lang = useLang();
   const [cards, setCards] = useState<Card[]>([]);
   const [selected, setSelected] = useState<string>(ELTON_ID);
   const { snack, show } = useSnack();
@@ -55,17 +57,17 @@ export default function HomePage() {
     e.stopPropagation();
     const url = `${SITE_URL}/s/${shopId}`;
     void navigator.clipboard?.writeText(url).catch(() => undefined);
-    show(`コピーしました\n${url}`, "ok");
+    show(`${t("home.copied", lang)}\n${url}`, "ok");
   };
 
   return (
     <main className="home">
-      <h1 className="slogan">非公式ジモティーお助けツール</h1>
-      <p className="subhero">受付中かどうかをリアルタイムで確認して受け渡し日時を予約、あとはジモティーで連絡して取引完了</p>
+      <h1 className="slogan">{t("home.slogan", lang)}</h1>
+      <p className="subhero">{t("home.sub", lang)}</p>
       <button type="button" className="cta go home-cta"
-        onClick={() => router.push(adminPath(ensureShopId()))}>2クリックで始める</button>
+        onClick={() => router.push(adminPath(ensureShopId()))}>{t("home.cta", lang)}</button>
       <div className="home-browse">
-        <div className="shop-tabs" role="tablist" aria-label="ショップ一覧">
+        <div className="shop-tabs" role="tablist" aria-label={t("home.tabs", lang)}>
           {cards.length ? cards.map((c) => (
             <button key={c.id} type="button" role="tab"
               className={`shop-tab${selected === c.id ? " on" : ""}`}
@@ -73,12 +75,12 @@ export default function HomePage() {
               onClick={() => setSelected(c.id)}>
               {c.count}点 {c.ward}
               {c.id === shopId && (
-                <span className="share" onClick={copyUrl}>URLコピー</span>
+                <span className="share" onClick={copyUrl}>{t("home.copy", lang)}</span>
               )}
             </button>
           )) : (
-            <span className="shop-tab ph on">読み込み中…
-              <span className="share" onClick={copyUrl}>URLコピー</span>
+            <span className="shop-tab ph on">{t("home.loading", lang)}
+              <span className="share" onClick={copyUrl}>{t("home.copy", lang)}</span>
             </span>
           )}
         </div>
