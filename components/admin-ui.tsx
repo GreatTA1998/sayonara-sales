@@ -36,7 +36,7 @@ const fmtSlot = (a: string, b: string) => `${a}–${b}`;
 type ContactMode = "jimoty" | "line" | "phone" | "facebook";
 type MinMode = "items" | "total";
 const CONTACT_OPTS: [string, string][] = [
-  ["jimoty", "ジモティー"], ["line", "LINE"], ["phone", "電話"], ["facebook", "Facebook"],
+  ["jimoty", "ジモティー"], ["facebook", "Facebook"], ["line", "LINE"], ["phone", "電話"],
 ];
 const MIN_OPTS: [string, string][] = [["items", "最低点数"], ["total", "最低合計"]];
 const methodJa = (m?: string) =>
@@ -194,8 +194,8 @@ export default function ShopAdminView({ shop, name }: Props) {
     setJimoty(j); setLineInvite(l); setPhone(p); setFacebook(f);
     setYoutube(body.youtubeUrl || ytUrl(bioVal) || local.youtubeUrl || "");
     setContactMode(
-      (j.trim() && "jimoty") || (l.trim() && "line") || (p.trim() && "phone")
-        || (f.trim() && "facebook") || "jimoty",
+      (j.trim() && "jimoty") || (f.trim() && "facebook") || (l.trim() && "line")
+        || (p.trim() && "phone") || "jimoty",
     );
     setSlots(body.slots?.length ? body.slots : [...PICKUP_SLOTS]);
     setPickupTo(body.pickupTo || body.moveOut || "");

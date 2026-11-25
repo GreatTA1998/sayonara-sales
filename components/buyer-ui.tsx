@@ -96,7 +96,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const phoneDisp = (state?.phone || "").trim();
   const canJimoty = !!jimotyUrl, canLine = !!lineUrl, canPhone = !!phoneDisp, canFb = !!facebookUrl;
   const methodOpts = (
-    [["jimoty", canJimoty], ["line", canLine], ["phone", canPhone], ["facebook", canFb]] as const
+    [["jimoty", canJimoty], ["facebook", canFb], ["line", canLine], ["phone", canPhone]] as const
   ).filter(([, ok]) => ok).map(([id]) => [id, CH[id][0]] as [Method, string]);
   const barMove = moveOutLeft(state?.moveOut ? [state.moveOut] : []);
   const loggedIn = !!knownName;
@@ -189,7 +189,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const minTotal = Number(state?.minTotal) || 0;
   const underFloor = minTotal > 0 && cartTotal < minTotal;
   const canSend = !!slot && !!method && !!contactVal && chanOk && pickedItems.length > 0
-    && (method === "jimoty" ? canJimoty : method === "line" ? canLine : canPhone)
+    && ({ jimoty: canJimoty, facebook: canFb, line: canLine, phone: canPhone }[method])
     && (!after || day >= after) && !underFloor;
   const rule = state?.rule || null;
 
@@ -313,7 +313,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             const n = getName();
             if (n) setLineName(n);
             setOpenId(null); setSlot(null);
-            setMethod(canJimoty ? "jimoty" : canLine ? "line" : canPhone ? "phone" : canFb ? "facebook" : null);
+            setMethod(canJimoty ? "jimoty" : canFb ? "facebook" : canLine ? "line" : canPhone ? "phone" : null);
             setChanOk(false); setErr(null); setCheckout(true);
           }}>
           {pickedItems.length ? `引き取りを依頼 (${pickedItems.length})` : "引き取りを依頼"}
