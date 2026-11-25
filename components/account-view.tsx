@@ -45,7 +45,7 @@ export function AccountView({
   return (
     <div className="account-view">
       <h1>{name || t("me.title", lang)}</h1>
-      {!name ? (
+      {!name && !hard ? (
         <SoftLoginForm className="soft-login" onDone={(id) => onLoginDone?.(id)} />
       ) : (
         <>
@@ -53,7 +53,7 @@ export function AccountView({
             <>
               <p className="hint">{t("me.lineSecure", lang)}</p>
               <dl className="id-view">
-                <div><dt>{t("me.lineName", lang)}</dt><dd>{line || "—"}</dd></div>
+                <div><dt>{t("me.lineName", lang)}</dt><dd>{line || name || "—"}</dd></div>
                 <div><dt>{t("me.jimotyName", lang)}</dt><dd>{jimoty || "—"}</dd></div>
                 <div><dt>{t("me.facebookName", lang)}</dt><dd>{facebook || "—"}</dd></div>
               </dl>

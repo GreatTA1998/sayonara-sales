@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { byPrice, Listings, ListingTools, money, Seg, useDense, usePriceDir, useShowSold } from "@/components/photo-listing";
 import { SoftLoginForm } from "@/components/soft-login";
@@ -6,9 +7,10 @@ import { useBodyScrollLock, useMaskDismiss } from "@/components/snack";
 import { afterLbl, dayLbl, moveOutLeft, tokyoYmd } from "@/lib/days";
 import { CLAIM_KEY, lineLoginHref, WL_KEY } from "@/components/line-oauth";
 import { bookShop, claimShop, joinWaitLive, leaveWaitLive, listenShop } from "@/lib/live";
+import { t, useLang } from "@/lib/lang";
 import { notifyLine } from "@/lib/notify";
 import {
-  adoptShop, applyLineSession, getId, getLineUid, getName, openShop, pushBuy, subscribeAuth,
+  adoptShop, adminPath, applyLineSession, getId, getLineUid, getName, openShop, pushBuy, subscribeAuth,
 } from "@/lib/shop";
 import {
   bookableDays, cartAfter, cartRule, itemFlags, shopContact, shopMins, shopPublished, shopSlots,
@@ -86,6 +88,8 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [lineName, setLineName] = useState("");
   const knownName = useSyncExternalStore(subscribeAuth, getName, () => "");
   const lineUid = useSyncExternalStore(subscribeAuth, getLineUid, () => "");
+  const myShop = useSyncExternalStore(subscribeAuth, getId, () => "");
+  const lang = useLang();
   const [chanOk, setChanOk] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -106,10 +110,12 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     [["jimoty", canJimoty], ["facebook", canFb], ["line", canLine], ["phone", canPhone]] as const
   ).filter(([, ok]) => ok).map(([id]) => [id, CH[id][0]] as [Method, string]);
   const barMove = moveOutLeft(state?.moveOut ? [state.moveOut] : []);
-  const loggedIn = !!knownName;
+  const loggedIn = !!(knownName || lineUid);
   const hardLine = !!lineUid;
-  /** Unpublished + unbound — first soft/LINE login wins. */
-  const claimable = !!state && !state.published && !state.ownerUid && !embed && shop !== "elton";
+  /** Unowned dig5 — Claim CTA; never gated on published (handoff shops may be live). */
+  const claimable = !!state && !state.ownerUid && !embed && shop !== "elton";
+  /** Soft pointer after claim / adopt — owner chrome instead of Claim. */
+  const isMine = !!state?.ownerUid && myShop === shop;
   /** Soft identity (incl. Facebook名) covers Jimoty/LINE/FB contact; phone still typed. */
   const useStored = method === "phone" ? false
     : method === "line" ? (hardLine || loggedIn) : loggedIn;
@@ -137,7 +143,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     try {
       adoptShop(shop);
       const r = await claimShop(shop);
-      if (r === "taken") setErr("すでに他の人がクレーム済みです");
+      if (r === "taken") setErr(t("claim.taken", lang));
       else setClaimOpen(false);
       setState((prev) => prev && r !== "taken" ? { ...prev, ownerUid: "me" } : prev);
     } catch (e) { setErr(e instanceof Error ? e.message : "失敗しました"); }
@@ -371,17 +377,22 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
       {claimable && (
         <div className="claim-banner">
           {claimOpen ? (
-            <SoftLoginForm className="soft-login claim-login" onDone={() => { void doClaim(); }} />
+            <SoftLoginForm className="soft-login claim-login" claimShopId={shop}
+              onDone={() => { void doClaim(); }} />
           ) : (
             <button type="button" className="cta go" disabled={claimBusy}
               onClick={() => {
-                try { sessionStorage.setItem(CLAIM_KEY, shop); } catch { /* ignore */ }
-                if (knownName || lineUid) void doClaim();
+                if (loggedIn) void doClaim();
                 else setClaimOpen(true);
               }}>
-              {claimBusy ? "処理中…" : "このショップを自分のものにする"}
+              {claimBusy ? t("claim.busy", lang) : t("claim.cta", lang)}
             </button>
           )}
+        </div>
+      )}
+      {isMine && !embed && (
+        <div className="claim-banner">
+          <Link className="cta go" href={adminPath(shop)} prefetch>{t("claim.manage", lang)}</Link>
         </div>
       )}
       {err && !checkout && !open && <div className="err">{err}</div>}

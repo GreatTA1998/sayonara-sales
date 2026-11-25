@@ -89,12 +89,12 @@ export async function claimShop(shopRaw: string): Promise<"ok" | "mine" | "taken
   return prev === user.uid ? "mine" : "ok";
 }
 
-/** Live shop: public onSnapshot (no auth). Admin seeds doc; claim only if soft/LINE. */
+/** Live shop: public onSnapshot (no auth). Admin may seed doc; never auto-claim. */
 export function listenShop(
   shopRaw: string,
   onData: (s: Store) => void,
   onErr?: (e: Error) => void,
-  opts?: { claimOwner?: boolean },
+  opts?: { seed?: boolean },
 ): Unsubscribe {
   const shop = parseShop(shopRaw);
   const db = getDb();
@@ -138,16 +138,10 @@ export function listenShop(
     }, fail);
   };
 
-  // New shops 404 until the doc exists — seed without ownerUid; claim if already logged in.
-  if (opts?.claimOwner && shop !== ELTON_SHOP) {
+  // New shops 404 until the doc exists — seed without ownerUid; claim is an explicit CTA.
+  if (opts?.seed && shop !== ELTON_SHOP) {
     void ensureAuth()
-      .then(async () => {
-        await ensureShopDoc(shop);
-        if (softLogged()) {
-          const r = await claimShop(shop);
-          if (r === "taken") throw new Error(NO_EDIT);
-        }
-      })
+      .then(() => ensureShopDoc(shop))
       .then(start)
       .catch(fail);
   } else start();
@@ -228,11 +222,13 @@ async function setClaimItems(
 /** Admin mutations — same action surface as old /api/admin. */
 export async function adminAct(shopRaw: string, body: Record<string, unknown>): Promise<unknown> {
   const shop = parseShop(shopRaw);
-  await ensureAuth();
-  // Non-elton: soft/LINE claim then owner writes. Elton: signedIn only (rules).
+  const user = await ensureAuth();
+  // Non-elton: must already own (explicit claim). Elton: signedIn only (rules).
   if (shop !== ELTON_SHOP) {
-    const r = await claimShop(shop);
-    if (r === "taken") throw new Error(NO_EDIT);
+    if (!softLogged()) throw new Error(NEED_LOGIN);
+    const prev = String((await getDoc(doc(getDb(), "shops", shop))).data()?.ownerUid || "");
+    if (!prev) throw new Error("先にショップをクレームしてください");
+    if (prev !== user.uid) throw new Error(NO_EDIT);
   }
   const db = getDb();
   const shopRef = doc(db, "shops", shop);

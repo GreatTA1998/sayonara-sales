@@ -40,6 +40,9 @@ export const WL_KEY = "ss-wl";
 export const CLAIM_KEY = "ss-claim";
 
 /** Hard login. Needs LINE_CHANNEL_ID/SECRET on Vercel; else ?line_err=config. */
-export function LineLoginLink() {
-  return <a className="cta line" href={lineLoginHref()}>LINEでログイン</a>;
+export function LineLoginLink({ onNavigate }: { onNavigate?: () => void } = {}) {
+  return (
+    <a className="cta line" href={lineLoginHref()}
+      onClick={() => { onNavigate?.(); }}>LINEでログイン</a>
+  );
 }
