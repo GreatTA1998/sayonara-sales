@@ -1,13 +1,14 @@
-# Publish Firestore rules when firestore.rules changes on main.
-# Keyless: GitHub OIDC impersonates github-rules-deploy via Workload Identity.
-# No JSON keys and no GitHub secrets. One-time setup: docs/rules-deploy.md
-# Photos are Vercel Blob. Indexes are not deployed.
+# Publish Firestore rules when firestore.rules or this workflow changes on main.
+# Keyless Workload Identity. The Rules REST API needs only firebaserules.admin.
+# The Firebase CLI is not used: it calls serviceusage, which this account cannot.
+# One-time setup: docs/rules-deploy.md
 name: deploy-firebase-rules
 on:
   push:
     branches: [main]
     paths:
       - firestore.rules
+      - .github/workflows/deploy-firebase-rules.yml
   workflow_dispatch:
 
 permissions:
@@ -29,12 +30,13 @@ jobs:
         with:
           workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ env.SERVICE_ACCOUNT }}
+          token_format: access_token
       - name: Workload Identity is not configured
         if: steps.auth.outcome == 'failure'
         run: |
           echo "::error title=Rules not deployed::Workload Identity is not set up for ${SERVICE_ACCOUNT} (${WORKLOAD_IDENTITY_PROVIDER}). One-time setup, browser only: docs/rules-deploy.md. No GitHub secret is used. Until then, paste firestore.rules in the Firebase console."
           exit 1
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: npx -y firebase-tools@15.37.0 deploy --only firestore:rules --project sayonara-sales --non-interactive
+      - name: Publish Firestore rules
+        env:
+          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: python3 scripts/publish-firestore-rules.py
