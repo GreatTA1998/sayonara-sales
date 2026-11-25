@@ -78,7 +78,7 @@ export function ListingTools({
   );
 }
 
-export const money = (p: number | null) => (p == null ? "未設定" : `¥${p.toLocaleString()}`);
+export const money = (p: number | null) => (p == null ? "要相談" : `¥${p.toLocaleString()}`);
 
 function labelName(name: string) {
   const t = (name || "").trim();
@@ -120,7 +120,7 @@ function PhotoCard({
       </div>
       {!dense && (
         <div className="xmeta">
-          {item.price != null ? <div className="xprice">{money(item.price)}</div> : null}
+          <div className="xprice">{money(item.price)}</div>
           <div className={`xname${!item.name?.trim() ? " empty" : ""}`}>{name}</div>
         </div>
       )}
@@ -140,7 +140,7 @@ function TextTile({
     <button type="button" disabled={disabled} aria-label={name} onClick={onClick}
       className={`xtxt${dense ? " dense" : ""}${later ? " later" : ""}${cls}`}
       data-after={item.after || undefined}>
-      {!dense && item.price != null ? <span className="xprice">{money(item.price)}</span> : null}
+      {!dense && <span className="xprice">{money(item.price)}</span>}
       <span className={`xname${!item.name?.trim() ? " empty" : ""}`}>{name}</span>
     </button>
   );
