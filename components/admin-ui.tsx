@@ -744,7 +744,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   async function saveMins(mode = minMode, n = minItems, y = minTotal) {
     const body = await act({
       action: "mins",
-      minItems: mode === "items" ? n : 0,
+      minItems: mode === "items" ? Math.min(5, Math.max(0, n)) : 0,
       minTotal: mode === "total" ? y : 0,
     }, "保存しました");
     if (!body) return;
@@ -1093,14 +1093,21 @@ export default function ShopAdminView({ shop, name }: Props) {
           </div>
           <label className="float lead"><span>{minMode === "items" ? "最低点数" : "最低合計"}</span>
             <span className="lead-row">
-              <input type="number" min={0} inputMode="numeric"
-                aria-label={minMode === "items" ? "最低点数（0でなし）" : "最低合計円（0でなし）"}
-                value={minMode === "items" ? minItems : minTotal}
-                onChange={(e) => {
-                  const n = Math.max(0, Math.floor(Number(e.target.value) || 0));
-                  (minMode === "items" ? setMinItems : setMinTotal)(n);
-                }}
-                onBlur={() => void saveMins(minMode)} />
+              {minMode === "items" ? (
+                <select aria-label="最低点数（0でなし）" value={Math.min(5, minItems)}
+                  onChange={(e) => {
+                    const n = Number(e.target.value);
+                    setMinItems(n);
+                    void saveMins("items", n);
+                  }}>
+                  {Array.from({ length: 6 }, (_, i) => <option key={i} value={i}>{i}</option>)}
+                </select>
+              ) : (
+                <input type="number" min={0} inputMode="numeric"
+                  aria-label="最低合計円（0でなし）" value={minTotal}
+                  onChange={(e) => setMinTotal(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+                  onBlur={() => void saveMins("total")} />
+              )}
               <span aria-hidden="true">{minMode === "items" ? "点" : "円"}</span>
             </span>
           </label>
