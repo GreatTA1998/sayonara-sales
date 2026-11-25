@@ -36,7 +36,7 @@ type State = {
 type Receipt = { day: string; slot: string; total?: number };
 type Method = "jimoty" | "line" | "phone" | "facebook";
 type Props = {
-  shop: string; name: string; /** Flatten padding when embedded on home. */ embed?: boolean;
+  shop: string; /** Flatten padding when embedded on home. */ embed?: boolean;
   onReady?: () => void;
 };
 const CH = {
@@ -80,7 +80,7 @@ function toBuyerState(shop: string, s: Store): State {
   };
 }
 
-export default function ShopBuyerView({ shop, name, embed, onReady }: Props) {
+export default function ShopBuyerView({ shop, embed, onReady }: Props) {
   const [state, setState] = useState<State | null>(null);
   const [day, setDay] = useState("");
   const cartKey = `ss-cart-${shop}`;
@@ -388,7 +388,7 @@ export default function ShopBuyerView({ shop, name, embed, onReady }: Props) {
         <p className="ext-links">
           {state.jimotyUrl ? (
             <a className="ext-link" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">
-              {name}のジモティープロフィール
+              ジモティー
             </a>
           ) : null}
           {state.facebookUrl ? (

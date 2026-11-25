@@ -1,7 +1,7 @@
 "use client";
 import ShopBuyerView from "@/components/buyer-ui";
-import { ELTON_ID, ELTON_LABEL } from "@/lib/shop";
+import { ELTON_ID } from "@/lib/shop";
 
 export default function EltonBuyer() {
-  return <ShopBuyerView shop={ELTON_ID} name={ELTON_LABEL} />;
+  return <ShopBuyerView shop={ELTON_ID} />;
 }

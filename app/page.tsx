@@ -6,7 +6,7 @@ import { Snack, useSnack } from "@/components/snack";
 import { peekShop } from "@/lib/live";
 import { t, useLang } from "@/lib/lang";
 import {
-  AUTH_EVT, ELTON_ID, ELTON_LABEL, adminPath, ensureShopId, listSales, type SaleRow,
+  AUTH_EVT, ELTON_ID, adminPath, ensureShopId, listSales, type SaleRow,
 } from "@/lib/shop";
 import { SITE_URL } from "@/lib/site";
 
@@ -86,8 +86,7 @@ export default function HomePage() {
             ))}
           </div>
           <div className="home-shop">
-            <ShopBuyerView key={shopId} shop={shopId} name={active?.name || ELTON_LABEL} embed
-              onReady={onShopReady} />
+            <ShopBuyerView key={shopId} shop={shopId} embed onReady={onShopReady} />
           </div>
         </div>
         <footer className="soft-promo hint">Made by エルトン</footer>
