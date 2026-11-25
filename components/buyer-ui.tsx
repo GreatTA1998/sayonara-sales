@@ -433,41 +433,43 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
         <div className="mask drawer" role="dialog" aria-modal="true" aria-label={open.name} {...detailMask}>
           <div className="sheet drawer" onClick={(e) => e.stopPropagation()}>
             {openPics.length > 0 && <div className="pics">{openPics.map((src) => <img key={src} src={src} alt="" loading="lazy" decoding="async" />)}</div>}
-            <div className="sp">{money(open.price)}</div>
-            <h2>{open.name}</h2>
-            {open.note ? <p className="sn">{open.note}</p> : null}
-            {open.availableAfter && open.availableAfter > tokyoYmd() ? (
-              <p className="hint">{dayLbl(open.availableAfter)}以降受取可</p>
-            ) : null}
-            {soldOpen ? (
-              <p className="sw sold">{t("badge.sold", lang)}</p>
-            ) : takenOpen ? (
-              <>
-                <p className="sw sold">{t("badge.booked", lang)}{open.when ? ` — ${open.when}` : ""}</p>
-                {open.waitN ? <p className="sw">{open.waitN}人待ち</p> : null}
-                {err && <div className="err">{err}</div>}
-                {waiting ? (
-                  <button type="button" className="cta soft" disabled={busy}
-                    onClick={() => void leaveWait(open.id)}>順番をやめる</button>
-                ) : canWaitSoft ? (
-                  <button type="button" className="cta go" disabled={busy}
-                    onClick={() => void joinWait(open.id)}>キャンセル待ち</button>
-                ) : (
-                  <a className="cta line" href={lineLoginHref()}
-                    onClick={() => { try { sessionStorage.setItem(WL_KEY, `${shop}|${open.id}`); } catch { /* */ } }}>
-                    LINEでログインして並ぶ
-                  </a>
-                )}
-              </>
-            ) : (
-              <>
-                {open.reqN ? <p className="sw">{t("badge.reqN", lang, { n: open.reqN })}</p> : null}
-                <button type="button" className={`cta${onOpen ? " soft" : " go"}`}
-                  onClick={() => { toggle(open.id); closeDetail(); }}>
-                  {onOpen ? "外す" : open.reqN ? "次に並ぶ" : "追加"}
-                </button>
-              </>
-            )}
+            <div className="dr-side">
+              <div className="sp">{money(open.price)}</div>
+              <h2>{open.name}</h2>
+              {open.note ? <p className="sn">{open.note}</p> : null}
+              {open.availableAfter && open.availableAfter > tokyoYmd() ? (
+                <p className="hint">{dayLbl(open.availableAfter)}以降受取可</p>
+              ) : null}
+              {soldOpen ? (
+                <p className="sw sold">{t("badge.sold", lang)}</p>
+              ) : takenOpen ? (
+                <>
+                  <p className="sw sold">{t("badge.booked", lang)}{open.when ? ` — ${open.when}` : ""}</p>
+                  {open.waitN ? <p className="sw">{open.waitN}人待ち</p> : null}
+                  {err && <div className="err">{err}</div>}
+                  {waiting ? (
+                    <button type="button" className="cta soft" disabled={busy}
+                      onClick={() => void leaveWait(open.id)}>順番をやめる</button>
+                  ) : canWaitSoft ? (
+                    <button type="button" className="cta go" disabled={busy}
+                      onClick={() => void joinWait(open.id)}>キャンセル待ち</button>
+                  ) : (
+                    <a className="cta line" href={lineLoginHref()}
+                      onClick={() => { try { sessionStorage.setItem(WL_KEY, `${shop}|${open.id}`); } catch { /* */ } }}>
+                      LINEでログインして並ぶ
+                    </a>
+                  )}
+                </>
+              ) : (
+                <>
+                  {open.reqN ? <p className="sw">{t("badge.reqN", lang, { n: open.reqN })}</p> : null}
+                  <button type="button" className={`cta${onOpen ? " soft" : " go"}`}
+                    onClick={() => { toggle(open.id); closeDetail(); }}>
+                    {onOpen ? "外す" : open.reqN ? "次に並ぶ" : "追加"}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
