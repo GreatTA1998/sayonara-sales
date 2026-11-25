@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { byPrice, Listings, ListingTools, money, Seg, useDense, usePriceDir, useShowSold } from "@/components/photo-listing";
+import { PhotoLightbox } from "@/components/photo-lightbox";
 import { SoftLoginForm } from "@/components/soft-login";
 import { useBodyScrollLock, useMaskDismiss } from "@/components/snack";
 import { afterLbl, dayLbl, moveOutLeft, tokyoYmd } from "@/lib/days";
@@ -86,6 +87,7 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
   const cartKey = `ss-cart-${shop}`;
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
   const [openId, setOpenId] = useState<string | null>(null);
+  const [viewPic, setViewPic] = useState<string | null>(null);
   const [checkout, setCheckout] = useState(false);
   const [slot, setSlot] = useState<string | null>(null);
   const [method, setMethod] = useState<Method | null>(null);
@@ -219,12 +221,13 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       e.preventDefault();
+      if (viewPic) { setViewPic(null); return; }
       if (checkout) setCheckout(false);
       else setOpenId(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, checkout]);
+  }, [open, checkout, viewPic]);
 
   const gridItems = [...(state?.items || [])].sort(byPrice(priceDir));
   const listItems = showSold ? gridItems : gridItems.filter((i) => !i.sold);
@@ -307,7 +310,7 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
     finally { setBusy(false); }
   }
 
-  function closeDetail() { setOpenId(null); }
+  function closeDetail() { setViewPic(null); setOpenId(null); }
   const detailMask = useMaskDismiss(closeDetail);
 
   async function book() {
@@ -432,7 +435,7 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
       {open && !checkout && (
         <div className="mask drawer" role="dialog" aria-modal="true" aria-label={open.name} {...detailMask}>
           <div className="sheet drawer" onClick={(e) => e.stopPropagation()}>
-            {openPics.length > 0 && <div className="pics">{openPics.map((src) => <img key={src} src={src} alt="" loading="lazy" decoding="async" />)}</div>}
+            {openPics.length > 0 && <div className="pics">{openPics.map((src) => <img key={src} src={src} alt="" loading="lazy" decoding="async" onClick={() => setViewPic(src)} />)}</div>}
             <div className="dr-side">
               <div className="sp">{money(open.price)}</div>
               <h2>{open.name}</h2>
@@ -472,6 +475,9 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
             </div>
           </div>
         </div>
+      )}
+      {viewPic && open && (
+        <PhotoLightbox src={viewPic} onClose={() => setViewPic(null)} />
       )}
       {checkout && (
         <div className="mask" role="dialog" aria-modal="true" aria-label="引き取り日程"
