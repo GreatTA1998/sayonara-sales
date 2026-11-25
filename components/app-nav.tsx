@@ -5,9 +5,9 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AccountView } from "@/components/account-view";
 import { Icon } from "@/components/icons";
 import { useLineOAuthReturn } from "@/components/line-oauth";
-import { SoftLoginForm } from "@/components/soft-login";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { listenPendingRequests } from "@/lib/live";
+import { t, useLang } from "@/lib/lang";
 import { adminPath, ensureShopId, getId, getName, subscribeAuth } from "@/lib/shop";
 
 type Shot = { preview: string; url?: string; err?: string };
@@ -20,6 +20,7 @@ export default function AppNav() {
   const path = usePathname() || "";
   const name = useSyncExternalStore(subscribeAuth, getName, () => "");
   const shopId = useSyncExternalStore(subscribeAuth, getId, () => "");
+  const lang = useLang();
   const [open, setOpen] = useState<"help" | "me" | "">("");
   const [body, setBody] = useState("");
   const [shot, setShot] = useState<Shot | null>(null);
@@ -111,7 +112,7 @@ export default function AppNav() {
     <nav className="app-nav bot" aria-label="アプリ">
       <div className="app-nav-inner">
         <div className="nav-start">
-          <Link href="/" className="brand" prefetch aria-label="サヨナラ ホーム">
+          <Link href="/" className="brand" prefetch aria-label={t("nav.home", lang)}>
             <img className="logo" src="/sun-logo.png" alt="" width={52} height={27} decoding="async" />
             <span>サヨナラ</span>
           </Link>
@@ -121,15 +122,15 @@ export default function AppNav() {
               if (shopId) return;
               e.preventDefault();
               router.push(adminPath(ensureShopId()));
-            }}>{shopId ? <>投稿一覧{reqN > 0 ? <span className="nav-badge" aria-label={`依頼${reqN}件`}>{reqN}</span> : null}</> : "投稿"}</Link>
+            }}>{shopId ? <>{t("nav.listings", lang)}{reqN > 0 ? <span className="nav-badge" aria-label={t("nav.req", lang, { n: reqN })}>{reqN}</span> : null}</> : t("nav.post", lang)}</Link>
         </div>
         <div className="nav-end">
           <div className="nav-help">
             <button type="button" className={`nav-a${open === "help" ? " on" : ""}`}
               aria-expanded={open === "help"} aria-haspopup="dialog"
-              onClick={() => { setOpen(open === "help" ? "" : "help"); setMsg(""); }}>ヘルプ</button>
+              onClick={() => { setOpen(open === "help" ? "" : "help"); setMsg(""); }}>{t("nav.help", lang)}</button>
             {open === "help" && (
-              <form className="menu-pop up pane help-pane" role="dialog" aria-label="ヘルプ" onSubmit={sendHelp}
+              <form className="menu-pop up pane help-pane" role="dialog" aria-label={t("nav.help", lang)} onSubmit={sendHelp}
                 onPaste={(e) => {
                   const item = [...e.clipboardData.items].find((i) => i.type.startsWith("image/"));
                   if (!item) return;
@@ -173,15 +174,12 @@ export default function AppNav() {
           <div className="nav-me">
             <button type="button" className={`nav-a${open === "me" ? " on" : ""}`}
               aria-expanded={open === "me"} aria-haspopup="dialog"
-              onClick={() => setOpen(open === "me" ? "" : "me")}>{name || "ログイン"}</button>
-            {open === "me" && (name ? (
-              <div className="menu-pop up pane help-pane me-pane" role="dialog" aria-label="アカウント">
-                <AccountView onAfterLogout={closeMe} onNav={closeMe} />
+              onClick={() => setOpen(open === "me" ? "" : "me")}>{name || t("nav.login", lang)}</button>
+            {open === "me" && (
+              <div className="menu-pop up pane help-pane me-pane" role="dialog" aria-label={t("me.title", lang)}>
+                <AccountView onAfterLogout={closeMe} onLoginDone={closeMe} onNav={closeMe} />
               </div>
-            ) : (
-              <SoftLoginForm className="menu-pop up pane soft-login" autoFocus
-                onDone={closeMe} />
-            ))}
+            )}
           </div>
         </div>
       </div>
