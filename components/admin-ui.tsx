@@ -758,10 +758,6 @@ export default function ShopAdminView({ shop, name }: Props) {
     if (d.over !== d.from) void reorderPhotos(d.from, d.over);
   }
 
-  function copyUrl() {
-    void navigator.clipboard?.writeText(`${SITE_URL}/s/${shop}`).catch(() => undefined);
-    show("コピーしました", "ok");
-  }
   function publish() {
     const val = contactMode === "jimoty" ? jimoty : contactMode === "line" ? lineInvite
       : contactMode === "phone" ? phone : facebook;
@@ -877,7 +873,7 @@ export default function ShopAdminView({ shop, name }: Props) {
           <span aria-hidden="true">区</span>
         </label>
         <span className="spacer" aria-hidden="true" />
-        {!unbound && logged && <button type="button" className="share" onClick={copyUrl}>URLコピー</button>}
+        {!unbound && logged && <button type="button" className="share" onClick={() => copyText(`${SITE_URL}/s/${shop}`)}>URLコピー</button>}
         {unbound ? (
           <span className="save-more">
             <button type="button" className="req" disabled={ownBusy}
