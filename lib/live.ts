@@ -326,13 +326,14 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       if ("bio" in body) patch.bio = String(body.bio || "").trim();
       if ("jimotyUrl" in body) patch.jimotyUrl = String(body.jimotyUrl || "").trim();
       if ("youtubeUrl" in body) patch.youtubeUrl = String(body.youtubeUrl || "").trim();
+      if ("facebookUrl" in body) patch.facebookUrl = String(body.facebookUrl || "").trim();
       if ("lineInviteUrl" in body) patch.lineInviteUrl = String(body.lineInviteUrl || "").trim();
       if ("phone" in body) patch.phone = String(body.phone || "").trim();
       await updateDoc(shopRef, patch);
       return {
         bio: String(patch.bio ?? ""), jimotyUrl: String(patch.jimotyUrl ?? ""),
-        youtubeUrl: String(patch.youtubeUrl ?? ""), lineInviteUrl: String(patch.lineInviteUrl ?? ""),
-        phone: String(patch.phone ?? ""),
+        youtubeUrl: String(patch.youtubeUrl ?? ""), facebookUrl: String(patch.facebookUrl ?? ""),
+        lineInviteUrl: String(patch.lineInviteUrl ?? ""), phone: String(patch.phone ?? ""),
       };
     }
     case "dates": {

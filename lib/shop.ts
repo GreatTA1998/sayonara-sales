@@ -1,6 +1,8 @@
-/** Soft Jimoty and/or LINE name → one shop. Hard login = LINE OAuth (ss-line-uid). */
+/** Soft Jimoty / LINE / Facebook name → one shop. Hard login = LINE OAuth (ss-line-uid). */
 const JIMOTY_KEY = "ss-jimoty-name";
 const LINE_KEY = "ss-line-name";
+const FB_KEY = "ss-facebook-name";
+const NAME_KEYS = [JIMOTY_KEY, LINE_KEY, FB_KEY] as const;
 const ID_KEY = "ss-shop-id";
 const MAP_KEY = "ss-shop-map";
 const UID_KEY = "ss-line-uid";
@@ -34,38 +36,40 @@ const readMap = (): Record<string, string> => {
   catch { return {}; }
 };
 
-const clearNames = () => {
-  localStorage.removeItem(JIMOTY_KEY); localStorage.removeItem(LINE_KEY);
-};
+const clearNames = () => { for (const k of NAME_KEYS) localStorage.removeItem(k); };
 
-/** Reclaim id↔names so shops aren’t orphaned across Jimoty/LINE soft keys. */
+/** Reclaim id↔names so shops aren’t orphaned across soft keys. */
 let ready = false;
 const hydrate = () => {
   if (ready || typeof window === "undefined") return;
   ready = true;
-  let j = stored(JIMOTY_KEY), l = stored(LINE_KEY), id = stored(ID_KEY);
+  let j = stored(JIMOTY_KEY), l = stored(LINE_KEY), f = stored(FB_KEY), id = stored(ID_KEY);
   const map = readMap();
-  if (!j && !l && isShop(id)) {
+  if (!j && !l && !f && isShop(id)) {
     j = id === ELTON_ID ? ELTON_LABEL : (Object.entries(map).find(([, v]) => v === id)?.[0] || "");
     if (j) localStorage.setItem(JIMOTY_KEY, j);
   }
-  const name = j || l;
-  if (name && !isShop(id)) id = knownId(j) || knownId(l) || (j && map[norm(j)]) || (l && map[norm(l)]) || "";
+  const name = j || l || f;
+  if (name && !isShop(id)) {
+    id = knownId(j) || knownId(l) || knownId(f)
+      || (j && map[norm(j)]) || (l && map[norm(l)]) || (f && map[norm(f)]) || "";
+  }
   if (!name || !isShop(id)) return;
-  if (j) map[norm(j)] = id;
-  if (l) map[norm(l)] = id;
+  for (const n of [j, l, f]) if (n) map[norm(n)] = id;
   localStorage.setItem(MAP_KEY, JSON.stringify(map));
   localStorage.setItem(ID_KEY, id);
 };
 
 const stored = (k: string) => (localStorage.getItem(k) || "").trim();
-/** Display identity: Jimoty first, else soft LINE name. */
+/** Display identity: Jimoty → LINE → Facebook. */
 export const getName = () =>
-  typeof window === "undefined" ? "" : (hydrate(), stored(JIMOTY_KEY) || stored(LINE_KEY));
+  typeof window === "undefined" ? "" : (hydrate(), stored(JIMOTY_KEY) || stored(LINE_KEY) || stored(FB_KEY));
 export const getJimotyName = () =>
   typeof window === "undefined" ? "" : (hydrate(), stored(JIMOTY_KEY));
 export const getLineName = () =>
   typeof window === "undefined" ? "" : (hydrate(), stored(LINE_KEY));
+export const getFacebookName = () =>
+  typeof window === "undefined" ? "" : (hydrate(), stored(FB_KEY));
 export const getId = () =>
   typeof window === "undefined" ? "" : (hydrate(), stored(ID_KEY));
 export const adminPath = (id: string) => `/s/${id}/admin`;
@@ -76,21 +80,22 @@ export const subscribeAuth = (cb: () => void) => {
   return () => window.removeEventListener(AUTH_EVT, cb);
 };
 
-export type Profile = { bio: string; jimotyUrl: string; youtubeUrl: string };
+export type Profile = { bio: string; jimotyUrl: string; youtubeUrl: string; facebookUrl: string };
 export const getProfile = (): Profile => {
-  if (typeof window === "undefined") return { bio: "", jimotyUrl: "", youtubeUrl: "" };
+  if (typeof window === "undefined") return { bio: "", jimotyUrl: "", youtubeUrl: "", facebookUrl: "" };
   try {
     const p = JSON.parse(localStorage.getItem(PROF_KEY) || "{}") as Partial<Profile>;
     return {
       bio: String(p.bio || ""), jimotyUrl: String(p.jimotyUrl || ""),
-      youtubeUrl: String(p.youtubeUrl || ""),
+      youtubeUrl: String(p.youtubeUrl || ""), facebookUrl: String(p.facebookUrl || ""),
     };
-  } catch { return { bio: "", jimotyUrl: "", youtubeUrl: "" }; }
+  } catch { return { bio: "", jimotyUrl: "", youtubeUrl: "", facebookUrl: "" }; }
 };
 export const saveProfile = (p: Profile) => {
   if (typeof window === "undefined") return;
   localStorage.setItem(PROF_KEY, JSON.stringify({
     bio: p.bio.trim(), jimotyUrl: p.jimotyUrl.trim(), youtubeUrl: p.youtubeUrl.trim(),
+    facebookUrl: p.facebookUrl.trim(),
   }));
 };
 
@@ -116,15 +121,16 @@ const uidBoundTo = (id: string) => {
   return u;
 };
 
-/** Soft login: Jimoty and/or LINE → one account. Empty both clears soft names.
+/** Soft login: Jimoty and/or LINE and/or Facebook → one account. Empty all clears soft names.
  *  null = account is LINE-secured; soft bypass denied (use OAuth). */
-export const softLogin = (jimoty: string, line: string): string | null => {
+export const softLogin = (jimoty: string, line: string, facebook = ""): string | null => {
   if (typeof window === "undefined") return "";
-  const j = jimoty.trim(), l = line.trim();
-  if (!j && !l) { clearNames(); notifyAuth(); return getId(); }
+  const j = jimoty.trim(), l = line.trim(), f = facebook.trim();
+  if (!j && !l && !f) { clearNames(); notifyAuth(); return getId(); }
   const map = readMap();
   const cur = getId();
-  let id = knownId(j) || knownId(l) || (j && map[norm(j)]) || (l && map[norm(l)]) || "";
+  let id = knownId(j) || knownId(l) || knownId(f)
+    || (j && map[norm(j)]) || (l && map[norm(l)]) || (f && map[norm(f)]) || "";
   if (!isShop(id) && isShop(cur)) id = cur;
   if (isShop(id)) {
     const bound = uidBoundTo(id);
@@ -132,9 +138,9 @@ export const softLogin = (jimoty: string, line: string): string | null => {
   }
   if (j) localStorage.setItem(JIMOTY_KEY, j);
   if (l) localStorage.setItem(LINE_KEY, l);
+  if (f) localStorage.setItem(FB_KEY, f);
   if (isShop(id)) {
-    if (j) map[norm(j)] = id;
-    if (l) map[norm(l)] = id;
+    for (const n of [j, l, f]) if (n) map[norm(n)] = id;
     localStorage.setItem(MAP_KEY, JSON.stringify(map));
     localStorage.setItem(ID_KEY, id);
   }
@@ -142,9 +148,9 @@ export const softLogin = (jimoty: string, line: string): string | null => {
   return id;
 };
 
-/** Single-name soft bind (checkout / legacy). kind=line writes LINE soft name. */
-export const openShop = (n: string, kind: "jimoty" | "line" = "jimoty") =>
-  softLogin(kind === "jimoty" ? n : "", kind === "line" ? n : "") ?? "";
+/** Single-name soft bind (checkout / legacy). */
+export const openShop = (n: string, kind: "jimoty" | "line" | "facebook" = "jimoty") =>
+  softLogin(kind === "jimoty" ? n : "", kind === "line" ? n : "", kind === "facebook" ? n : "") ?? "";
 
 /** Hard LINE OAuth uid (empty = soft-only / logged out). */
 export const getLineUid = () =>

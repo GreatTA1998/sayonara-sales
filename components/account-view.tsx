@@ -7,7 +7,8 @@ import { SoftLoginForm } from "@/components/soft-login";
 import { dayLbl } from "@/lib/days";
 import { getSavedLang, langLabel, offerLang, setLang, t, useLang } from "@/lib/lang";
 import {
-  getJimotyName, getLineName, getLineUid, getName, listBuys, logout, subscribeAuth, type BuyRow,
+  getFacebookName, getJimotyName, getLineName, getLineUid, getName, listBuys, logout, subscribeAuth,
+  type BuyRow,
 } from "@/lib/shop";
 
 const pts = (names: (string | undefined | null)[]) => {
@@ -27,6 +28,7 @@ export function AccountView({
   const hard = useSyncExternalStore(subscribeAuth, getLineUid, () => "");
   const jimoty = useSyncExternalStore(subscribeAuth, getJimotyName, () => "");
   const line = useSyncExternalStore(subscribeAuth, getLineName, () => "");
+  const facebook = useSyncExternalStore(subscribeAuth, getFacebookName, () => "");
   const lang = useLang();
   const [buys, setBuys] = useState<BuyRow[]>([]);
   useEffect(() => {
@@ -53,6 +55,7 @@ export function AccountView({
               <dl className="id-view">
                 <div><dt>{t("me.lineName", lang)}</dt><dd>{line || "—"}</dd></div>
                 <div><dt>{t("me.jimotyName", lang)}</dt><dd>{jimoty || "—"}</dd></div>
+                <div><dt>{t("me.facebookName", lang)}</dt><dd>{facebook || "—"}</dd></div>
               </dl>
             </>
           ) : (
