@@ -28,9 +28,14 @@ type State = {
   minItems?: number; minTotal?: number; rule?: string | null;
 };
 type Receipt = { day: string; slot: string; total?: number };
-type Method = "jimoty" | "line" | "phone";
+type Method = "jimoty" | "line" | "phone" | "facebook";
 type Props = { shop: string; name: string; /** Flatten padding when embedded on home. */ embed?: boolean };
-const CH = { jimoty: ["ジモティー", "メッセージ済み", "ジモティー名（依頼の識別）"], line: ["LINE", "友だち追加してメッセージ済み", "LINE名"], phone: ["電話", "メッセージ済み", "電話番号"] } as const;
+const CH = {
+  jimoty: ["ジモティー", "メッセージ済み", "ジモティー名（依頼の識別）"],
+  line: ["LINE", "友だち追加してメッセージ済み", "LINE名"],
+  phone: ["電話", "メッセージ済み", "電話番号"],
+  facebook: ["Facebook", "メッセージ済み", "Facebook名"],
+} as const;
 
 /** Confirmed only — pending is disclaimer + still 依頼可. */
 const locked = (i: Item) => i.taken;
@@ -86,15 +91,17 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const open = (openId && state?.items.find((i) => i.id === openId)) || null;
   const myKeys = mineKeys(lineName);
   const jimotyUrl = (state?.jimotyUrl || "").trim();
+  const facebookUrl = (state?.facebookUrl || "").trim();
   const lineUrl = (state?.lineInviteUrl || "").trim();
   const phoneDisp = (state?.phone || "").trim();
-  const canJimoty = !!jimotyUrl, canLine = !!lineUrl, canPhone = !!phoneDisp;
-  const methodOpts = ([["jimoty", canJimoty], ["line", canLine], ["phone", canPhone]] as const)
-    .filter(([, ok]) => ok).map(([id]) => [id, CH[id][0]] as [Method, string]);
+  const canJimoty = !!jimotyUrl, canLine = !!lineUrl, canPhone = !!phoneDisp, canFb = !!facebookUrl;
+  const methodOpts = (
+    [["jimoty", canJimoty], ["line", canLine], ["phone", canPhone], ["facebook", canFb]] as const
+  ).filter(([, ok]) => ok).map(([id]) => [id, CH[id][0]] as [Method, string]);
   const barMove = moveOutLeft(state?.moveOut ? [state.moveOut] : []);
   const loggedIn = !!knownName;
   const hardLine = !!lineUid;
-  /** Soft identity (incl. Facebook名) covers Jimoty/LINE contact; phone still typed. */
+  /** Soft identity (incl. Facebook名) covers Jimoty/LINE/FB contact; phone still typed. */
   const useStored = method === "phone" ? false
     : method === "line" ? (hardLine || loggedIn) : loggedIn;
   const contactVal = (useStored ? knownName : lineName).trim();
@@ -258,8 +265,9 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         day, slot, itemIds, contactMethod: method, contact: contactVal,
         lineUid: lineUid || undefined,
       });
-      if (method === "jimoty" || (method === "line" && !hardLine && !loggedIn)) {
-        openShop(contactVal, method === "line" ? "line" : "jimoty");
+      if (method === "jimoty" || method === "facebook"
+        || (method === "line" && !hardLine && !loggedIn)) {
+        openShop(contactVal, method);
       }
       pushBuy({
         code: String(data.code || ""), shop, day, slot,
@@ -305,7 +313,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
             const n = getName();
             if (n) setLineName(n);
             setOpenId(null); setSlot(null);
-            setMethod(canJimoty ? "jimoty" : canLine ? "line" : canPhone ? "phone" : null);
+            setMethod(canJimoty ? "jimoty" : canLine ? "line" : canPhone ? "phone" : canFb ? "facebook" : null);
             setChanOk(false); setErr(null); setCheckout(true);
           }}>
           {pickedItems.length ? `引き取りを依頼 (${pickedItems.length})` : "引き取りを依頼"}
@@ -420,8 +428,10 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
                   {method && <>
                     <div className="linebox">
                       <a className="linelink" target="_blank" rel="noopener noreferrer"
-                        href={method === "jimoty" ? jimotyUrl : method === "line" ? lineUrl : telHref(phoneDisp)}>
-                        {method === "jimoty" ? "出品者のジモティ" : method === "line" ? "LINE招待リンク" : phoneDisp}
+                        href={method === "jimoty" ? jimotyUrl : method === "line" ? lineUrl
+                          : method === "facebook" ? facebookUrl : telHref(phoneDisp)}>
+                        {method === "jimoty" ? "出品者のジモティー" : method === "line" ? "LINE招待リンク"
+                          : method === "facebook" ? "Facebook Marketplace" : phoneDisp}
                       </a>
                       <label className="late-check"><input type="checkbox" checked={chanOk}
                         onChange={(e) => setChanOk(e.target.checked)} />{CH[method][1]}</label>
@@ -431,7 +441,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
                     ) : method === "line" ? (
                       <p className="hint">ジモティーのアカウントをお持ちでない方向けです。</p>
                     ) : null}
-                    {method !== "jimoty" && !hardLine && (
+                    {method !== "jimoty" && method !== "facebook" && !hardLine && (
                       <>
                         <p className="hint">依頼・ステータス・キャンセル待ちの通知はLINEログインで受け取れます。</p>
                         <a className="cta line" href={lineLoginHref()}>LINEでログイン</a>
