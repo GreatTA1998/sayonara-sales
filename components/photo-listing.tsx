@@ -154,17 +154,9 @@ type ListProps<T extends PhotoItem> = {
   classNameFor?: (item: T) => string;
   disabledFor?: (item: T) => boolean;
   dense?: boolean;
-  loading?: boolean;
 };
 
 export function Listings<T extends PhotoItem>(p: ListProps<T>) {
-  if (p.loading && !p.items.length) {
-    return (
-      <div className="xgrid skel" aria-busy="true" aria-label="読み込み中">
-        {[0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="xcard" />)}
-      </div>
-    );
-  }
   const withPh: T[] = [];
   const noPh: T[] = [];
   for (const i of p.items) ((i.photos || []).length ? withPh : noPh).push(i);
