@@ -1061,6 +1061,26 @@ export default function ShopAdminView({ shop, name }: Props) {
       <section className="prof-block">
         <div className="slot-add">
           <DateField label="退去日" value={pickupTo} onChange={(v) => { setPickupTo(v); void saveDates(v); }} />
+        </div>
+        <div className="slot-add">
+          <Seg label="カート条件" value={minMode} onPick={(v) => {
+            const mode = v as MinMode;
+            setMinMode(mode);
+            void saveMins(mode);
+          }} opts={MIN_OPTS} />
+          <label className="float lead"><span>{minMode === "items" ? "最低点数" : "最低合計"}</span>
+            <span className="lead-row">
+              <input type="number" min={0} inputMode="numeric"
+                aria-label={minMode === "items" ? "最低点数（0でなし）" : "最低合計円（0でなし）"}
+                value={minMode === "items" ? minItems : minTotal}
+                onChange={(e) => {
+                  const n = Math.max(0, Math.floor(Number(e.target.value) || 0));
+                  (minMode === "items" ? setMinItems : setMinTotal)(n);
+                }}
+                onBlur={() => void saveMins(minMode)} />
+              <span aria-hidden="true">{minMode === "items" ? "点" : "円"}</span>
+            </span>
+          </label>
           <label className="float lead"><span>最短予約</span>
             <span className="lead-row">
               <select aria-label="最短予約（日前）" value={leadDays}
@@ -1075,6 +1095,9 @@ export default function ShopAdminView({ shop, name }: Props) {
             </span>
           </label>
         </div>
+        <p className="hint">{minMode === "items"
+          ? "点数＝おすすめ（下回っても依頼可・不人気・大型は例外）"
+          : "合計＝必須（この金額未満は依頼できません）"}</p>
         <div className="slot-edit" role="list" aria-label="受取時間">
           {slots.map((s) => (
             <button key={s} type="button" className="slot" role="listitem"
@@ -1110,35 +1133,6 @@ export default function ShopAdminView({ shop, name }: Props) {
                 onBlur={() => void persistProfile(bio, jimoty, youtube)}
                 placeholder="内見動画URL" inputMode="url" autoComplete="url" /></label>
           </div>
-          <Seg label="カート条件" value={minMode} onPick={(v) => {
-            const mode = v as MinMode;
-            setMinMode(mode);
-            void saveMins(mode);
-          }} opts={MIN_OPTS} />
-          <p className="hint">{minMode === "items"
-            ? "点数＝おすすめ（下回っても依頼可・不人気・大型は例外）"
-            : "合計＝必須（この金額未満は依頼できません）"}</p>
-          {minMode === "items" ? (
-            <label className="float lead"><span>最低点数</span>
-              <span className="lead-row">
-                <input type="number" min={0} inputMode="numeric" aria-label="最低点数（0でなし）"
-                  value={minItems}
-                  onChange={(e) => setMinItems(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-                  onBlur={() => void saveMins("items")} />
-                <span aria-hidden="true">点</span>
-              </span>
-            </label>
-          ) : (
-            <label className="float lead"><span>最低合計</span>
-              <span className="lead-row">
-                <input type="number" min={0} inputMode="numeric" aria-label="最低合計円（0でなし）"
-                  value={minTotal}
-                  onChange={(e) => setMinTotal(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-                  onBlur={() => void saveMins("total")} />
-                <span aria-hidden="true">円</span>
-              </span>
-            </label>
-          )}
         </details>
       </section>
       )}
