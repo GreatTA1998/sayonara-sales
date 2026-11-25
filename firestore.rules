@@ -17,9 +17,12 @@ service cloud.firestore {
       // Public reads: unpublished = private link preview; home filters published client-side.
       allow read: if true;
 
+      // Create may precede login/claim — ownerUid optional until claim bind.
       allow create: if signedIn()
-        && request.resource.data.ownerUid == request.auth.uid;
+        && (!('ownerUid' in request.resource.data)
+            || request.resource.data.ownerUid == request.auth.uid);
 
+      // Owner edits, or first claim: no ownerUid yet → stamp self (+ soft name labels).
       allow update: if canAdmin(shopId)
         || (signedIn() && !('ownerUid' in resource.data)
             && request.resource.data.ownerUid == request.auth.uid);

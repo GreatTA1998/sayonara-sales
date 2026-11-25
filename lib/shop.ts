@@ -213,6 +213,24 @@ export const pushBuy = (row: Omit<BuyRow, "at">) => {
   notifyAuth();
 };
 
+/** Point soft/LINE identity at this shop (claim from preview link). */
+export const adoptShop = (id: string) => {
+  if (typeof window === "undefined" || !isShop(id)) return;
+  const map = readMap();
+  const j = stored(JIMOTY_KEY), l = stored(LINE_KEY), f = stored(FB_KEY);
+  for (const n of [j, l, f]) if (n) map[norm(n)] = id;
+  localStorage.setItem(MAP_KEY, JSON.stringify(map));
+  localStorage.setItem(ID_KEY, id);
+  const uid = stored(UID_KEY);
+  if (uid) {
+    const umap = readUidMap();
+    for (const [k, v] of Object.entries(umap)) if (v === id && k !== uid) delete umap[k];
+    umap[uid] = id;
+    localStorage.setItem(UID_MAP, JSON.stringify(umap));
+  }
+  notifyAuth();
+};
+
 /** Drop a shop from local map/pointer (home tabs + 投稿一覧). Does not touch Firestore. */
 export const forgetShop = (id: string) => {
   if (typeof window === "undefined" || !isShop(id) || id === ELTON_ID) return;

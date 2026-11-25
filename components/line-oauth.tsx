@@ -36,6 +36,8 @@ export const lineLoginHref = (ret?: string) => {
 
 /** Pending waitlist join after OAuth (shop|itemId). */
 export const WL_KEY = "ss-wl";
+/** Pending shop claim after OAuth (shop id). */
+export const CLAIM_KEY = "ss-claim";
 
 /** Hard login. Needs LINE_CHANNEL_ID/SECRET on Vercel; else ?line_err=config. */
 export function LineLoginLink() {

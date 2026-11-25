@@ -11,6 +11,9 @@ import { ensureAuth, getDb } from "./fb";
 import { dayLbl, tokyoYmd } from "./days";
 import { DEF_LEAD, DEF_MIN } from "./sale";
 import {
+  getFacebookName, getJimotyName, getLineName, getLineUid, getName,
+} from "./shop";
+import {
   applyDates, applyMins, bookableDays, cartAfter, claimFields,
   ELTON_SHOP, hasBuyerContact, itemFields, normalizeSlots, normalizeSpots, parseShop, shortCode, shopMins,
   shopFields, shopSlots, storeFromDocs, takenSlots, uid, type Claim, type Item, type Store,
@@ -41,35 +44,52 @@ const emptySeed = (id: string): Store =>
 
 const denied = (e: unknown) => String((e as { code?: string })?.code || "").endsWith("permission-denied");
 const NO_EDIT = "このショップの編集権限がありません";
+const NEED_LOGIN = "ログインしてください";
 
-/** Claim ownerUid for non-elton shops. Elton: soft Jimoty era — no UID gate (rules). */
-async function claimShopOwner(shop: string, uid: string) {
+const softLogged = () => !!(getName() || getLineUid());
+
+/** Soft/LINE labels + ownerUid — only written on claim. */
+function claimPatch(uid: string) {
+  const j = getJimotyName(), l = getLineName(), f = getFacebookName(), lu = getLineUid();
+  return {
+    ownerUid: uid, updatedAt: new Date().toISOString(),
+    ...(j ? { ownerJimotyName: j } : {}), ...(l ? { ownerLineName: l } : {}),
+    ...(f ? { ownerFacebookName: f } : {}), ...(lu ? { ownerLineUid: lu } : {}),
+  };
+}
+
+/** Seed shop doc with no ownerUid (create may precede login). */
+async function ensureShopDoc(shop: string) {
   if (shop === ELTON_SHOP) return;
   const ref = doc(getDb(), "shops", shop);
-  const now = new Date().toISOString();
-  const seedDoc = () => {
-    const seed = emptySeed(shop);
-    seed.ownerUid = uid;
-    return { ...shopFields(seed), ownerUid: uid, updatedAt: now };
-  };
-  // Deployed rules reject get() of a missing shop (`resource.data` on null).
-  // Same error as a private shop — merge ownerUid only, never a full overwrite.
+  const seed = { ...shopFields(emptySeed(shop)), updatedAt: new Date().toISOString() };
   let snap;
   try { snap = await getDoc(ref); }
   catch (e) {
     if (!denied(e)) throw e;
-    try { await setDoc(ref, { ownerUid: uid, updatedAt: now }, { merge: true }); }
-    catch (err) { if (denied(err)) throw new Error(NO_EDIT); throw err; }
-    snap = await getDoc(ref);
+    await setDoc(ref, seed, { merge: true });
+    return;
   }
-  if (!snap.exists()) { await setDoc(ref, seedDoc()); return; }
-  const data = snap.data() || {};
-  if (data.ownerUid && data.ownerUid !== uid) throw new Error(NO_EDIT);
-  if (!data.ownerUid) await updateDoc(ref, { ownerUid: uid, updatedAt: now });
-  if (!("address" in data)) await setDoc(ref, seedDoc(), { merge: true });
+  if (!snap.exists() || !("address" in (snap.data() || {}))) {
+    await setDoc(ref, seed, { merge: true });
+  }
 }
 
-/** Live shop: public onSnapshot (no auth). Owner claim only when opts.claimOwner. */
+/** Bind ownership. Soft/LINE required. First wins; later = mine / taken. */
+export async function claimShop(shopRaw: string): Promise<"ok" | "mine" | "taken"> {
+  const shop = parseShop(shopRaw);
+  if (shop === ELTON_SHOP) return "mine";
+  if (!softLogged()) throw new Error(NEED_LOGIN);
+  const user = await ensureAuth();
+  await ensureShopDoc(shop);
+  const ref = doc(getDb(), "shops", shop);
+  const prev = String((await getDoc(ref)).data()?.ownerUid || "");
+  if (prev && prev !== user.uid) return "taken";
+  await updateDoc(ref, claimPatch(user.uid));
+  return prev === user.uid ? "mine" : "ok";
+}
+
+/** Live shop: public onSnapshot (no auth). Admin seeds doc; claim only if soft/LINE. */
 export function listenShop(
   shopRaw: string,
   onData: (s: Store) => void,
@@ -118,9 +138,18 @@ export function listenShop(
     }, fail);
   };
 
-  // New shops 404 the listener until the doc exists — claim (create) first.
+  // New shops 404 until the doc exists — seed without ownerUid; claim if already logged in.
   if (opts?.claimOwner && shop !== ELTON_SHOP) {
-    void ensureAuth().then((u) => claimShopOwner(shop, u.uid)).then(start).catch(fail);
+    void ensureAuth()
+      .then(async () => {
+        await ensureShopDoc(shop);
+        if (softLogged()) {
+          const r = await claimShop(shop);
+          if (r === "taken") throw new Error(NO_EDIT);
+        }
+      })
+      .then(start)
+      .catch(fail);
   } else start();
 
   return () => { dead = true; stopShop?.(); stopItems?.(); stopClaims?.(); };
@@ -199,9 +228,12 @@ async function setClaimItems(
 /** Admin mutations — same action surface as old /api/admin. */
 export async function adminAct(shopRaw: string, body: Record<string, unknown>): Promise<unknown> {
   const shop = parseShop(shopRaw);
-  const user = await ensureAuth();
-  // Non-elton: await ownership. Elton soft-auth: signedIn only (no ownerUid race).
-  if (shop !== ELTON_SHOP) await claimShopOwner(shop, user.uid);
+  await ensureAuth();
+  // Non-elton: soft/LINE claim then owner writes. Elton: signedIn only (rules).
+  if (shop !== ELTON_SHOP) {
+    const r = await claimShop(shop);
+    if (r === "taken") throw new Error(NO_EDIT);
+  }
   const db = getDb();
   const shopRef = doc(db, "shops", shop);
   const action = String(body.action || "");
