@@ -10,9 +10,10 @@ Shop state: **Firebase Firestore** via the **client SDK** + security rules + `on
 ## Data model
 
 ```
-shops/{shopId}                    # ownerUid, address, bio, contact, slots, dates, published
+shops/{shopId}                    # ownerUid, ownerLineUid, address, bio, contact, slots, dates, published
 shops/{shopId}/items/{itemId}     # name, price, note, photos, paused, claimId, pos
 shops/{shopId}/claims/{claimId}   # code, day, slot, itemIds, contact, buyerUid, status, waiters, createdAt
+uids/{firebaseUid}                # shopId — one shop per account (claim transaction + rules)
 ```
 
 ## Env (Vercel)

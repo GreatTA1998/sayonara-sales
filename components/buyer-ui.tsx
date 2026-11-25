@@ -6,7 +6,7 @@ import { SoftLoginForm } from "@/components/soft-login";
 import { useBodyScrollLock, useMaskDismiss } from "@/components/snack";
 import { afterLbl, dayLbl, moveOutLeft, tokyoYmd } from "@/lib/days";
 import { CLAIM_KEY, lineLoginHref, WL_KEY } from "@/components/line-oauth";
-import { bookShop, claimShop, joinWaitLive, leaveWaitLive, listenShop } from "@/lib/live";
+import { bookShop, claimShop, findOwnedShop, joinWaitLive, leaveWaitLive, listenShop } from "@/lib/live";
 import { t, useLang } from "@/lib/lang";
 import { notifyLine } from "@/lib/notify";
 import {
@@ -31,7 +31,7 @@ type State = {
   moveOut?: string;
   lineInviteUrl?: string | null; phone?: string | null; items: Item[];
   minItems?: number; minTotal?: number; rule?: string | null;
-  published?: boolean; ownerUid?: string;
+  published?: boolean; ownerUid?: string; ownerLineUid?: string;
 };
 type Receipt = { day: string; slot: string; total?: number };
 type Method = "jimoty" | "line" | "phone" | "facebook";
@@ -61,7 +61,7 @@ function toBuyerState(shop: string, s: Store): State {
     days, slots, taken,
     moveOut: s.moveOut || s.pickupTo || "",
     lineInviteUrl: contact.lineInviteUrl || null, phone: contact.phone || null,
-    published: shopPublished(shop, s), ownerUid: s.ownerUid,
+    published: shopPublished(shop, s), ownerUid: s.ownerUid, ownerLineUid: s.ownerLineUid,
     ...shopMins(s), rule: cartRule(s),
     items: s.items.filter((i) => !i.paused).map((it) => {
       const { id, name, price, note, photos, availableAfter } = it;
@@ -99,6 +99,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [showSold, setShowSold] = useShowSold();
   const [claimOpen, setClaimOpen] = useState(false);
   const [claimBusy, setClaimBusy] = useState(false);
+  const [ownedId, setOwnedId] = useState("");
   const open = (openId && state?.items.find((i) => i.id === openId)) || null;
   const myKeys = mineKeys(lineName);
   const jimotyUrl = (state?.jimotyUrl || "").trim();
@@ -112,10 +113,13 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const barMove = moveOutLeft(state?.moveOut ? [state.moveOut] : []);
   const loggedIn = !!(knownName || lineUid);
   const hardLine = !!lineUid;
-  /** Unowned dig5 — Claim CTA; never gated on published (handoff shops may be live). */
-  const claimable = !!state && !state.ownerUid && !embed && shop !== "elton";
-  /** Soft pointer after claim / adopt — owner chrome instead of Claim. */
-  const isMine = !!state?.ownerUid && myShop === shop;
+  const ownsOther = !!ownedId && ownedId !== shop;
+  /** Own shop (ownerUid / soft pointer / LINE) → 出品を管理, not Claim. */
+  const isMine = !!state?.ownerUid && (
+    ownedId === shop || myShop === shop || (!!lineUid && state.ownerLineUid === lineUid)
+  );
+  /** Unowned dig5 — Claim CTA; hide when this account already owns another shop. */
+  const claimable = !!state && !state.ownerUid && !ownsOther && !isMine && !embed && shop !== "elton";
   /** Soft identity (incl. Facebook名) covers Jimoty/LINE/FB contact; phone still typed. */
   const useStored = method === "phone" ? false
     : method === "line" ? (hardLine || loggedIn) : loggedIn;
@@ -138,14 +142,25 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     return unsub;
   }, [shop, cartKey]);
 
+  useEffect(() => {
+    if (!loggedIn) { setOwnedId(""); return; }
+    let dead = false;
+    void findOwnedShop().then((id) => { if (!dead) setOwnedId(id); }).catch(() => { if (!dead) setOwnedId(""); });
+    return () => { dead = true; };
+  }, [loggedIn, lineUid, knownName]);
+
   async function doClaim() {
     setClaimBusy(true); setErr(null);
     try {
-      adoptShop(shop);
       const r = await claimShop(shop);
       if (r === "taken") setErr(t("claim.taken", lang));
-      else setClaimOpen(false);
-      setState((prev) => prev && r !== "taken" ? { ...prev, ownerUid: "me" } : prev);
+      else if (r === "other") setErr(t("claim.other", lang));
+      else {
+        adoptShop(shop);
+        setOwnedId(shop);
+        setClaimOpen(false);
+        setState((prev) => prev && { ...prev, ownerUid: "me" });
+      }
     } catch (e) { setErr(e instanceof Error ? e.message : "失敗しました"); }
     finally { setClaimBusy(false); }
   }
