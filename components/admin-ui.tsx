@@ -91,7 +91,21 @@ const IMPORT_OPTS: [string, string][] = [["jimoty", "ジモティー"], ["facebo
 /** Muse/Grok seeds — FB Marketplace / generic → Sayonara (no scrape API). */
 const IMPORT_PROMPTS = {
   facebook: (url: string) =>
-    `Sayonara Salesに Facebook Marketplace から取り込む。\n元URL: ${url}\nプロフィール説明→ショップメモ。受付中の出品ごとに品名・価格（円・不明は無料）・説明を簡潔な日本語の箇条書きで。写真URLがあれば添えて。このURLの出品／プロフィールを見て進めて。`,
+    `Import a seller into Sayonara on beta.sayonara.tokyo (beta only, never production) from this Facebook post: ${url}
+
+1. Read the post and the seller's Marketplace listings. Skip items that are reserved or sold. If the same item appears in more than one place, the newest post's price wins.
+2. Set up an unclaimed shop for the seller.
+3. Shop settings:
+   - Shop memo: write concise Japanese from the post covering why they're selling, the pickup area or nearest station, pickup only or delivery, whether furniture can be disassembled and whether prices are negotiable.
+   - Ward (区): the ward of their pickup area.
+   - Facebook URL: the post URL above, not their profile.
+4. For each item:
+   - Name in short Japanese.
+   - Description: copy the seller's description faithfully.
+   - If it's only available from a certain date, fill the available-from field instead of writing the date in the description.
+5. Photos: use the highest-resolution version available, and prefer an item's own photo over a collage. For each item, make one plain square crop centered on the item, cut from the seller's photo with no padding, blur, borders or enhancing. If the photo is a collage or price sheet, crop only that item's photo out of it. Upload the main photo first. Keep it quick and simple.
+6. Don't invent a contact the seller didn't post. If publishing is blocked, leave the shop unpublished and tell me.
+7. Send me the shop URL, a screenshot, and any items with a missing price, photo or detail.`,
   other: `Sayonara Salesに出品を取り込む。\nこれから渡す元データ（他サイト・メモ・スクショ説明など）からショップメモと出品一覧（品名・価格円・説明）を抽出し、コピペ用の日本語リストで返して。Muse AI か Grok Bot 向け。`,
 };
 
