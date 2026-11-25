@@ -524,7 +524,7 @@ export default function ShopBuyerView({ shop, name, embed, onReady }: Props) {
                     ) : method === "line" ? (
                       <p className="hint">ジモティーのアカウントをお持ちでない方向けです。</p>
                     ) : null}
-                    {method !== "jimoty" && method !== "facebook" && !hardLine && (
+                    {method === "jimoty" && !hardLine && (
                       <>
                         <p className="hint">依頼・ステータス・キャンセル待ちの通知はLINEログインで受け取れます。</p>
                         <a className="cta line" href={lineLoginHref()}>LINEでログイン</a>
@@ -544,7 +544,6 @@ export default function ShopBuyerView({ shop, name, embed, onReady }: Props) {
             {err && <div className="err">{err}</div>}
             <button type="button" className={`cta${canSend ? " go" : ""}`} disabled={busy || !canSend}
               onClick={book}>{busy ? "送信中…" : "依頼を送信"}</button>
-            <p className="hint send-hint">返事までだいたい2日かかることがあります。出品者が依頼のなかから選びます。</p>
           </div>
         </div>
       )}
