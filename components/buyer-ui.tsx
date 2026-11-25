@@ -113,12 +113,11 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const barMove = moveOutLeft(state?.moveOut ? [state.moveOut] : []);
   const loggedIn = !!(knownName || lineUid);
   const hardLine = !!lineUid;
-  const ownsOther = !!ownedId && ownedId !== shop;
   /** Own shop (ownerUid / soft pointer / LINE uid) → 出品を管理, not Claim. */
   const isMine = ownedId === shop || myShop === shop
     || (!!lineUid && state?.ownerLineUid === lineUid);
-  /** Unowned dig5 — Claim CTA; hide when this account already owns another shop. */
-  const claimable = !!state && !state.ownerUid && !ownsOther && !isMine && !embed && shop !== "elton";
+  /** Buyer `/s/{id}` only: unpublished + unclaimed + not logged in (FB pre-built shops). */
+  const claimable = !!state && !state.published && !state.ownerUid && !loggedIn && !embed && shop !== "elton";
   /** Soft identity (incl. Facebook名) covers Jimoty/LINE/FB contact; phone still typed. */
   const useStored = method === "phone" ? false
     : method === "line" ? (hardLine || loggedIn) : loggedIn;

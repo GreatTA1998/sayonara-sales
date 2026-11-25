@@ -10,7 +10,7 @@ import { dayLbl, daysBetween, tokyoYmd } from "@/lib/days";
 import { DECLINE_PRESETS, DEF_LEAD, DEF_MIN, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
 import { SoftLoginForm } from "@/components/soft-login";
 import { CLAIM_KEY } from "@/components/line-oauth";
-import { adminAct, claimShop, findOwnedShop, listenShop } from "@/lib/live";
+import { adminAct, claimShop, listenShop } from "@/lib/live";
 import { notifyLine } from "@/lib/notify";
 import { t, useLang } from "@/lib/lang";
 import {
@@ -146,7 +146,6 @@ export default function ShopAdminView({ shop, name }: Props) {
   const label = softName || (/^\d{5}$/.test(name) ? "" : name);
   const [ownOpen, setOwnOpen] = useState(false);
   const [ownBusy, setOwnBusy] = useState(false);
-  const [ownedId, setOwnedId] = useState("");
   const [camOpen, setCamOpen] = useState(false);
   const [camItemId, setCamItemId] = useState<string | null>(null);
   const [bio, setBio] = useState("");
@@ -242,16 +241,8 @@ export default function ShopAdminView({ shop, name }: Props) {
     if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
   }, []);
 
-  const ownsOther = !!ownedId && ownedId !== shop;
-  const mineLine = !!lineUid && data?.ownerLineUid === lineUid;
-  const claimable = !!data && !data.ownerUid && !ownsOther && !mineLine && shop !== ELTON_SHOP;
-  const unclaimedShop = shop !== ELTON_SHOP && !!data && !data.ownerUid;
-  useEffect(() => {
-    if (!logged) { setOwnedId(""); return; }
-    let dead = false;
-    void findOwnedShop().then((id) => { if (!dead) setOwnedId(id); }).catch(() => { if (!dead) setOwnedId(""); });
-    return () => { dead = true; };
-  }, [logged, lineUid, softName]);
+  /** Seller create/投稿 — unbound until login+bind; claim banner is buyer `/s/{id}` only. */
+  const unbound = shop !== ELTON_SHOP && !!data && !data.ownerUid;
   async function doClaim() {
     setOwnBusy(true); setErr(null);
     try {
@@ -261,7 +252,6 @@ export default function ShopAdminView({ shop, name }: Props) {
         setErr(msg); show(msg, "err");
       } else {
         adoptShop(shop);
-        setOwnedId(shop);
         setOwnOpen(false);
         setData((d) => d && { ...d, ownerUid: "me" });
       }
@@ -270,7 +260,7 @@ export default function ShopAdminView({ shop, name }: Props) {
       setErr(msg); show(msg, "err");
     } finally { setOwnBusy(false); }
   }
-  /** After claim-banner LINE OAuth — adopt + claim once. */
+  /** After ログインして保存 LINE OAuth — adopt + claim once. */
   useEffect(() => {
     let raw = "";
     try { raw = sessionStorage.getItem(CLAIM_KEY) || ""; } catch { return; }
@@ -779,10 +769,6 @@ export default function ShopAdminView({ shop, name }: Props) {
     show("コピーしました", "ok");
   }
   function publish() {
-    if (shop !== ELTON_SHOP && !data?.ownerUid) {
-      const msg = "先にショップをクレームしてください";
-      setErr(msg); show(msg, "err"); return;
-    }
     const val = contactMode === "jimoty" ? jimoty : contactMode === "line" ? lineInvite
       : contactMode === "phone" ? phone : facebook;
     if (!val.trim()) {
@@ -904,32 +890,29 @@ export default function ShopAdminView({ shop, name }: Props) {
           <span aria-hidden="true">区</span>
         </label>
         <span className="spacer" aria-hidden="true" />
-        {logged && <button type="button" className="share" onClick={copyUrl}>URLコピー</button>}
-        <button type="button" className="req"
-          onClick={unclaimedShop ? publish : !logged ? () => router.push("/me") : pub === "on" ? () => router.push(`/s/${shop}`) : publish}>
-          {unclaimedShop || logged ? (pub === "on" ? "店舗を見る" : "公開する") : "ログインして保存"}
-        </button>
+        {!unbound && logged && <button type="button" className="share" onClick={copyUrl}>URLコピー</button>}
+        {unbound ? (
+          <span className="save-more">
+            <button type="button" className="req" disabled={ownBusy}
+              onClick={() => { if (logged) void doClaim(); else setOwnOpen((v) => !v); }}>
+              {ownBusy ? t("claim.busy", lang) : "ログインして保存"}
+            </button>
+            {ownOpen && !logged && (
+              <div className="menu-pop pane" role="dialog" aria-label="ログインして保存">
+                <SoftLoginForm claimShopId={shop} onDone={() => { void doClaim(); }} />
+              </div>
+            )}
+          </span>
+        ) : (
+          <button type="button" className="req"
+            onClick={pub === "on" ? () => router.push(`/s/${shop}`) : publish}>
+            {pub === "on" ? "店舗を見る" : "公開する"}
+          </button>
+        )}
       </header>
 
       {err && <div className="err">{err}</div>}
       {!data && !err && <p className="text-sm text-muted pad">読み込み中…</p>}
-      {claimable && (
-        <div className="claim-banner">
-          {ownOpen ? (
-            <div className="claim-login">
-              <SoftLoginForm claimShopId={shop} onDone={() => { void doClaim(); }} />
-            </div>
-          ) : (
-            <button type="button" className="cta go" disabled={ownBusy}
-              onClick={() => {
-                if (logged) void doClaim();
-                else setOwnOpen(true);
-              }}>
-              {ownBusy ? t("claim.busy", lang) : t("claim.cta", lang)}
-            </button>
-          )}
-        </div>
-      )}
 
       {([["依頼", requests], ["引き取り予定", pending]] as const).map(([title, list]) => (list.length > 0 || (title === "引き取り予定" && hasDone)) && (
         <section key={title} className="claims">
