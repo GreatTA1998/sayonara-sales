@@ -13,8 +13,8 @@ import {
   adoptShop, adminPath, applyLineSession, getId, getLineUid, getName, openShop, pushBuy, subscribeAuth,
 } from "@/lib/shop";
 import {
-  bookableDays, cartAfter, cartRule, itemFlags, shopContact, shopMins, shopPublished, shopSlots,
-  takenSlots, type Store,
+  bookableDays, cartAfter, cartDiscount, cartRule, itemFlags, shopContact, shopItemOff,
+  shopPublished, shopSlots, takenSlots, type Store,
 } from "@/lib/store";
 import { telHref, ytUrl } from "@/lib/sale";
 
@@ -30,7 +30,7 @@ type State = {
   days: string[]; slots: string[]; taken: Record<string, string[]>;
   moveOut?: string;
   lineInviteUrl?: string | null; phone?: string | null; items: Item[];
-  minItems?: number; minTotal?: number; rule?: string | null;
+  itemOff?: number; rule?: string | null;
   published?: boolean; ownerUid?: string; ownerLineUid?: string;
 };
 type Receipt = { day: string; slot: string; total?: number };
@@ -56,6 +56,7 @@ function toBuyerState(shop: string, s: Store): State {
   const days = bookableDays(s);
   const slots = shopSlots(s);
   const contact = shopContact(shop, s);
+  const off = shopItemOff(s);
   const taken: Record<string, string[]> = {};
   for (const d of days) taken[d] = takenSlots(s, d);
   return {
@@ -65,7 +66,7 @@ function toBuyerState(shop: string, s: Store): State {
     moveOut: s.moveOut || s.pickupTo || "",
     lineInviteUrl: contact.lineInviteUrl || null, phone: contact.phone || null,
     published: shopPublished(shop, s), ownerUid: s.ownerUid, ownerLineUid: s.ownerLineUid,
-    ...shopMins(s), rule: cartRule(s),
+    itemOff: off, rule: cartRule(off),
     items: s.items.filter((i) => !i.paused).map((it) => {
       const { id, name, price, note, photos, availableAfter } = it;
       const after = availableAfter && availableAfter > tokyoYmd() ? afterLbl(availableAfter) : "";
@@ -242,12 +243,13 @@ export default function ShopBuyerView({ shop, name, embed, onReady }: Props) {
   useEffect(() => {
     if (slot && (!(state?.slots || []).includes(slot) || (state?.taken?.[day] || []).includes(slot))) setSlot(null);
   }, [state, day, slot]);
-  const cartTotal = pickedItems.reduce((n, i) => n + (i.price ?? 0), 0);
-  const minTotal = Number(state?.minTotal) || 0;
-  const underFloor = minTotal > 0 && cartTotal < minTotal;
+  const cartSub = pickedItems.reduce((n, i) => n + (i.price ?? 0), 0);
+  const itemOff = Number(state?.itemOff) || 0;
+  const cartOff = cartDiscount(pickedItems.length, itemOff);
+  const cartTotal = Math.max(0, cartSub - cartOff);
   const canSend = !!slot && !!method && !!contactVal && chanOk && pickedItems.length > 0
     && ({ jimoty: canJimoty, facebook: canFb, line: canLine, phone: canPhone }[method])
-    && (!after || day >= after) && !underFloor;
+    && (!after || day >= after);
   const rule = state?.rule || null;
 
   function toggle(id: string) {
@@ -492,15 +494,14 @@ export default function ShopBuyerView({ shop, name, embed, onReady }: Props) {
             {!days.length ? <p className="sw">予約できる日がありません。</p>
               : !freeSlots.length ? <p className="sw">この日は空きがありません。</p> : null}
             <p className="total">現金合計 {money(cartTotal)}</p>
+            {cartOff > 0 ? (
+              <p className="hint">まとめ買い −{money(cartOff)}（1点¥{itemOff.toLocaleString("ja-JP")}×{pickedItems.length}）</p>
+            ) : null}
             <ul className="claim-items">{pickedItems.map((i) => (
               <li key={i.id}><span>{i.name?.trim() || "無題"}</span><span>{money(i.price)}</span></li>
             )).concat(waitItems.map((i) => (
               <li key={i.id}><span>{i.name?.trim() || "無題"} · キャンセル待ち</span><span>{money(i.price)}</span></li>
             )))}</ul>
-            {rule ? <p className="ask">{rule}</p> : null}
-            {underFloor ? (
-              <p className="err">合計¥{minTotal.toLocaleString("ja-JP")}以上で依頼できます</p>
-            ) : null}
             <div className="field contact"><span>連絡方法</span>
               {!methodOpts.length ? (
                 <p className="sw">出品者の連絡先が未設定です。しばらくしてから再度お試しください。</p>

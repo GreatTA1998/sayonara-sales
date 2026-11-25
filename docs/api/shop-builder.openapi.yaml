@@ -578,14 +578,10 @@ components:
           type: integer
           minimum: 0
           description: Soonest a buyer may book, in days from today.
-        minItems:
+        itemOff:
           type: integer
           minimum: 0
-          description: Soft minimum item count. Sending this clears `minTotal`.
-        minTotal:
-          type: integer
-          minimum: 0
-          description: Hard minimum yen total. Sending this clears `minItems`.
+          description: Yen off per cart item (progressive bulk reward). 0 = off; unset defaults to 100.
     PickupSpot:
       type: object
       additionalProperties: false
