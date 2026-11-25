@@ -917,8 +917,9 @@ export default function ShopAdminView({ shop, name }: Props) {
       {claimable && (
         <div className="claim-banner">
           {ownOpen ? (
-            <SoftLoginForm className="soft-login claim-login" claimShopId={shop}
-              onDone={() => { void doClaim(); }} />
+            <div className="claim-login">
+              <SoftLoginForm claimShopId={shop} onDone={() => { void doClaim(); }} />
+            </div>
           ) : (
             <button type="button" className="cta go" disabled={ownBusy}
               onClick={() => {

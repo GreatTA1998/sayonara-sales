@@ -393,8 +393,9 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
       {claimable && (
         <div className="claim-banner">
           {claimOpen ? (
-            <SoftLoginForm className="soft-login claim-login" claimShopId={shop}
-              onDone={() => { void doClaim(); }} />
+            <div className="claim-login">
+              <SoftLoginForm claimShopId={shop} onDone={() => { void doClaim(); }} />
+            </div>
           ) : (
             <button type="button" className="cta go" disabled={claimBusy}
               onClick={() => {

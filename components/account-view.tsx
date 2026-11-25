@@ -46,7 +46,7 @@ export function AccountView({
     <div className="account-view">
       <h1>{name || t("me.title", lang)}</h1>
       {!name && !hard ? (
-        <SoftLoginForm className="soft-login" onDone={(id) => onLoginDone?.(id)} />
+        <SoftLoginForm onDone={(id) => onLoginDone?.(id)} />
       ) : (
         <>
           {hard ? (
