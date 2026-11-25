@@ -16,7 +16,7 @@ export function SoftLoginForm({
   claimShopId?: string;
 }) {
   const lang = useLang();
-  const [mode, setMode] = useState<Mode>("jimoty");
+  const [mode, setMode] = useState<Mode>("facebook");
   const [names, setNames] = useState({ jimoty: "", line: "", facebook: "" });
   const [err, setErr] = useState("");
   const ok = Object.values(names).some((v) => v.trim());
