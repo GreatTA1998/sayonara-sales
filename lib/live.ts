@@ -9,6 +9,7 @@ import {
 } from "firebase/firestore";
 import { ensureAuth, getDb } from "./fb";
 import { dayLbl, tokyoYmd } from "./days";
+import { DEF_LEAD } from "./sale";
 import {
   applyDates, applyMins, bookableDays, cartAfter, claimFields,
   ELTON_SHOP, hasBuyerContact, itemFields, normalizeSlots, normalizeSpots, parseShop, shortCode, shopMins,
@@ -35,8 +36,8 @@ function assemble(s: ShopSnap): Store {
 
 const emptySeed = (id: string): Store =>
   id === ELTON_SHOP
-    ? { address: "目黒区", lineInviteUrl: "", phone: "", items: [], claims: [], published: true }
-    : { address: "", items: [], claims: [] };
+    ? { address: "目黒区", lineInviteUrl: "", phone: "", items: [], claims: [], published: true, leadDays: DEF_LEAD }
+    : { address: "", items: [], claims: [], leadDays: DEF_LEAD };
 
 const denied = (e: unknown) => String((e as { code?: string })?.code || "").endsWith("permission-denied");
 const NO_EDIT = "このショップの編集権限がありません";
