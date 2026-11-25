@@ -498,7 +498,7 @@ export async function leaveWaitLive(shopRaw: string, itemId: string, accounts: s
 
 /** Buyer book — creates requested claim; snapshot reconciles. */
 export async function bookShop(shopRaw: string, body: {
-  day: string; slot: string; itemIds: string[]; contact: string; contactMethod: "jimoty" | "line" | "phone";
+  day: string; slot: string; itemIds: string[]; contact: string; contactMethod: "jimoty" | "line" | "phone" | "facebook";
   lineUid?: string;
 }): Promise<{ code: string; day: string; slot: string; address: string; contact: string; contactMethod: string; total: number; items: string[] }> {
   const shop = parseShop(shopRaw);

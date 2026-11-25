@@ -33,11 +33,20 @@ type AdminState = {
 };
 type Props = { shop: string; name: string };
 const fmtSlot = (a: string, b: string) => `${a}–${b}`;
-type ContactMode = "jimoty" | "line" | "phone";
+type ContactMode = "jimoty" | "line" | "phone" | "facebook";
 type MinMode = "items" | "total";
-const CONTACT_OPTS: [string, string][] = [["jimoty", "ジモティー"], ["line", "LINE"], ["phone", "電話"]];
+const CONTACT_OPTS: [string, string][] = [
+  ["jimoty", "ジモティー"], ["line", "LINE"], ["phone", "電話"], ["facebook", "Facebook"],
+];
 const MIN_OPTS: [string, string][] = [["items", "最低点数"], ["total", "最低合計"]];
-const methodJa = (m?: string) => (m === "jimoty" ? "ジモティー" : m === "phone" ? "電話" : m === "line" ? "LINE" : m || "");
+const methodJa = (m?: string) =>
+  (m === "jimoty" ? "ジモティー" : m === "phone" ? "電話" : m === "line" ? "LINE" : m === "facebook" ? "Facebook" : m || "");
+const CONTACT_FIELD: Record<ContactMode, { span: string; ph: string; mode: "url" | "tel"; ac: string }> = {
+  jimoty: { span: "ジモティープロフィール", ph: "https://jmty.jp/…", mode: "url", ac: "url" },
+  line: { span: "LINE招待リンク", ph: "https://line.me/ti/p/…", mode: "url", ac: "off" },
+  phone: { span: "電話番号", ph: "080-0000-0000", mode: "tel", ac: "tel" },
+  facebook: { span: "Facebook Marketplace", ph: "投稿またはプロフィールURL", mode: "url", ac: "url" },
+};
 const kuStem = (v: string) => v.replace(/区$/, "");
 const kuFull = (v: string) => { const s = kuStem(v).trim(); return s ? `${s}区` : ""; };
 const itemLabel = (it?: Item | null) => it?.name?.trim() || "無題";
@@ -172,10 +181,13 @@ export default function ShopAdminView({ shop, name }: Props) {
     setBio(bioVal);
     const j = body.jimotyUrl || local.jimotyUrl || "";
     const l = body.lineInviteUrl || "", p = body.phone || "";
-    setJimoty(j); setLineInvite(l); setPhone(p);
+    const f = body.facebookUrl || local.facebookUrl || "";
+    setJimoty(j); setLineInvite(l); setPhone(p); setFacebook(f);
     setYoutube(body.youtubeUrl || ytUrl(bioVal) || local.youtubeUrl || "");
-    setFacebook(body.facebookUrl || local.facebookUrl || "");
-    setContactMode((j.trim() && "jimoty") || (l.trim() && "line") || (p.trim() && "phone") || "jimoty");
+    setContactMode(
+      (j.trim() && "jimoty") || (l.trim() && "line") || (p.trim() && "phone")
+        || (f.trim() && "facebook") || "jimoty",
+    );
     setSlots(body.slots?.length ? body.slots : [...PICKUP_SLOTS]);
     setPickupTo(body.pickupTo || body.moveOut || "");
     setLeadDays(body.leadDays ?? DEF_LEAD);
@@ -693,8 +705,10 @@ export default function ShopAdminView({ shop, name }: Props) {
     show("コピーしました", "ok");
   }
   function publish() {
-    if (!(contactMode === "jimoty" ? jimoty : contactMode === "line" ? lineInvite : phone).trim()) {
-      const msg = `${contactMode === "jimoty" ? "Jimoty profile" : contactMode === "line" ? "LINE招待リンク" : "電話番号"}を入力してください`;
+    const val = contactMode === "jimoty" ? jimoty : contactMode === "line" ? lineInvite
+      : contactMode === "phone" ? phone : facebook;
+    if (!val.trim()) {
+      const msg = `${CONTACT_FIELD[contactMode].span}を入力してください`;
       setErr(msg); show(msg, "err"); return;
     }
     setPub("on");
@@ -846,15 +860,16 @@ export default function ShopAdminView({ shop, name }: Props) {
               placeholder="動作確認・値引き・引越し・車・まとめ買い優先など" /></label>
           <Seg label="買い手連絡" value={contactMode} onPick={(v) => setContactMode(v as ContactMode)}
             opts={CONTACT_OPTS} />
-          {contactMode !== "jimoty" && (
-            <label className="float"><span>{contactMode === "line" ? "LINE招待リンク" : "電話番号"}</span>
-              <input value={contactMode === "line" ? lineInvite : phone}
-                onChange={(e) => (contactMode === "line" ? setLineInvite : setPhone)(e.target.value)}
-                onBlur={() => void persistProfile(bio, jimoty, youtube, lineInvite, phone)}
-                placeholder={contactMode === "line" ? "https://line.me/ti/p/…" : "080-0000-0000"}
-                inputMode={contactMode === "line" ? "url" : "tel"}
-                autoComplete={contactMode === "line" ? "off" : "tel"} /></label>
-          )}
+          <label className="float"><span>{CONTACT_FIELD[contactMode].span}</span>
+            <input
+              value={contactMode === "jimoty" ? jimoty : contactMode === "line" ? lineInvite
+                : contactMode === "phone" ? phone : facebook}
+              onChange={(e) => (contactMode === "jimoty" ? setJimoty : contactMode === "line" ? setLineInvite
+                : contactMode === "phone" ? setPhone : setFacebook)(e.target.value)}
+              onBlur={() => void persistProfile(bio, jimoty, youtube, lineInvite, phone)}
+              placeholder={CONTACT_FIELD[contactMode].ph}
+              inputMode={CONTACT_FIELD[contactMode].mode}
+              autoComplete={CONTACT_FIELD[contactMode].ac} /></label>
         </section>
       )}
 
@@ -1067,18 +1082,10 @@ export default function ShopAdminView({ shop, name }: Props) {
         <details className="opt">
           <summary>任意</summary>
           <div className="name-price">
-            <label className="float"><span>Jimoty profile</span>
-              <input value={jimoty} onChange={(e) => setJimoty(e.target.value)}
-                onBlur={() => void persistProfile(bio, jimoty, youtube)}
-                placeholder="https://jmty.jp/…" inputMode="url" autoComplete="url" /></label>
             <label className="float"><span>内見動画</span>
               <input value={youtube} onChange={(e) => setYoutube(e.target.value)}
                 onBlur={() => void persistProfile(bio, jimoty, youtube)}
                 placeholder="内見動画URL" inputMode="url" autoComplete="url" /></label>
-            <label className="float"><span>Facebook Marketplace</span>
-              <input value={facebook} onChange={(e) => setFacebook(e.target.value)}
-                onBlur={() => void persistProfile(bio, jimoty, youtube)}
-                placeholder="投稿またはプロフィールURL" inputMode="url" autoComplete="url" /></label>
           </div>
           <Seg label="カート条件" value={minMode} onPick={(v) => {
             const mode = v as MinMode;
