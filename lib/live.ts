@@ -156,8 +156,9 @@ export async function peekShop(shopRaw: string): Promise<{ address: string; coun
   };
 }
 
+/** Missing/blank → null (unset → 要相談). Explicit 0 stays ¥0 — never coerce unset to free. */
 const numPrice = (v: unknown) => {
-  if (v === "" || v == null || Number.isNaN(Number(v))) return 0;
+  if (v === "" || v == null || Number.isNaN(Number(v))) return null;
   return Math.max(0, Number(v));
 };
 
