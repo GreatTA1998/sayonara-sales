@@ -17,8 +17,10 @@ export type Claim = {
   spotId?: string; spotName?: string; spotMapsUrl?: string;
   /** requested = pending; booked = 予約済; picked_up = 引取済 (sold). */
   status: "requested" | "booked" | "picked_up" | "cancelled"; createdAt: string;
-  waiters?: { account: string; at: string }[];
+  waiters?: { account: string; at: string; lineUid?: string }[];
   buyerUid?: string;
+  /** LINE Login userId (OA push). Soft Jimoty-only = absent → no push. */
+  lineUid?: string;
   declineReason?: string;
 };
 export type Store = {
@@ -232,6 +234,7 @@ export function claimFields(c: Claim): Record<string, unknown> {
     waiters: c.waiters || [],
     ...(c.spotId ? { spotId: c.spotId, spotName: c.spotName || null, spotMapsUrl: c.spotMapsUrl || null } : {}),
     ...(c.buyerUid ? { buyerUid: c.buyerUid } : {}),
+    ...(c.lineUid ? { lineUid: c.lineUid } : {}),
     ...(c.declineReason ? { declineReason: c.declineReason } : {}),
   };
 }
@@ -267,11 +270,16 @@ export function storeFromDocs(
         if (r.spotName) c.spotName = String(r.spotName);
         if (r.spotMapsUrl) c.spotMapsUrl = String(r.spotMapsUrl);
         if (r.buyerUid) c.buyerUid = String(r.buyerUid);
+        if (r.lineUid) c.lineUid = String(r.lineUid);
         if (r.declineReason) c.declineReason = String(r.declineReason);
         if (Array.isArray(r.waiters)) {
           c.waiters = r.waiters.map((w) => {
-            const row = w as { account?: string; at?: string };
-            return { account: String(row.account || ""), at: String(row.at || "") };
+            const row = w as { account?: string; at?: string; lineUid?: string };
+            const out: { account: string; at: string; lineUid?: string } = {
+              account: String(row.account || ""), at: String(row.at || ""),
+            };
+            if (row.lineUid) out.lineUid = String(row.lineUid);
+            return out;
           }).filter((w) => w.account);
         }
         return c;

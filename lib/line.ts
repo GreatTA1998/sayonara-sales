@@ -72,9 +72,50 @@ export const authorizeUrl = (state: string, redirectUri: string) => {
     state,
     scope: "profile openid",
     ui_locales: "ja",
+    // Friend checkbox at login (Messaging OA linked to same Login provider).
+    bot_prompt: "normal",
   });
   return `https://access.line.me/oauth2/v2.1/authorize?${q}`;
 };
+
+/** Messaging API long-lived token (Vercel only). Missing → push no-ops. */
+export const messagingToken = () => process.env.LINE_CHANNEL_ACCESS_TOKEN?.trim() || "";
+export const lineUidOk = (to: string) => /^U[0-9a-f]{32}$/i.test(to);
+
+export type LinePushKind = "confirm" | "decline" | "reschedule" | "waitlist" | "wait_open";
+
+/** JP OA templates. Soft-fail callers treat skipped as ok. */
+export function linePushText(
+  kind: LinePushKind,
+  p: { day?: string; slot?: string; code?: string; reason?: string } = {},
+) {
+  const when = [p.day, p.slot].filter(Boolean).join(" ");
+  if (kind === "confirm") {
+    return `【サヨナラセール】受取が確定しました。\n${when}${p.code ? `\n受付コード ${p.code}` : ""}`.trim();
+  }
+  if (kind === "reschedule") return `【サヨナラセール】受取日程が変更されました。\n${when}`.trim();
+  if (kind === "waitlist") return "【サヨナラセール】キャンセル待ちに登録しました。空きが出たらお知らせします。";
+  if (kind === "wait_open") return "【サヨナラセール】キャンセルが出ました。ショップページでご確認ください。";
+  const reason = (p.reason || "").trim();
+  return reason || "【サヨナラセール】今回はご案内できませんでした。";
+}
+
+/** POST /v2/bot/message/push. No token or bad uid → skipped (site still works). */
+export async function pushLine(to: string, text: string): Promise<{ ok: boolean; skipped?: boolean }> {
+  const token = messagingToken();
+  if (!token || !lineUidOk(to) || !text.trim()) return { ok: true, skipped: true };
+  try {
+    const res = await fetch("https://api.line.me/v2/bot/message/push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ to, messages: [{ type: "text", text: text.slice(0, 5000) }] }),
+    });
+    if (!res.ok) return { ok: false };
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}
 
 export async function exchangeCode(code: string, redirectUri: string) {
   const body = new URLSearchParams({

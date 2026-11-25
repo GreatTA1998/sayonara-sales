@@ -27,6 +27,7 @@ shops/{shopId}/claims/{claimId}   # code, day, slot, itemIds, contact, buyerUid,
 | `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | prod | Storage bucket |
 | `BLOB_READ_WRITE_TOKEN` | prod | Photo uploads only |
 | `LINE_CHANNEL_ID` / `LINE_CHANNEL_SECRET` | optional | Hard LINE OAuth (see store `docs/line-login-setup.md`) |
+| `LINE_CHANNEL_ACCESS_TOKEN` | optional | Messaging API push (`/v2/bot/message/push`); no-op if unset |
 | `NEXT_PUBLIC_SITE_URL` | optional | prod default `https://sayonara.tokyo`; Preview/`beta` → `https://beta.sayonara.tokyo` |
 | `REPORT_WEBHOOK_URL` | optional | Cursor Automation webhook — POST on each Help report |
 | `REPORT_WEBHOOK_AUTH` | optional | Bearer for that webhook (`Generate auth header`) |

@@ -24,15 +24,18 @@ export function useLineOAuthReturn(onDone?: () => void) {
   }, []);
 }
 
-export const lineLoginHref = () => {
+export const lineLoginHref = (ret?: string) => {
   if (typeof window === "undefined") return "/api/auth/line";
   const q = new URLSearchParams({
-    return: window.location.pathname + window.location.search || "/",
+    return: ret || window.location.pathname + window.location.search || "/",
   });
   const shop = getId();
   if (shop) q.set("shop", shop);
   return `/api/auth/line?${q}`;
 };
+
+/** Pending waitlist join after OAuth (shop|itemId). */
+export const WL_KEY = "ss-wl";
 
 /** Hard login. Needs LINE_CHANNEL_ID/SECRET on Vercel; else ?line_err=config. */
 export function LineLoginLink() {
