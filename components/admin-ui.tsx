@@ -246,6 +246,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const ownsOther = !!ownedId && ownedId !== shop;
   const mineLine = !!lineUid && data?.ownerLineUid === lineUid;
   const claimable = !!data && !data.ownerUid && !ownsOther && !mineLine && shop !== ELTON_SHOP;
+  const unclaimedShop = shop !== ELTON_SHOP && !!data && !data.ownerUid;
   useEffect(() => {
     if (!logged) { setOwnedId(""); return; }
     let dead = false;
@@ -906,8 +907,8 @@ export default function ShopAdminView({ shop, name }: Props) {
         <span className="spacer" aria-hidden="true" />
         {logged && <button type="button" className="share" onClick={copyUrl}>URLコピー</button>}
         <button type="button" className="req"
-          onClick={!logged ? () => router.push("/me") : pub === "on" ? () => router.push(`/s/${shop}`) : publish}>
-          {!logged ? "ログインして保存" : pub === "on" ? "店舗を見る" : "公開する"}
+          onClick={unclaimedShop ? publish : !logged ? () => router.push("/me") : pub === "on" ? () => router.push(`/s/${shop}`) : publish}>
+          {unclaimedShop || logged ? (pub === "on" ? "店舗を見る" : "公開する") : "ログインして保存"}
         </button>
       </header>
 

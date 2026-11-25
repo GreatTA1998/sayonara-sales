@@ -59,16 +59,12 @@ function claimPatch(uid: string) {
   };
 }
 
-/** Seed shop doc with no ownerUid. creatorUid = this anon uid; claim is separate. */
+/** Seed shop doc with no ownerUid. Claim is a separate write. */
 async function ensureShopDoc(shop: string) {
   if (shop === ELTON_SHOP) return;
-  const user = await ensureAuth();
+  await ensureAuth();
   const ref = doc(getDb(), "shops", shop);
-  const seed = {
-    ...shopFields(emptySeed(shop)),
-    creatorUid: user.uid,
-    updatedAt: new Date().toISOString(),
-  };
+  const seed = { ...shopFields(emptySeed(shop)), updatedAt: new Date().toISOString() };
   let snap;
   try { snap = await getDoc(ref); }
   catch (e) {
@@ -332,17 +328,15 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
   const db = getDb();
   const shopRef = doc(db, "shops", shop);
   const action = String(body.action || "");
-  // Elton: any signed-in user. Other shops: owner, or the unclaimed creator.
-  // Publishing still needs a claim. Editing never writes ownerUid.
+  // Elton: any signed-in user. Unclaimed: any anon/signed-in user may edit, not publish.
+  // Claimed: only that ownerUid. Editing never writes ownerUid.
   if (shop !== ELTON_SHOP) {
-    if (!softLogged()) throw new Error(NEED_LOGIN);
     const meta = (await getDoc(shopRef)).data() || {};
     const prev = String(meta.ownerUid || "");
-    const creator = String(meta.creatorUid || "");
-    if (prev && prev !== user.uid) throw new Error(NO_EDIT);
-    if (!prev && creator && creator !== user.uid) throw new Error(NO_EDIT);
-    if (!prev && action === "publish") throw new Error(NEED_CLAIM);
-    if (!prev && !creator) await updateDoc(shopRef, { creatorUid: user.uid });
+    if (prev) {
+      if (!softLogged()) throw new Error(NEED_LOGIN);
+      if (prev !== user.uid) throw new Error(NO_EDIT);
+    } else if (action === "publish") throw new Error(NEED_CLAIM);
   }
 
   switch (action) {

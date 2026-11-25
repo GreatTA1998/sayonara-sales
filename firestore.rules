@@ -18,17 +18,9 @@ service cloud.firestore {
     function unclaimed(shopId) {
       return shopId != 'elton' && !('ownerUid' in shopDoc(shopId));
     }
-    // Preparer: anon uid stamped at create. Edits are not a claim and stay unpublished.
-    function isCreator(shopId) {
-      return signedIn()
-        && 'creatorUid' in shopDoc(shopId)
-        && shopDoc(shopId).creatorUid == request.auth.uid;
-    }
-    function canPrepare(shopId) {
-      return isCreator(shopId) && unclaimed(shopId);
-    }
+    // Unclaimed dig5: any signed-in user, including anonymous auth. Not a claim.
     function canEdit(shopId) {
-      return canAdmin(shopId) || canPrepare(shopId);
+      return canAdmin(shopId) || (signedIn() && unclaimed(shopId));
     }
     function ownerFieldsUntouched() {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
@@ -52,24 +44,17 @@ service cloud.firestore {
       // Public reads: unpublished = private link preview; home filters published client-side.
       allow read: if true;
 
-      // New shop: creatorUid is the anon preparer. Create does not claim or publish.
+      // Create does not claim or publish. Any signed-in uid, including anonymous.
       allow create: if signedIn()
-        && request.resource.data.creatorUid == request.auth.uid
         && request.resource.data.published == false
         && !('ownerUid' in request.resource.data)
         && !('ownerLineUid' in request.resource.data);
 
-      // Owner edits. Preparer edits an unclaimed shop without claiming or publishing.
-      // Legacy docs with no creatorUid: first signed-in editor stamps themselves.
-      // First claim: no ownerUid yet → stamp self. getAfter sees uids/{uid} created
-      // in the same transaction. A different user (the seller) may claim.
+      // Owner edits. Anyone signed-in may edit an unclaimed shop, but that
+      // write cannot set owner fields or publish. Claim is the only ownerUid stamp.
+      // getAfter sees uids/{uid} created in the same claim transaction.
       allow update: if canAdmin(shopId)
-        || (canPrepare(shopId)
-            && request.resource.data.creatorUid == resource.data.creatorUid
-            && staysUnpublished()
-            && ownerFieldsUntouched())
-        || (signedIn() && unclaimed(shopId) && !('creatorUid' in resource.data)
-            && request.resource.data.creatorUid == request.auth.uid
+        || (signedIn() && unclaimed(shopId)
             && staysUnpublished()
             && ownerFieldsUntouched())
         || (signedIn() && !('ownerUid' in resource.data)

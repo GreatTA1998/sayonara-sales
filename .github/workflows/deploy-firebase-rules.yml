@@ -1,0 +1,28 @@
+# Publish Firestore rules when they change on main. Elton has no terminal.
+# Photos are Vercel Blob, not Firebase Storage, and firestore.indexes.json is
+# empty — deploying either would fail or delete console indexes. Rules only.
+name: deploy-firebase-rules
+on:
+  push:
+    branches: [main]
+    paths:
+      - firestore.rules
+      - firebase.json
+      - .github/workflows/deploy-firebase-rules.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npx -y firebase-tools@15.37.0 deploy --only firestore:rules --project sayonara-sales --non-interactive
