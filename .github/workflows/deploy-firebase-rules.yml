@@ -1,6 +1,7 @@
-# Publish Firestore rules when they change on main. Elton has no terminal.
-# Photos are Vercel Blob, not Firebase Storage, and firestore.indexes.json is
-# empty — deploying either would fail or delete console indexes. Rules only.
+# Publish Firestore rules when they change on main. No Google login after setup.
+# Photos are Vercel Blob, not Firebase Storage. firestore.indexes.json is empty,
+# so indexes are not deployed (that would delete console indexes).
+# One-time setup: docs/rules-deploy.md
 name: deploy-firebase-rules
 on:
   push:
@@ -19,6 +20,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Require FIREBASE_SERVICE_ACCOUNT
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error title=Rules not deployed::GitHub secret FIREBASE_SERVICE_ACCOUNT is missing. One-time setup (no deploy login after that): docs/rules-deploy.md. Until then, paste firestore.rules in the Firebase console."
+            exit 1
+          fi
       - uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
