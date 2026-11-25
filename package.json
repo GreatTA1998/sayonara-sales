@@ -5,7 +5,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test:rules": "npx firebase-tools emulators:exec --only firestore --project demo-sayonara \"node scripts/firestore-rules.test.mjs\""
+    "test:rules": "npx firebase-tools emulators:exec --only firestore --project demo-sayonara \"node scripts/firestore-rules.test.mjs\"",
+    "test:shop-builder-spec": "tsx scripts/shop-builder-spec.test.ts",
+    "test:shop-builder": "npx firebase-tools emulators:exec --only firestore,auth --project demo-sayonara \"tsx scripts/shop-builder.contract.test.ts\"",
+    "test": "npm run test:shop-builder-spec && npm run test:rules && npm run test:shop-builder"
   },
   "dependencies": {
     "@vercel/blob": "^2.9.0",
@@ -19,6 +22,8 @@
     "@firebase/rules-unit-testing": "^4.0.1",
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
-    "typescript": "^5.7.0"
+    "tsx": "^4.23.15",
+    "typescript": "^5.7.0",
+    "yaml": "^2.9.1"
   }
 }

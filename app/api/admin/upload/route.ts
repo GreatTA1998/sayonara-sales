@@ -1,21 +1,8 @@
 import { NextResponse } from "next/server";
-import { put } from "@vercel/blob";
-import sharp from "sharp";
+import { BlobPhotoError, storeShopPhoto } from "@/lib/blob-photo";
 import { shopFromUrl, uid } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
-
-const MAX = 1600;
-const QUALITY = 82;
-
-async function compress(file: File) {
-  const buf = Buffer.from(await file.arrayBuffer());
-  return sharp(buf)
-    .rotate()
-    .resize({ width: MAX, height: MAX, fit: "inside", withoutEnlargement: true })
-    .webp({ quality: QUALITY })
-    .toBuffer();
-}
 
 /** Blob photo upload only — client writes Firestore item docs. */
 export async function POST(req: Request) {
@@ -30,22 +17,15 @@ export async function POST(req: Request) {
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "file required" }, { status: 400 });
     }
-    const mime = (file.type || "").toLowerCase();
-    if (mime && !mime.startsWith("image/") && mime !== "application/octet-stream") {
-      return NextResponse.json({ error: "Image only" }, { status: 400 });
-    }
-    const body = await compress(file);
-    const blob = await put(`sayonara-photos/${shop}/${itemId}-${Date.now()}.webp`, body, {
-      access: "public",
-      contentType: "image/webp",
-    });
+    const stored = await storeShopPhoto(shop, itemId, file);
     return NextResponse.json({
-      url: blob.url,
+      url: stored.url,
       itemId,
-      bytesIn: file.size,
-      bytesOut: body.length,
+      bytesIn: stored.bytesIn,
+      bytesOut: stored.bytesOut,
     });
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : "Upload failed" }, { status: 400 });
+    const status = e instanceof BlobPhotoError ? e.status : 400;
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Upload failed" }, { status });
   }
 }
