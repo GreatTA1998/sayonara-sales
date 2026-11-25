@@ -244,7 +244,8 @@ export default function ShopAdminView({ shop, name }: Props) {
   }, []);
 
   const ownsOther = !!ownedId && ownedId !== shop;
-  const claimable = !!data && !data.ownerUid && !ownsOther && shop !== ELTON_SHOP;
+  const mineLine = !!lineUid && data?.ownerLineUid === lineUid;
+  const claimable = !!data && !data.ownerUid && !ownsOther && !mineLine && shop !== ELTON_SHOP;
   useEffect(() => {
     if (!logged) { setOwnedId(""); return; }
     let dead = false;

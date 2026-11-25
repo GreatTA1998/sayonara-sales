@@ -80,6 +80,16 @@ export async function findOwnedShop(): Promise<string> {
   const user = await ensureAuth();
   const db = getDb();
   const uref = doc(db, "uids", user.uid);
+  const lu = getLineUid();
+  // LINE-secured: durable ownerLineUid wins over stale uids/{anon} dig5.
+  if (lu) {
+    const byLine = await getDocs(query(collection(db, "shops"), where("ownerLineUid", "==", lu), limit(1)));
+    if (!byLine.empty) {
+      const id = byLine.docs[0].id;
+      try { await setDoc(uref, { shopId: id }); } catch { /* race / offline */ }
+      return id;
+    }
+  }
   const usnap = await getDoc(uref);
   if (usnap.exists()) return String(usnap.data()?.shopId || "");
   const byUid = await getDocs(query(collection(db, "shops"), where("ownerUid", "==", user.uid), limit(1)));
@@ -89,10 +99,7 @@ export async function findOwnedShop(): Promise<string> {
     try { await setDoc(uref, { shopId: id }); } catch { /* race / offline */ }
     return id;
   }
-  const lu = getLineUid();
-  if (!lu) return "";
-  const byLine = await getDocs(query(collection(db, "shops"), where("ownerLineUid", "==", lu), limit(1)));
-  return byLine.empty ? "" : byLine.docs[0].id;
+  return "";
 }
 
 /**
