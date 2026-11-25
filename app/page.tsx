@@ -17,6 +17,7 @@ export default function HomePage() {
   const lang = useLang();
   const [cards, setCards] = useState<Card[]>([]);
   const [selected, setSelected] = useState<string>(ELTON_ID);
+  const [readyShop, setReadyShop] = useState<string | null>(null);
   const { snack, show } = useSnack();
 
   const refresh = useCallback(async () => {
@@ -53,6 +54,8 @@ export default function HomePage() {
 
   const active = cards.find((c) => c.id === selected) || cards[0];
   const shopId = active?.id || ELTON_ID;
+  const panelReady = cards.length > 0 && readyShop !== null;
+  const onShopReady = useCallback(() => setReadyShop(shopId), [shopId]);
   const copyUrl = (e: { stopPropagation(): void }) => {
     e.stopPropagation();
     const url = `${SITE_URL}/s/${shopId}`;
@@ -66,29 +69,29 @@ export default function HomePage() {
       <p className="subhero">{t("home.sub", lang)}</p>
       <button type="button" className="cta go home-cta"
         onClick={() => router.push(adminPath(ensureShopId()))}>{t("home.cta", lang)}</button>
-      <div className="home-browse">
-        <div className="shop-tabs" role="tablist" aria-label={t("home.tabs", lang)}>
-          {cards.length ? cards.map((c) => (
-            <button key={c.id} type="button" role="tab"
-              className={`shop-tab${selected === c.id ? " on" : ""}`}
-              aria-selected={selected === c.id}
-              onClick={() => setSelected(c.id)}>
-              {c.count}点 {c.ward}
-              {c.id === shopId && (
-                <span className="share" onClick={copyUrl}>{t("home.copy", lang)}</span>
-              )}
-            </button>
-          )) : (
-            <span className="shop-tab ph on">{t("home.loading", lang)}
-              <span className="share" onClick={copyUrl}>{t("home.copy", lang)}</span>
-            </span>
-          )}
+      <div className={panelReady ? "shop-panel in" : "shop-panel"} aria-busy={!panelReady}
+        aria-hidden={!panelReady}>
+        <div className="home-browse">
+          <div className="shop-tabs" role="tablist" aria-label={t("home.tabs", lang)}>
+            {cards.map((c) => (
+              <button key={c.id} type="button" role="tab"
+                className={`shop-tab${selected === c.id ? " on" : ""}`}
+                aria-selected={selected === c.id}
+                onClick={() => setSelected(c.id)}>
+                {c.count}点 {c.ward}
+                {c.id === shopId && (
+                  <span className="share" onClick={copyUrl}>{t("home.copy", lang)}</span>
+                )}
+              </button>
+            ))}
+          </div>
+          <div className="home-shop">
+            <ShopBuyerView key={shopId} shop={shopId} name={active?.name || ELTON_LABEL} embed
+              onReady={onShopReady} />
+          </div>
         </div>
-        <div className="home-shop">
-          <ShopBuyerView key={shopId} shop={shopId} name={active?.name || ELTON_LABEL} embed />
-        </div>
+        <footer className="soft-promo hint">Made by エルトン</footer>
       </div>
-      <footer className="soft-promo hint">Made by エルトン</footer>
       <Snack snack={snack} />
     </main>
   );

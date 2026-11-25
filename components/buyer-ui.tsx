@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { byPrice, Listings, ListingTools, money, Seg, useDense, usePriceDir, useShowSold } from "@/components/photo-listing";
 import { SoftLoginForm } from "@/components/soft-login";
 import { useBodyScrollLock, useMaskDismiss } from "@/components/snack";
@@ -35,7 +35,10 @@ type State = {
 };
 type Receipt = { day: string; slot: string; total?: number };
 type Method = "jimoty" | "line" | "phone" | "facebook";
-type Props = { shop: string; name: string; /** Flatten padding when embedded on home. */ embed?: boolean };
+type Props = {
+  shop: string; name: string; /** Flatten padding when embedded on home. */ embed?: boolean;
+  onReady?: () => void;
+};
 const CH = {
   jimoty: ["ジモティー", "メッセージ済み", "ジモティー名（依頼の識別）"],
   line: ["LINE", "友だち追加してメッセージ済み", "LINE名"],
@@ -76,7 +79,7 @@ function toBuyerState(shop: string, s: Store): State {
   };
 }
 
-export default function ShopBuyerView({ shop, name, embed }: Props) {
+export default function ShopBuyerView({ shop, name, embed, onReady }: Props) {
   const [state, setState] = useState<State | null>(null);
   const [day, setDay] = useState("");
   const cartKey = `ss-cart-${shop}`;
@@ -100,6 +103,8 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [claimOpen, setClaimOpen] = useState(false);
   const [claimBusy, setClaimBusy] = useState(false);
   const [ownedId, setOwnedId] = useState("");
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
   const open = (openId && state?.items.find((i) => i.id === openId)) || null;
   const myKeys = mineKeys(lineName);
   const jimotyUrl = (state?.jimotyUrl || "").trim();
@@ -132,6 +137,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     const unsub = listenShop(shop, (s) => {
       const next = toBuyerState(shop, s);
       setState(next);
+      onReadyRef.current?.();
       setOpenId((id) => (id && next.items.some((i) => i.id === id) ? id : null));
       setDay((d) => (d && next.days?.includes(d) ? d : (next.days?.[0] || "")));
     }, (e) => setErr(e.message || "読み込みに失敗しました"));
@@ -344,6 +350,8 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     );
   }
 
+  if (!state) return <main className={`buy${embed ? " embed" : ""}`} aria-busy="true" />;
+
   const soldOpen = !!open?.sold;
   const takenOpen = !!open?.taken && !soldOpen;
   const onOpen = open ? picked.has(open.id) : false;
@@ -356,9 +364,9 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     : state?.bio;
 
   return (
-    <main className={`buy${embed ? " embed" : ""}`}>
+    <main className={`buy${embed ? " embed" : " shop-in"}`}>
       <header className="bar">
-        <span className="area">{(state?.address || "").trim() || "区"}</span>
+        <span className="area">{(state.address || "").trim()}</span>
         <span className="span">{barMove}</span>
         <button type="button" className="req"
           onClick={() => {
@@ -417,7 +425,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         <ListingTools dir={priceDir} onDir={setPriceDir} dense={dense} onDense={setDense}
           showSold={showSold} onShowSold={setShowSold} />
       )}
-      <Listings items={listItems} dense={dense} loading={!state}
+      <Listings items={listItems} dense={dense}
         onSelect={(it) => { setErr(null); setOpenId(it.id); }}
         classNameFor={(item) => `${picked.has(item.id) ? "on" : ""}${item.sold ? " sold" : item.taken ? " booked" : item.reqN ? " req" : ""}`.trim()} />
       {open && !checkout && (
