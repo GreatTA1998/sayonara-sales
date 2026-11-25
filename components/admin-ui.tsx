@@ -886,6 +886,10 @@ export default function ShopAdminView({ shop, name }: Props) {
               placeholder={CONTACT_FIELD[contactMode].ph}
               inputMode={CONTACT_FIELD[contactMode].mode}
               autoComplete={CONTACT_FIELD[contactMode].ac} /></label>
+          <label className="float"><span>内見動画</span>
+            <input value={youtube} onChange={(e) => setYoutube(e.target.value)}
+              onBlur={() => void persistProfile(bio, jimoty, youtube)}
+              placeholder="内見動画URL" inputMode="url" autoComplete="url" /></label>
         </section>
       )}
 
@@ -1127,15 +1131,6 @@ export default function ShopAdminView({ shop, name }: Props) {
             )}
           </span>
         </div>
-        <details className="opt">
-          <summary>任意</summary>
-          <div className="name-price">
-            <label className="float"><span>内見動画</span>
-              <input value={youtube} onChange={(e) => setYoutube(e.target.value)}
-                onBlur={() => void persistProfile(bio, jimoty, youtube)}
-                placeholder="内見動画URL" inputMode="url" autoComplete="url" /></label>
-          </div>
-        </details>
       </section>
       )}
 
