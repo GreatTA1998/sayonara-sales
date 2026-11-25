@@ -21,7 +21,7 @@ type Item = {
   waitAs?: string[];
 };
 type State = {
-  address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
+  address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string; facebookUrl?: string;
   days: string[]; slots: string[]; taken: Record<string, string[]>;
   moveOut?: string;
   lineInviteUrl?: string | null; phone?: string | null; items: Item[];
@@ -30,7 +30,7 @@ type State = {
 type Receipt = { day: string; slot: string; total?: number };
 type Method = "jimoty" | "line" | "phone";
 type Props = { shop: string; name: string; /** Flatten padding when embedded on home. */ embed?: boolean };
-const CH = { jimoty: ["ジモティー", "メッセージ済み", "ジモティ名（依頼の識別）"], line: ["LINE", "友だち追加してメッセージ済み", "LINE名"], phone: ["電話", "メッセージ済み", "電話番号"] } as const;
+const CH = { jimoty: ["ジモティー", "メッセージ済み", "ジモティー名（依頼の識別）"], line: ["LINE", "友だち追加してメッセージ済み", "LINE名"], phone: ["電話", "メッセージ済み", "電話番号"] } as const;
 
 /** Confirmed only — pending is disclaimer + still 依頼可. */
 const locked = (i: Item) => i.taken;
@@ -46,6 +46,7 @@ function toBuyerState(shop: string, s: Store): State {
   for (const d of days) taken[d] = takenSlots(s, d);
   return {
     address: s.address, bio: s.bio || "", jimotyUrl: s.jimotyUrl || "", youtubeUrl: s.youtubeUrl || "",
+    facebookUrl: s.facebookUrl || "",
     days, slots, taken,
     moveOut: s.moveOut || s.pickupTo || "",
     lineInviteUrl: contact.lineInviteUrl || null, phone: contact.phone || null,
@@ -93,9 +94,10 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const barMove = moveOutLeft(state?.moveOut ? [state.moveOut] : []);
   const loggedIn = !!knownName;
   const hardLine = !!lineUid;
-  const contactVal = (
-    (method === "jimoty" && loggedIn) || (method === "line" && hardLine) ? knownName : lineName
-  ).trim();
+  /** Soft identity (incl. Facebook名) covers Jimoty/LINE contact; phone still typed. */
+  const useStored = method === "phone" ? false
+    : method === "line" ? (hardLine || loggedIn) : loggedIn;
+  const contactVal = (useStored ? knownName : lineName).trim();
 
   useEffect(() => {
     try {
@@ -197,7 +199,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   async function joinWait(id: string) {
     const n = (getName() || lineName).trim();
     if (!n) { setErr("ログインしてください"); return; }
-    if (!lineUid) openShop(n);
+    if (!lineUid && !getName()) openShop(n);
     setLineName(n); setErr(null); setBusy(true);
     try {
       await joinWaitLive(shop, id, n, mineKeys(n), lineUid);
@@ -256,7 +258,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
         day, slot, itemIds, contactMethod: method, contact: contactVal,
         lineUid: lineUid || undefined,
       });
-      if (method === "jimoty" || (method === "line" && !hardLine)) {
+      if (method === "jimoty" || (method === "line" && !hardLine && !loggedIn)) {
         openShop(contactVal, method === "line" ? "line" : "jimoty");
       }
       pushBuy({
@@ -311,11 +313,18 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
       </header>
       {bioShow ? <p className="hint bio">{bioShow}</p> : null}
       {rule ? <p className="ask">{rule}</p> : null}
-      {state?.jimotyUrl ? (
+      {(state?.jimotyUrl || state?.facebookUrl) ? (
         <p className="ext-links">
-          <a className="ext-link" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">
-            {name}のジモティープロフィール
-          </a>
+          {state.jimotyUrl ? (
+            <a className="ext-link" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">
+              {name}のジモティープロフィール
+            </a>
+          ) : null}
+          {state.facebookUrl ? (
+            <a className="ext-link" href={state.facebookUrl} target="_blank" rel="noopener noreferrer">
+              Facebook Marketplace
+            </a>
+          ) : null}
           {/* 内見動画 temporarily hidden (SS-315); admin youtubeUrl kept. */}
         </p>
       ) : null}
@@ -428,7 +437,7 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
                         <a className="cta line" href={lineLoginHref()}>LINEでログイン</a>
                       </>
                     )}
-                    {!(loggedIn && method === "jimoty") && !(hardLine && method === "line") && (
+                    {!useStored && (
                       <label className="float"><span>{CH[method][2]}</span>
                         <input value={lineName} onChange={(e) => setLineName(e.target.value)}
                           placeholder={method === "phone" ? "080-0000-0000" : "表示名"}

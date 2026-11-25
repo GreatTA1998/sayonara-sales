@@ -24,7 +24,7 @@ export type Claim = {
   declineReason?: string;
 };
 export type Store = {
-  address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
+  address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string; facebookUrl?: string;
   lineInviteUrl?: string; phone?: string;
   slots?: string[];
   pickupSpots?: PickupSpot[];
@@ -203,6 +203,7 @@ export function shopFields(s: Store): Record<string, unknown> {
     bio: s.bio || "",
     jimotyUrl: s.jimotyUrl || "",
     youtubeUrl: s.youtubeUrl || "",
+    facebookUrl: s.facebookUrl || "",
     lineInviteUrl: s.lineInviteUrl || "",
     phone: s.phone || "",
     slots: s.slots?.length ? s.slots : [],
@@ -288,6 +289,7 @@ export function storeFromDocs(
   if (shop.bio) s.bio = String(shop.bio);
   if (shop.jimotyUrl) s.jimotyUrl = String(shop.jimotyUrl);
   if (shop.youtubeUrl) s.youtubeUrl = String(shop.youtubeUrl);
+  if (shop.facebookUrl) s.facebookUrl = String(shop.facebookUrl);
   if (shop.lineInviteUrl) s.lineInviteUrl = String(shop.lineInviteUrl);
   if (shop.phone) s.phone = String(shop.phone);
   if (Array.isArray(shop.slots) && shop.slots.length) s.slots = shop.slots.map(String);

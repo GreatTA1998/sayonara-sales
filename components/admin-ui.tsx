@@ -25,7 +25,7 @@ type Claim = {
   waiters?: { account: string; at: string; lineUid?: string }[];
 };
 type AdminState = {
-  address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string;
+  address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string; facebookUrl?: string;
   lineInviteUrl?: string; phone?: string; slots?: string[];
   pickupFrom?: string; pickupTo?: string; moveOut?: string; leadDays?: number;
   minItems?: number; minTotal?: number; published?: boolean;
@@ -111,6 +111,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [bio, setBio] = useState("");
   const [jimoty, setJimoty] = useState("");
   const [youtube, setYoutube] = useState("");
+  const [facebook, setFacebook] = useState("");
   const [lineInvite, setLineInvite] = useState("");
   const [phone, setPhone] = useState("");
   const [contactMode, setContactMode] = useState<ContactMode>("jimoty");
@@ -173,6 +174,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     const l = body.lineInviteUrl || "", p = body.phone || "";
     setJimoty(j); setLineInvite(l); setPhone(p);
     setYoutube(body.youtubeUrl || ytUrl(bioVal) || local.youtubeUrl || "");
+    setFacebook(body.facebookUrl || local.facebookUrl || "");
     setContactMode((j.trim() && "jimoty") || (l.trim() && "line") || (p.trim() && "phone") || "jimoty");
     setSlots(body.slots?.length ? body.slots : [...PICKUP_SLOTS]);
     setPickupTo(body.pickupTo || body.moveOut || "");
@@ -270,13 +272,13 @@ export default function ShopAdminView({ shop, name }: Props) {
 
   async function persistProfile(
     nextBio: string, nextJimoty: string, nextYt = youtube,
-    nextLine = lineInvite, nextPhone = phone,
+    nextLine = lineInvite, nextPhone = phone, nextFb = facebook,
   ) {
     const yt = nextYt.trim() || ytUrl(nextBio);
-    saveProfile({ bio: nextBio, jimotyUrl: nextJimoty, youtubeUrl: yt });
+    saveProfile({ bio: nextBio, jimotyUrl: nextJimoty, youtubeUrl: yt, facebookUrl: nextFb });
     await act({
       action: "profile", bio: nextBio, jimotyUrl: nextJimoty, youtubeUrl: yt,
-      lineInviteUrl: nextLine, phone: nextPhone,
+      facebookUrl: nextFb, lineInviteUrl: nextLine, phone: nextPhone,
     });
     if (yt !== nextYt) setYoutube(yt);
   }
@@ -550,7 +552,7 @@ export default function ShopAdminView({ shop, name }: Props) {
       if (data.name) openShop(data.name);
       const url = data.url || prev.url;
       setJimoty(url);
-      saveProfile({ bio, jimotyUrl: url, youtubeUrl: youtube });
+      saveProfile({ bio, jimotyUrl: url, youtubeUrl: youtube, facebookUrl: facebook });
       const ok = await act(
         { action: "import", items: data.items || [], jimotyUrl: url },
         `${data.items?.length || 0}件取り込みました`,
@@ -1073,6 +1075,10 @@ export default function ShopAdminView({ shop, name }: Props) {
               <input value={youtube} onChange={(e) => setYoutube(e.target.value)}
                 onBlur={() => void persistProfile(bio, jimoty, youtube)}
                 placeholder="内見動画URL" inputMode="url" autoComplete="url" /></label>
+            <label className="float"><span>Facebook Marketplace</span>
+              <input value={facebook} onChange={(e) => setFacebook(e.target.value)}
+                onBlur={() => void persistProfile(bio, jimoty, youtube)}
+                placeholder="投稿またはプロフィールURL" inputMode="url" autoComplete="url" /></label>
           </div>
           <Seg label="カート条件" value={minMode} onPick={(v) => {
             const mode = v as MinMode;
