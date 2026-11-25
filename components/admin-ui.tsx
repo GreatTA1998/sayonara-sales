@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { DateField, Icon, IconBtn } from "@/components/icons";
 import { byPrice, Listings, ListingTools, Seg, useDense, usePriceDir, useShowSold, type PhotoItem } from "@/components/photo-listing";
 import SquareCam from "@/components/square-cam";
+import { PhotoLightbox } from "@/components/photo-lightbox";
 import { Snack, useBodyScrollLock, useMaskDismiss, useSnack } from "@/components/snack";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { dayLbl, daysBetween, tokyoYmd } from "@/lib/days";
@@ -1334,11 +1335,8 @@ export default function ShopAdminView({ shop, name }: Props) {
         </div>
       )}
       {viewPic && open && (
-        <div className="mask lb" role="dialog" aria-modal="true" aria-label="写真" onClick={() => setViewPic(null)}>
-          <img src={viewPic} alt="" onClick={(e) => e.stopPropagation()} />
-          <button type="button" className="cta soft" disabled={busyOpen}
-            onClick={(e) => { e.stopPropagation(); void deletePhoto(open, viewPic); }}>削除</button>
-        </div>
+        <PhotoLightbox src={viewPic} onClose={() => setViewPic(null)} deleteDisabled={busyOpen}
+          onDelete={() => void deletePhoto(open, viewPic)} />
       )}
       <Snack snack={snack} />
     </main>
