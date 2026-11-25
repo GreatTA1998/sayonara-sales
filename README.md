@@ -5,12 +5,12 @@ Phone-first move-out sale. Hub `/`; seller UI `/s/{id}/admin` (Elton `/s/elton/a
 **Production:** https://sayonara.tokyo (Promote only)  
 **Beta:** https://beta.sayonara.tokyo (merges land here first — see store `docs/beta-sayonara-tokyo.md`)
 
-Shop state: **Firebase Firestore** via the **client SDK** + security rules + `onSnapshot` sole SOT (no client optimistic listing ids). Photos stay on Vercel Blob. Soft identity = Jimoty and/or LINE and/or Facebook name (one account); hard login = LINE OAuth (needs channel env). Anonymous Firebase Auth for writes. Soft-auth era: `/s/elton` admin writes need signed-in only (not `ownerUid` match); other shops still claim `ownerUid`.
+Shop state: **Firebase Firestore** via the **client SDK** + security rules + `onSnapshot` sole SOT (no client optimistic listing ids). Photos stay on Vercel Blob. Soft identity = Jimoty and/or LINE and/or Facebook name (one account); hard login = LINE OAuth (needs channel env). Anonymous Firebase Auth for writes. Soft-auth era: `/s/elton` admin writes need signed-in only (not `ownerUid` match). Other shops: the anon `creatorUid` may edit while unclaimed and unpublished; `ownerUid` is set only by Claim, and after that only the owner edits.
 
 ## Data model
 
 ```
-shops/{shopId}                    # ownerUid, ownerLineUid, address, bio, contact, slots, dates, published
+shops/{shopId}                    # creatorUid, ownerUid (claim only), ownerLineUid, address, bio, contact, slots, dates, published
 shops/{shopId}/items/{itemId}     # name, price, note, photos, paused, claimId, pos
 shops/{shopId}/claims/{claimId}   # code, day, slot, itemIds, contact, buyerUid, status, waiters, createdAt
 uids/{firebaseUid}                # shopId — one shop per account (claim transaction + rules)

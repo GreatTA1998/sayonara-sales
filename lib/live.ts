@@ -45,6 +45,7 @@ const emptySeed = (id: string): Store =>
 const denied = (e: unknown) => String((e as { code?: string })?.code || "").endsWith("permission-denied");
 const NO_EDIT = "このショップの編集権限がありません";
 const NEED_LOGIN = "ログインしてください";
+const NEED_CLAIM = "先にショップをクレームしてください";
 
 const softLogged = () => !!(getName() || getLineUid());
 
@@ -58,21 +59,25 @@ function claimPatch(uid: string) {
   };
 }
 
-/** Seed shop doc with no ownerUid (create may precede login). */
+/** Seed shop doc with no ownerUid. creatorUid = this anon uid; claim is separate. */
 async function ensureShopDoc(shop: string) {
   if (shop === ELTON_SHOP) return;
+  const user = await ensureAuth();
   const ref = doc(getDb(), "shops", shop);
-  const seed = { ...shopFields(emptySeed(shop)), updatedAt: new Date().toISOString() };
+  const seed = {
+    ...shopFields(emptySeed(shop)),
+    creatorUid: user.uid,
+    updatedAt: new Date().toISOString(),
+  };
   let snap;
   try { snap = await getDoc(ref); }
   catch (e) {
     if (!denied(e)) throw e;
-    await setDoc(ref, seed, { merge: true });
+    await setDoc(ref, seed);
     return;
   }
-  if (!snap.exists() || !("address" in (snap.data() || {}))) {
-    await setDoc(ref, seed, { merge: true });
-  }
+  if (!snap.exists()) await setDoc(ref, seed);
+  else if (!("address" in (snap.data() || {}))) await setDoc(ref, seed, { merge: true });
 }
 
 /** Shop already bound to this Firebase uid or LINE uid (empty = none). */
@@ -324,16 +329,21 @@ async function setClaimItems(
 export async function adminAct(shopRaw: string, body: Record<string, unknown>): Promise<unknown> {
   const shop = parseShop(shopRaw);
   const user = await ensureAuth();
-  // Non-elton: must already own (explicit claim). Elton: signedIn only (rules).
-  if (shop !== ELTON_SHOP) {
-    if (!softLogged()) throw new Error(NEED_LOGIN);
-    const prev = String((await getDoc(doc(getDb(), "shops", shop))).data()?.ownerUid || "");
-    if (!prev) throw new Error("先にショップをクレームしてください");
-    if (prev !== user.uid) throw new Error(NO_EDIT);
-  }
   const db = getDb();
   const shopRef = doc(db, "shops", shop);
   const action = String(body.action || "");
+  // Elton: any signed-in user. Other shops: owner, or the unclaimed creator.
+  // Publishing still needs a claim. Editing never writes ownerUid.
+  if (shop !== ELTON_SHOP) {
+    if (!softLogged()) throw new Error(NEED_LOGIN);
+    const meta = (await getDoc(shopRef)).data() || {};
+    const prev = String(meta.ownerUid || "");
+    const creator = String(meta.creatorUid || "");
+    if (prev && prev !== user.uid) throw new Error(NO_EDIT);
+    if (!prev && creator && creator !== user.uid) throw new Error(NO_EDIT);
+    if (!prev && action === "publish") throw new Error(NEED_CLAIM);
+    if (!prev && !creator) await updateDoc(shopRef, { creatorUid: user.uid });
+  }
 
   switch (action) {
     case "add": {

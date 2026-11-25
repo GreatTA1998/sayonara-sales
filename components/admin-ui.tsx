@@ -779,6 +779,10 @@ export default function ShopAdminView({ shop, name }: Props) {
     show("コピーしました", "ok");
   }
   function publish() {
+    if (shop !== ELTON_SHOP && !data?.ownerUid) {
+      const msg = "先にショップをクレームしてください";
+      setErr(msg); show(msg, "err"); return;
+    }
     const val = contactMode === "jimoty" ? jimoty : contactMode === "line" ? lineInvite
       : contactMode === "phone" ? phone : facebook;
     if (!val.trim()) {

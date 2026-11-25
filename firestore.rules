@@ -18,6 +18,26 @@ service cloud.firestore {
     function unclaimed(shopId) {
       return shopId != 'elton' && !('ownerUid' in shopDoc(shopId));
     }
+    // Preparer: anon uid stamped at create. Edits are not a claim and stay unpublished.
+    function isCreator(shopId) {
+      return signedIn()
+        && 'creatorUid' in shopDoc(shopId)
+        && shopDoc(shopId).creatorUid == request.auth.uid;
+    }
+    function canPrepare(shopId) {
+      return isCreator(shopId) && unclaimed(shopId);
+    }
+    function canEdit(shopId) {
+      return canAdmin(shopId) || canPrepare(shopId);
+    }
+    function ownerFieldsUntouched() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'ownerUid', 'ownerLineUid', 'ownerJimotyName', 'ownerLineName', 'ownerFacebookName'
+      ]);
+    }
+    function staysUnpublished() {
+      return request.resource.data.published != true;
+    }
 
     // One shop per Firebase uid — written in the same claim transaction as ownerUid.
     match /uids/{uid} {
@@ -32,15 +52,26 @@ service cloud.firestore {
       // Public reads: unpublished = private link preview; home filters published client-side.
       allow read: if true;
 
-      // Create may precede login/claim — ownerUid optional until claim bind.
+      // New shop: creatorUid is the anon preparer. Create does not claim or publish.
       allow create: if signedIn()
-        && (!('ownerUid' in request.resource.data)
-            || request.resource.data.ownerUid == request.auth.uid);
+        && request.resource.data.creatorUid == request.auth.uid
+        && request.resource.data.published == false
+        && !('ownerUid' in request.resource.data)
+        && !('ownerLineUid' in request.resource.data);
 
-      // Owner edits, or first claim: no ownerUid yet → stamp self (+ soft name labels).
-      // getAfter: uids/{uid} is created in the same transaction, so get() still sees no doc.
-      // That doc's shopId must be this shop (one shop per account). Claim cannot rewrite the shop.
+      // Owner edits. Preparer edits an unclaimed shop without claiming or publishing.
+      // Legacy docs with no creatorUid: first signed-in editor stamps themselves.
+      // First claim: no ownerUid yet → stamp self. getAfter sees uids/{uid} created
+      // in the same transaction. A different user (the seller) may claim.
       allow update: if canAdmin(shopId)
+        || (canPrepare(shopId)
+            && request.resource.data.creatorUid == resource.data.creatorUid
+            && staysUnpublished()
+            && ownerFieldsUntouched())
+        || (signedIn() && unclaimed(shopId) && !('creatorUid' in resource.data)
+            && request.resource.data.creatorUid == request.auth.uid
+            && staysUnpublished()
+            && ownerFieldsUntouched())
         || (signedIn() && !('ownerUid' in resource.data)
             && request.resource.data.ownerUid == request.auth.uid
             && existsAfter(/databases/$(database)/documents/uids/$(request.auth.uid))
@@ -54,9 +85,9 @@ service cloud.firestore {
 
       match /items/{itemId} {
         allow read: if true;
-        allow create: if canAdmin(shopId);
-        allow delete: if canAdmin(shopId) || (signedIn() && unclaimed(shopId));
-        allow update: if canAdmin(shopId) || (
+        allow create: if canEdit(shopId);
+        allow delete: if canEdit(shopId) || (signedIn() && unclaimed(shopId));
+        allow update: if canEdit(shopId) || (
           signedIn()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['claimId'])
           && resource.data.claimId == null
