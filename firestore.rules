@@ -6,7 +6,9 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/shops/$(shopId)).data;
     }
     function isOwner(shopId) {
-      return signedIn() && shopDoc(shopId).ownerUid == request.auth.uid;
+      return signedIn()
+        && 'ownerUid' in shopDoc(shopId)
+        && shopDoc(shopId).ownerUid == request.auth.uid;
     }
     // Soft Jimoty era: elton writable by any signed-in anon (no hard account yet).
     function canAdmin(shopId) {
@@ -36,11 +38,16 @@ service cloud.firestore {
             || request.resource.data.ownerUid == request.auth.uid);
 
       // Owner edits, or first claim: no ownerUid yet → stamp self (+ soft name labels).
-      // First claim also requires uids/{uid}.shopId == this shop (one shop per account).
+      // getAfter: uids/{uid} is created in the same transaction, so get() still sees no doc.
+      // That doc's shopId must be this shop (one shop per account). Claim cannot rewrite the shop.
       allow update: if canAdmin(shopId)
         || (signedIn() && !('ownerUid' in resource.data)
             && request.resource.data.ownerUid == request.auth.uid
-            && get(/databases/$(database)/documents/uids/$(request.auth.uid)).data.shopId == shopId);
+            && existsAfter(/databases/$(database)/documents/uids/$(request.auth.uid))
+            && getAfter(/databases/$(database)/documents/uids/$(request.auth.uid)).data.shopId == shopId
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'ownerUid', 'updatedAt', 'ownerJimotyName', 'ownerLineName', 'ownerFacebookName', 'ownerLineUid'
+            ]));
 
       // Empty-shop cleanup (SS-288); unclaimed dig5 wipe from /admin (OK confirm).
       allow delete: if canAdmin(shopId) || (signedIn() && unclaimed(shopId));
