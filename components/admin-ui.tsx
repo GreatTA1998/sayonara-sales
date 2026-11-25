@@ -8,9 +8,9 @@ import { Snack, useBodyScrollLock, useMaskDismiss, useSnack } from "@/components
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { dayLbl, daysBetween, tokyoYmd } from "@/lib/days";
 import { DECLINE_PRESETS, DEF_LEAD, DEF_MIN, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
-import { adminAct, listenShop } from "@/lib/live";
+import { adminAct, claimShop, listenShop } from "@/lib/live";
 import { notifyLine } from "@/lib/notify";
-import { forgetShop, getName, getProfile, openShop, saveProfile, subscribeAuth } from "@/lib/shop";
+import { forgetShop, getLineUid, getName, getProfile, openShop, saveProfile, subscribeAuth } from "@/lib/shop";
 import {
   ELTON_SHOP, itemFlags, pickupDays, shopMins, shopPublished, uid,
   type Store,
@@ -122,7 +122,8 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [keep, setKeep] = useState<string[]>([]);
   const [showDone, setShowDone] = useState(false);
   const softName = useSyncExternalStore(subscribeAuth, getName, () => "");
-  const logged = !!softName;
+  const lineUid = useSyncExternalStore(subscribeAuth, getLineUid, () => "");
+  const logged = !!(softName || lineUid);
   const label = softName || (/^\d{5}$/.test(name) ? "" : name);
   const [camOpen, setCamOpen] = useState(false);
   const [camItemId, setCamItemId] = useState<string | null>(null);
@@ -214,6 +215,14 @@ export default function ShopAdminView({ shop, name }: Props) {
     }, { claimOwner: true });
     return unsub;
   }, [shop, applySnap, show]);
+  /** Soft/LINE login while on admin → claim (create may precede login). */
+  useEffect(() => {
+    if (!logged || shop === ELTON_SHOP) return;
+    void claimShop(shop).catch((e) => {
+      const msg = e instanceof Error ? e.message : "クレームに失敗しました";
+      setErr(msg); show(msg, "err");
+    });
+  }, [logged, shop, show]);
   useEffect(() => () => {
     if (addrTimer.current) clearTimeout(addrTimer.current);
     if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }

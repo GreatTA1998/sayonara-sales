@@ -1,14 +1,17 @@
 "use client";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { byPrice, Listings, ListingTools, money, Seg, useDense, usePriceDir, useShowSold } from "@/components/photo-listing";
+import { SoftLoginForm } from "@/components/soft-login";
 import { useBodyScrollLock, useMaskDismiss } from "@/components/snack";
 import { afterLbl, dayLbl, moveOutLeft, tokyoYmd } from "@/lib/days";
-import { lineLoginHref, WL_KEY } from "@/components/line-oauth";
-import { bookShop, joinWaitLive, leaveWaitLive, listenShop } from "@/lib/live";
+import { CLAIM_KEY, lineLoginHref, WL_KEY } from "@/components/line-oauth";
+import { bookShop, claimShop, joinWaitLive, leaveWaitLive, listenShop } from "@/lib/live";
 import { notifyLine } from "@/lib/notify";
-import { applyLineSession, getId, getLineUid, getName, openShop, pushBuy, subscribeAuth } from "@/lib/shop";
 import {
-  bookableDays, cartAfter, cartRule, itemFlags, shopContact, shopMins, shopSlots,
+  adoptShop, applyLineSession, getId, getLineUid, getName, openShop, pushBuy, subscribeAuth,
+} from "@/lib/shop";
+import {
+  bookableDays, cartAfter, cartRule, itemFlags, shopContact, shopMins, shopPublished, shopSlots,
   takenSlots, type Store,
 } from "@/lib/store";
 import { telHref, ytUrl } from "@/lib/sale";
@@ -26,6 +29,7 @@ type State = {
   moveOut?: string;
   lineInviteUrl?: string | null; phone?: string | null; items: Item[];
   minItems?: number; minTotal?: number; rule?: string | null;
+  published?: boolean; ownerUid?: string;
 };
 type Receipt = { day: string; slot: string; total?: number };
 type Method = "jimoty" | "line" | "phone" | "facebook";
@@ -55,6 +59,7 @@ function toBuyerState(shop: string, s: Store): State {
     days, slots, taken,
     moveOut: s.moveOut || s.pickupTo || "",
     lineInviteUrl: contact.lineInviteUrl || null, phone: contact.phone || null,
+    published: shopPublished(shop, s), ownerUid: s.ownerUid,
     ...shopMins(s), rule: cartRule(s),
     items: s.items.filter((i) => !i.paused).map((it) => {
       const { id, name, price, note, photos, availableAfter } = it;
@@ -88,6 +93,8 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const [priceDir, setPriceDir] = usePriceDir();
   const [dense, setDense] = useDense();
   const [showSold, setShowSold] = useShowSold();
+  const [claimOpen, setClaimOpen] = useState(false);
+  const [claimBusy, setClaimBusy] = useState(false);
   const open = (openId && state?.items.find((i) => i.id === openId)) || null;
   const myKeys = mineKeys(lineName);
   const jimotyUrl = (state?.jimotyUrl || "").trim();
@@ -101,6 +108,8 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
   const barMove = moveOutLeft(state?.moveOut ? [state.moveOut] : []);
   const loggedIn = !!knownName;
   const hardLine = !!lineUid;
+  /** Unpublished + unbound — first soft/LINE login wins. */
+  const claimable = !!state && !state.published && !state.ownerUid && !embed && shop !== "elton";
   /** Soft identity (incl. Facebook名) covers Jimoty/LINE/FB contact; phone still typed. */
   const useStored = method === "phone" ? false
     : method === "line" ? (hardLine || loggedIn) : loggedIn;
@@ -122,6 +131,18 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
     else void applyLineSession().then((s) => { if (s?.name) setLineName(s.name); });
     return unsub;
   }, [shop, cartKey]);
+
+  async function doClaim() {
+    setClaimBusy(true); setErr(null);
+    try {
+      adoptShop(shop);
+      const r = await claimShop(shop);
+      if (r === "taken") setErr("すでに他の人がクレーム済みです");
+      else setClaimOpen(false);
+      setState((prev) => prev && r !== "taken" ? { ...prev, ownerUid: "me" } : prev);
+    } catch (e) { setErr(e instanceof Error ? e.message : "失敗しました"); }
+    finally { setClaimBusy(false); }
+  }
 
   /** After「LINEでログインして並ぶ」OAuth — join once, then clear. */
   useEffect(() => {
@@ -153,6 +174,17 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
       } catch (e) { setErr(e instanceof Error ? e.message : "失敗しました"); }
       finally { setBusy(false); }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shop, knownName, lineUid]);
+
+  /** After claim-banner LINE OAuth — adopt + claim once. */
+  useEffect(() => {
+    let raw = "";
+    try { raw = sessionStorage.getItem(CLAIM_KEY) || ""; } catch { return; }
+    if (raw !== shop) return;
+    if (!knownName && !lineUid) return;
+    try { sessionStorage.removeItem(CLAIM_KEY); } catch { /* ignore */ }
+    void doClaim();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shop, knownName, lineUid]);
   useBodyScrollLock(!!open || checkout);
@@ -336,6 +368,22 @@ export default function ShopBuyerView({ shop, name, embed }: Props) {
           {/* 内見動画 temporarily hidden (SS-315); admin youtubeUrl kept. */}
         </p>
       ) : null}
+      {claimable && (
+        <div className="claim-banner">
+          {claimOpen ? (
+            <SoftLoginForm className="soft-login claim-login" onDone={() => { void doClaim(); }} />
+          ) : (
+            <button type="button" className="cta go" disabled={claimBusy}
+              onClick={() => {
+                try { sessionStorage.setItem(CLAIM_KEY, shop); } catch { /* ignore */ }
+                if (knownName || lineUid) void doClaim();
+                else setClaimOpen(true);
+              }}>
+              {claimBusy ? "処理中…" : "このショップを自分のものにする"}
+            </button>
+          )}
+        </div>
+      )}
       {err && !checkout && !open && <div className="err">{err}</div>}
       {gridItems.length > 0 && (
         <ListingTools dir={priceDir} onDir={setPriceDir} dense={dense} onDense={setDense}
