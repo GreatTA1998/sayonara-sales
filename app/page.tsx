@@ -42,11 +42,7 @@ export default function HomePage() {
   return (
     <main className="home">
       <h1 className="slogan">{t("home.slogan", lang)}</h1>
-      <ul className="hero-bullets">
-        {t("home.bullets", lang).split("\n").map((line) => (
-          <li key={line}>{line}</li>
-        ))}
-      </ul>
+      <p className="hero-prose">{t("home.prose", lang)}</p>
       <div className={`shop-panel${panelReady ? " in" : ""}`} aria-busy={!panelReady} aria-label={panelReady ? undefined : t("home.loading", lang)}>
         <div className="home-browse">
           <div className="shop-tabs" role="tablist" aria-label={t("home.tabs", lang)}>
