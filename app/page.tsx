@@ -1,19 +1,17 @@
 "use client";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import ShopBuyerView from "@/components/buyer-ui";
 import { Snack, useSnack } from "@/components/snack";
 import { peekShop } from "@/lib/live";
 import { t, useLang } from "@/lib/lang";
 import {
-  AUTH_EVT, ELTON_ID, adminPath, ensureShopId, listSales, type SaleRow,
+  AUTH_EVT, ELTON_ID, listSales, type SaleRow,
 } from "@/lib/shop";
 import { SITE_URL } from "@/lib/site";
 
 type Card = SaleRow & { count: number };
 
 export default function HomePage() {
-  const router = useRouter();
   const lang = useLang();
   const [cards, setCards] = useState<Card[]>([]);
   const [selected, setSelected] = useState<string>(ELTON_ID);
@@ -66,9 +64,11 @@ export default function HomePage() {
   return (
     <main className="home">
       <h1 className="slogan">{t("home.slogan", lang)}</h1>
-      <p className="subhero">{t("home.sub", lang)}</p>
-      <button type="button" className="cta go home-cta"
-        onClick={() => router.push(adminPath(ensureShopId()))}>{t("home.cta", lang)}</button>
+      <ul className="hero-bullets">
+        {t("home.bullets", lang).split("\n").map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
       <div className={panelReady ? "shop-panel in" : "shop-panel"} aria-busy={!panelReady}
         aria-hidden={!panelReady}>
         <div className="home-browse">
