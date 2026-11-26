@@ -45,7 +45,6 @@ const emptySeed = (id: string): Store =>
 const denied = (e: unknown) => String((e as { code?: string })?.code || "").endsWith("permission-denied");
 const NO_EDIT = "このショップの編集権限がありません";
 const NEED_LOGIN = "ログインしてください";
-const NEED_CLAIM = "先にショップをクレームしてください";
 
 const softLogged = () => !!(getName() || getLineUid());
 
@@ -322,7 +321,7 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
   const db = getDb();
   const shopRef = doc(db, "shops", shop);
   const action = String(body.action || "");
-  // Elton: any signed-in user. Unclaimed: any anon/signed-in user may edit, not publish.
+  // Elton: any signed-in user. Unclaimed: any anon/signed-in user may edit+publish.
   // Claimed: only that ownerUid. Editing never writes ownerUid.
   if (shop !== ELTON_SHOP) {
     const meta = (await getDoc(shopRef)).data() || {};
@@ -330,7 +329,7 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
     if (prev) {
       if (!softLogged()) throw new Error(NEED_LOGIN);
       if (prev !== user.uid) throw new Error(NO_EDIT);
-    } else if (action === "publish") throw new Error(NEED_CLAIM);
+    }
   }
 
   switch (action) {
