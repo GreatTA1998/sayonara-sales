@@ -222,7 +222,7 @@ function parseSettings(raw: unknown) {
   if (raw == null) return undefined;
   const o = asObj(raw, "settings");
   unknown(o, SHOP_SETTING_KEYS, "settings");
-  for (const k of ["address", "bio", "jimotyUrl", "youtubeUrl", "facebookUrl", "lineInviteUrl", "phone"] as const) {
+  for (const k of ["address", "bio", "jimotyUrl", "youtubeUrl", "facebookUrl", "lineInviteUrl", "phone", "otherUrl"] as const) {
     if (k in o && typeof o[k] !== "string") throw bad(400, `settings.${k} must be a string`, { code: "validation" });
   }
   for (const k of ["leadDays", "itemOff"] as const) {
@@ -303,6 +303,7 @@ function settingsOf(s: Store) {
     facebookUrl: s.facebookUrl || "",
     lineInviteUrl: s.lineInviteUrl || "",
     phone: s.phone || "",
+    otherUrl: s.otherUrl || "",
     slots: s.slots?.length ? s.slots : shopSlots(s),
     pickupSpots: s.pickupSpots || [],
     pickupFrom: s.pickupFrom || "",

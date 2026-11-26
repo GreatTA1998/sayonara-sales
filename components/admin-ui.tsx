@@ -34,23 +34,23 @@ type Claim = {
 };
 type AdminState = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string; facebookUrl?: string;
-  lineInviteUrl?: string; phone?: string; slots?: string[];
+  lineInviteUrl?: string; phone?: string; otherUrl?: string; slots?: string[];
   pickupFrom?: string; pickupTo?: string; moveOut?: string; leadDays?: number;
   itemOff?: number; published?: boolean; ownerUid?: string; ownerLineUid?: string;
   items: Item[]; claims: Claim[];
 };
 type Props = { shop: string; name: string };
-type ContactMode = "jimoty" | "line" | "phone" | "facebook";
-const CONTACT_OPTS: [string, string][] = [
-  ["jimoty", "ジモティー"], ["facebook", "Facebook"], ["line", "LINE"], ["phone", "電話"],
+type ContactMode = "jimoty" | "facebook" | "line" | "phone" | "other";
+const CONTACT_OPTS: [ContactMode, string][] = [
+  ["jimoty", "ジモティー"], ["facebook", "Facebook"], ["line", "LINE"], ["phone", "電話"], ["other", "その他"],
 ];
-const methodJa = (m?: string) =>
-  (m === "jimoty" ? "ジモティー" : m === "phone" ? "電話" : m === "line" ? "LINE" : m === "facebook" ? "Facebook" : m || "");
+const methodJa = (m?: string) => CONTACT_OPTS.find(([k]) => k === m)?.[1] || m || "";
 const CONTACT_FIELD: Record<ContactMode, { span: string; ph: string; mode: "url" | "tel"; ac: string }> = {
   jimoty: { span: "ジモティープロフィール", ph: "https://jmty.jp/…", mode: "url", ac: "url" },
   line: { span: "LINE招待リンク", ph: "https://line.me/ti/p/…", mode: "url", ac: "off" },
   phone: { span: "電話番号", ph: "080-0000-0000", mode: "tel", ac: "tel" },
   facebook: { span: "Facebook Marketplace", ph: "投稿またはプロフィールURL", mode: "url", ac: "url" },
+  other: { span: "その他の連絡先", ph: "URLまたは連絡先（Craigslistなど）", mode: "url", ac: "url" },
 };
 const itemLabel = (it?: Item | null) => it?.name?.trim() || "無題";
 const isRemote = (u: string) => /^https?:\/\//i.test(u);
@@ -153,7 +153,12 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [facebook, setFacebook] = useState("");
   const [lineInvite, setLineInvite] = useState("");
   const [phone, setPhone] = useState("");
+  const [other, setOther] = useState("");
   const [contactMode, setContactMode] = useState<ContactMode>("jimoty");
+  const contactByMode = { jimoty, facebook, line: lineInvite, phone, other };
+  const setContactByMode = {
+    jimoty: setJimoty, facebook: setFacebook, line: setLineInvite, phone: setPhone, other: setOther,
+  };
   const [slots, setSlots] = useState<string[]>([...PICKUP_SLOTS]);
   const [slotOpen, setSlotOpen] = useState(false);
   const [pickupTo, setPickupTo] = useState("");
@@ -208,12 +213,12 @@ export default function ShopAdminView({ shop, name }: Props) {
     setBio(bioVal);
     const j = body.jimotyUrl || "";
     const l = body.lineInviteUrl || "", p = body.phone || "";
-    const f = body.facebookUrl || "";
-    setJimoty(j); setLineInvite(l); setPhone(p); setFacebook(f);
+    const f = body.facebookUrl || "", o = body.otherUrl || "";
+    setJimoty(j); setLineInvite(l); setPhone(p); setFacebook(f); setOther(o);
     setYoutube(body.youtubeUrl || ytUrl(bioVal) || "");
     setContactMode(
       (j.trim() && "jimoty") || (f.trim() && "facebook") || (l.trim() && "line")
-        || (p.trim() && "phone") || "jimoty",
+        || (p.trim() && "phone") || (o.trim() && "other") || "jimoty",
     );
     setSlots(shopSlots(body));
     setPickupTo(body.pickupTo || body.moveOut || "");
@@ -337,14 +342,11 @@ export default function ShopAdminView({ shop, name }: Props) {
     addrTimer.current = setTimeout(() => { void saveAddress(stem); }, 450);
   }
 
-  async function persistProfile(
-    nextBio: string, nextJimoty: string, nextYt = youtube,
-    nextLine = lineInvite, nextPhone = phone, nextFb = facebook,
-  ) {
+  async function persistProfile(nextBio = bio, nextYt = youtube) {
     const yt = nextYt.trim() || ytUrl(nextBio);
     await act({
-      action: "profile", bio: nextBio, jimotyUrl: nextJimoty, youtubeUrl: yt,
-      facebookUrl: nextFb, lineInviteUrl: nextLine, phone: nextPhone,
+      action: "profile", bio: nextBio, jimotyUrl: jimoty, youtubeUrl: yt,
+      facebookUrl: facebook, lineInviteUrl: lineInvite, phone, otherUrl: other,
     });
     if (yt !== nextYt) setYoutube(yt);
   }
@@ -756,13 +758,11 @@ export default function ShopAdminView({ shop, name }: Props) {
   }
 
   async function publish() {
-    const val = contactMode === "jimoty" ? jimoty : contactMode === "line" ? lineInvite
-      : contactMode === "phone" ? phone : facebook;
-    if (!val.trim()) {
+    if (!contactByMode[contactMode].trim()) {
       const msg = `${CONTACT_FIELD[contactMode].span}を入力してください`;
       setErr(msg); show(msg, "err"); return;
     }
-    await persistProfile(bio, jimoty, youtube, lineInvite, phone, facebook);
+    await persistProfile();
     setPub("on");
     show("公開しました", "ok");
     void act({ action: "publish" }).then((ok) => { if (!ok) setPub("off"); });
@@ -922,17 +922,15 @@ export default function ShopAdminView({ shop, name }: Props) {
           <label className="float"><span>ショップメモ</span>
             <textarea className="grow" value={bio} rows={1}
               onChange={(e) => setBio(e.target.value)}
-              onBlur={() => void persistProfile(bio, jimoty, youtube)}
+              onBlur={() => void persistProfile()}
               placeholder="動作確認・値引き・引越し・車・まとめ買い優先など" /></label>
           <Seg label="買い手連絡" value={contactMode} onPick={(v) => setContactMode(v as ContactMode)}
             opts={CONTACT_OPTS} />
           <label className="float"><span>{CONTACT_FIELD[contactMode].span}</span>
             <input
-              value={contactMode === "jimoty" ? jimoty : contactMode === "line" ? lineInvite
-                : contactMode === "phone" ? phone : facebook}
-              onChange={(e) => (contactMode === "jimoty" ? setJimoty : contactMode === "line" ? setLineInvite
-                : contactMode === "phone" ? setPhone : setFacebook)(e.target.value)}
-              onBlur={() => void persistProfile(bio, jimoty, youtube, lineInvite, phone)}
+              value={contactByMode[contactMode]}
+              onChange={(e) => setContactByMode[contactMode](e.target.value)}
+              onBlur={() => void persistProfile()}
               placeholder={CONTACT_FIELD[contactMode].ph}
               inputMode={CONTACT_FIELD[contactMode].mode}
               autoComplete={CONTACT_FIELD[contactMode].ac} /></label>
@@ -1168,7 +1166,7 @@ export default function ShopAdminView({ shop, name }: Props) {
           }} />
         <label className="float"><span>内見動画 任意</span>
           <input value={youtube} onChange={(e) => setYoutube(e.target.value)}
-            onBlur={() => void persistProfile(bio, jimoty, youtube)}
+            onBlur={() => void persistProfile()}
             placeholder="内見動画URL" inputMode="url" autoComplete="url" /></label>
       </section>
       )}

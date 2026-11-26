@@ -564,6 +564,7 @@ components:
         facebookUrl: { type: string }
         lineInviteUrl: { type: string }
         phone: { type: string }
+        otherUrl: { type: string }
         slots:
           type: array
           items: { type: string }

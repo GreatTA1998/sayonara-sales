@@ -22,6 +22,14 @@ export const telHref = (phone: string) => {
   return `tel:${d}`;
 };
 
+/** http(s) or bare host → href; free text → "". */
+export const extHref = (v: string) => {
+  const t = v.trim();
+  if (/^https?:\/\//i.test(t)) return t;
+  if (/^[\w.-]+\.[a-z]{2,}([/:?]|$)/i.test(t)) return `https://${t}`;
+  return "";
+};
+
 export const ytUrl = (s: string) => {
   const m = s.match(
     /https?:\/\/(?:www\.)?(?:youtu\.be\/[\w-]+(?:\?[^\s]*)?|youtube\.com\/(?:watch\?[^\s]*|shorts\/[\w-]+))/i,
