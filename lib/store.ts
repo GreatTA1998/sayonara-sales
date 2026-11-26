@@ -72,9 +72,12 @@ export function priceOf(v: unknown): number | null {
 }
 
 export const wardStem = (v: string) => v.replace(/区$/, "");
-/** Ward label as the editor stores it (trailing 区). */
+/** Bare ward names gain 区 (目黒 → 目黒区). 市/町/村 are stored as written (川口市 stays 川口市). */
 export function wardAddress(v: unknown) {
-  const s = wardStem(String(v || "")).trim();
+  const raw = String(v || "").trim();
+  if (!raw) return "";
+  if (/[市町村]$/.test(raw)) return raw;
+  const s = raw.replace(/区$/, "");
   return s ? `${s}区` : "";
 }
 

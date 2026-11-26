@@ -14,8 +14,10 @@ export const SLOT_MORNING = "10:00";
 export const SLOT_AFTERNOON = "14:00";
 export const SLOT_EVENING = "20:00";
 export const SHOT = { width: 1280, height: 830, quality: 82, langKey: "ss-lang" };
-export const MESSAGE_TEMPLATE =
-  "はじめまして。引っ越しの出品を、まとめて予約できるページにしました。\n{url}\n不要でしたら無視してください。";
+/** Messenger copy lives with the operator. The queue only names the next letter. */
+export const VARIANT_CYCLE = ["A", "D", "C", "B"];
+/** Elton, 2026-11-26: the next send is B. */
+export const VARIANT_NEXT = "B";
 
 const ITEM_LINE = /^.{2,80}?\s*[-–—:：]\s*(?:¥|￥)?\s*\d[\d,]*\s*(?:円|yen)\s*$/i;
 const BULLET_LINE = /^(?:[・\-*]|[0-9]+[.)])\s*.{1,80}?\d[\d,]*\s*(?:円|yen)\s*$/i;
@@ -50,13 +52,10 @@ export function assertLocalCdp(endpoint) {
   return u.toString();
 }
 
-export function resolveBase(envBase, allowProduction = false) {
-  const base = String(envBase || "https://beta.sayonara.tokyo").replace(/\/$/, "");
-  const host = new URL(base).hostname;
-  if ((host === "sayonara.tokyo" || host === "www.sayonara.tokyo") && !allowProduction) {
-    throw new Error("Refusing production sayonara.tokyo. Prospects use https://beta.sayonara.tokyo (pass --production to override).");
-  }
-  return base;
+/** Production unless `--beta`. An explicit SHOP_BUILDER_API_BASE is kept when beta is off. */
+export function resolveBase(envBase, { beta = false } = {}) {
+  if (beta) return "https://beta.sayonara.tokyo";
+  return String(envBase || "https://sayonara.tokyo").replace(/\/$/, "");
 }
 
 export function assertAgentId(id) {
@@ -80,14 +79,33 @@ export function outputWarning(abs, repoRoot) {
   return `warning: ${rel} is inside the repo and not under data/ — do not commit seller data`;
 }
 
-export function messageFor(url) {
-  return MESSAGE_TEMPLATE.replaceAll("{url}", url);
+/**
+ * Assign variants in cycle order. `next` is the letter for the first new row.
+ * A shopUrl already in `kept` keeps that letter and does not advance the cursor.
+ */
+export function assignVariants(rows, { next = VARIANT_NEXT, kept = new Map() } = {}) {
+  let i = VARIANT_CYCLE.indexOf(next);
+  if (i < 0) i = VARIANT_CYCLE.indexOf(VARIANT_NEXT);
+  const sends = [];
+  for (const row of rows) {
+    const prev = kept.get(row.shopUrl);
+    if (prev && VARIANT_CYCLE.includes(prev)) {
+      sends.push({ ...row, variant: prev });
+      continue;
+    }
+    sends.push({ ...row, variant: VARIANT_CYCLE[i] });
+    i = (i + 1) % VARIANT_CYCLE.length;
+  }
+  return { sends, next: VARIANT_CYCLE[i] };
 }
 
-/** Same mangling as wardAddress in lib/store.ts. 川口市 is stored as 川口市区. */
+/** Same rule as wardAddress in lib/store.ts. 市/町/村 stay; a bare ward gains 区. */
 export function wardStored(raw) {
-  const s = String(raw || "").replace(/区$/, "").trim();
-  return s ? `${s}区` : "";
+  const s = String(raw || "").trim();
+  if (!s) return "";
+  if (/[市町村]$/.test(s)) return s;
+  const stem = s.replace(/区$/, "");
+  return stem ? `${stem}区` : "";
 }
 
 export function canonicalFacebookUrl(raw) {
@@ -117,6 +135,10 @@ export function itemIdFromUrl(raw) {
 }
 export function itemUrl(id) {
   return `https://www.facebook.com/marketplace/item/${id}`;
+}
+/** Contact link the reserve form opens. Always an item URL, with the trailing slash. */
+export function listingContactUrl(id) {
+  return `https://www.facebook.com/marketplace/item/${id}/`;
 }
 
 export function assertGrabUrls(urls) {
@@ -197,7 +219,36 @@ function matched(text, re) {
   return String(text || "").match(re) || [];
 }
 
-/** Phrases we will not turn into slots. hint is set only when every phrase is one part of the day. */
+function hhmm(total) {
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/** Three times, 90 minutes apart, starting 30 minutes after `afterMin`. after 17:00 → 17:30, 19:00, 20:30. */
+export function slotsAfter(afterMin, endMin = 21 * 60) {
+  const out = [];
+  for (let t = afterMin + 30; t <= endMin && out.length < 3; t += 90) out.push(hhmm(t));
+  return out;
+}
+
+function hourOf(phrase) {
+  const s = String(phrase);
+  let m = s.match(/after\s*(\d{1,2})\s*p\.?m\.?/i);
+  if (m) return (Number(m[1]) % 12) + 12;
+  m = s.match(/after\s*(\d{1,2})\b/i);
+  if (m) return Number(m[1]);
+  m = s.match(/午後\s*(\d{1,2})\s*時/);
+  if (m) return (Number(m[1]) % 12) + 12;
+  m = s.match(/(\d{1,2})\s*時以降/);
+  if (m) return Number(m[1]);
+  return null;
+}
+
+/**
+ * No time phrase → null (the shop keeps 10:00, 14:00, 20:00).
+ * One window → slots that fit it. Mixed phrases → slots null, so the build waits.
+ */
 export function slotConstraint(text) {
   const evening = matched(text, /after\s*(?:5|6|7|8)\s*p\.?m\.?|after\s*(?:17|18|19|20)\b|(?:17|18|19|20)\s*時以降|午後\s*(?:5|6|7|8)\s*時以降|夕方(?:以降|のみ|だけ)|夜(?:のみ|だけ)|evenings?\s+only/gi);
   const morning = matched(text, /mornings?\s+only|午前(?:中)?(?:のみ|だけ)|before\s+noon/gi);
@@ -209,13 +260,31 @@ export function slotConstraint(text) {
     morning.length ? "morning" : "",
     afternoon.length ? "afternoon" : "",
   ].filter(Boolean);
-  const hint = kinds.length === 1
-    ? [kinds[0] === "evening" ? SLOT_EVENING : kinds[0] === "morning" ? SLOT_MORNING : SLOT_AFTERNOON]
-    : null;
-  const reason = hint
-    ? `Time constraint is ${kinds[0]} only (${hint[0]}). Not applied. Set settings.slots to the times you want.`
-    : "Time phrases disagree or are ambiguous. Not applied. Set settings.slots explicitly.";
-  return { raw, hint, reason };
+  if (kinds.length !== 1) {
+    return { raw, slots: null, reason: "Time phrases disagree. The 10:00/14:00/20:00 defaults were not used. Set settings.slots." };
+  }
+  let afterMin;
+  let endMin;
+  if (kinds[0] === "evening") {
+    const hours = [...new Set(evening.map(hourOf).filter((h) => h != null))];
+    if (hours.length > 1) {
+      return { raw, slots: null, reason: "More than one evening time. The defaults were not used. Set settings.slots." };
+    }
+    afterMin = (hours[0] ?? 17) * 60;
+    endMin = 21 * 60;
+  } else if (kinds[0] === "morning") {
+    afterMin = 8 * 60;
+    endMin = 12 * 60;
+  } else {
+    afterMin = 12 * 60;
+    endMin = 17 * 60;
+  }
+  const slots = slotsAfter(afterMin, endMin);
+  return {
+    raw,
+    slots,
+    reason: `Generated from the listing text (${raw.join(", ")}). Edit settings.slots if the window is wrong.`,
+  };
 }
 
 export function datePhrases(text) {
@@ -610,11 +679,23 @@ export async function runGrab(opts) {
   };
 }
 
-function contactUrl(grab, active) {
-  const entry = grab.entryUrl ? canonicalFacebookUrl(grab.entryUrl) : "";
-  if (entry && itemIdFromUrl(entry)) return entry;
-  const first = active.find((l) => l.url);
-  return first?.url ? canonicalFacebookUrl(first.url) : entry;
+const MOVE_OUT = /引っ越し|引越し|退去|転居|move-?out|moving/i;
+
+function contactRank(listing) {
+  const text = `${listing.title || ""}\n${listing.description || ""}`;
+  if (listing.bundleHint || bundleLines(listing.description || "").length >= 2) return 0;
+  if (MOVE_OUT.test(text)) return 1;
+  return 2;
+}
+
+/** Entry item URL wins. A profile picks a bundle, then a move-out post, then the first active listing. */
+export function pickContact(grab, active) {
+  const entryId = itemIdFromUrl(grab?.entryUrl || "");
+  const entry = entryId && active.find((l) => String(l.id) === entryId);
+  if (entry) return { listing: entry, from: "entry" };
+  const best = [...active].sort((a, b) => contactRank(a) - contactRank(b))[0];
+  const rank = contactRank(best);
+  return { listing: best, from: rank === 0 ? "bundle" : rank === 1 ? "move-out" : "first-active" };
 }
 function sourceSellerId(grab) {
   const id = String(grab.sellerId || "").match(/\d{6,}/)?.[0] || "";
@@ -624,13 +705,15 @@ function sourceSellerId(grab) {
   throw new Error("seller id is missing");
 }
 
-/** Deterministic shop-builder JSON. Does not set address, slots, dates, or split bundles. */
+/** Deterministic shop-builder JSON. Does not set address or dates, and does not split bundles. */
 export function convertGrab(grab) {
   if (!grab || !Array.isArray(grab.listings)) throw new Error("grab JSON has no listings");
   const active = grab.listings.filter((l) => l && l.status !== "sold" && l.status !== "pending" && String(l.title || "").trim());
   if (!active.length) throw new Error("No active listings to convert");
-  const facebookUrl = contactUrl(grab, active);
-  if (!facebookUrl) throw new Error("facebookUrl is required");
+  const picked = pickContact(grab, active);
+  const listingId = String(picked.listing?.id || "");
+  if (!/^\d{6,}$/.test(listingId)) throw new Error("facebookUrl requires a Marketplace listing id");
+  const facebookUrl = listingContactUrl(listingId);
   const corpus = active.map((l) => [l.title, l.description, l.locationText].filter(Boolean).join("\n")).join("\n");
   const slots = slotConstraint(corpus);
   const dates = datePhrases(corpus);
@@ -657,7 +740,7 @@ export function convertGrab(grab) {
   if (!items.length) throw new Error("No items to convert");
   const review = {
     warnings,
-    facebookUrlFrom: itemIdFromUrl(grab.entryUrl || "") ? "entry" : "first-listing",
+    facebookUrl: { from: picked.from, listingId, url: facebookUrl },
   };
   if (slots) review.slots = slots;
   if (dates.length) review.pickupTo = { raw: dates, reason: "Pickup window and move-out are one field (pickupTo). Not inferred." };
@@ -665,28 +748,31 @@ export function convertGrab(grab) {
     review.address = {
       raw: locs.join(" / "),
       storedAs: locs.map(wardStored),
-      reason: "Not sent. wardAddress appends 区 (川口市 is stored as 川口市区). Set settings.address only for a real ward.",
+      reason: "Not sent. 市/町/村 are stored as written; a bare ward still gains 区. Copy storedAs into settings.address when it is the pickup area.",
     };
   }
   if (bundles.length) review.bundles = bundles;
   const skipped = grab.listings.filter((l) => l && (l.status === "sold" || l.status === "pending")).map((l) => ({ id: l.id, status: l.status }));
   if (skipped.length) review.skipped = skipped;
   if (grab.stopped) review.stopped = grab.stopped;
+  const settings = { facebookUrl };
+  if (slots?.slots?.length) settings.slots = slots.slots;
   return {
     externalSource: { source: SOURCE, sellerId: sourceSellerId(grab) },
-    settings: { facebookUrl },
+    settings,
     items,
     review,
   };
 }
 
-/** Blocks a build when the shop would show the wrong times or unsplit items. Address does not block. */
+/** Blocks a build when slots could not be generated, or a bundle is still unsplit. Address does not block. */
 export function buildBlocked(shop) {
   const blocks = [];
   const review = shop?.review || {};
   const settings = shop?.settings || {};
-  if (!String(settings.facebookUrl || "").trim()) blocks.push("facebookUrl");
-  if (review.slots && !(Array.isArray(settings.slots) && settings.slots.length)) blocks.push("slots");
+  const facebookUrl = String(settings.facebookUrl || "").trim();
+  if (!/\/marketplace\/item\/\d+\/?$/.test(facebookUrl)) blocks.push("facebookUrl");
+  if (review.slots && !review.slots.slots && !(Array.isArray(settings.slots) && settings.slots.length)) blocks.push("slots");
   const bundles = Array.isArray(review.bundles) ? review.bundles : [];
   if (bundles.length && review.bundlesDone !== true && bundles.some((b) => b.done !== true)) blocks.push("bundles");
   return blocks;
@@ -745,7 +831,6 @@ export function sendRow(shop, state, shot) {
     shopId: state?.id || "",
     shopUrl: url,
     editorUrl: state?.editorUrl || "",
-    message: ready ? messageFor(url) : "",
     screenshot: ready ? (shot?.path || "") : "",
     checks,
     warnings: shop.review?.warnings || [],

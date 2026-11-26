@@ -5,9 +5,9 @@ import sharp from "sharp";
 import { cropSquare } from "./prospect-convert.mjs";
 import {
   PACE_MAX, PACE_MIN, SHOT, SLOT_EVENING, SOURCE,
-  assertGrabUrls, assertLocalCdp, buildBlocked, bundleLines, canonicalFacebookUrl,
+  assertGrabUrls, assertLocalCdp, assignVariants, buildBlocked, bundleLines, canonicalFacebookUrl,
   convertGrab, datePhrases, englishOk, extractNodes, isGraphqlUrl, itemFieldsFromListing,
-  messageFor, nameFromTitle, otherAgent, outputWarning, paceMs, pageBlock, pool,
+  nameFromTitle, otherAgent, outputWarning, paceMs, pageBlock, pool,
   redact, resolveBase, runGrab, sendRow, slotConstraint, verifyShop, wardStored, yenMarked,
 } from "./prospect.mjs";
 
@@ -91,7 +91,7 @@ test("profile grab reads graphql once per thin listing and drops other sellers",
   assert.equal(grab.listings.some((l) => l.id === OTHER || l.id === RELATED), false);
 });
 
-test("convert fills only deterministic fields and holds slots and bundles", async () => {
+test("convert fills only deterministic fields and holds bundles", async () => {
   const grab = await runGrab({
     session: sessionFor([]),
     urls: [`${profileUrl}?ref=1`],
@@ -100,11 +100,12 @@ test("convert fills only deterministic fields and holds slots and bundles", asyn
   const shop = convertGrab(grab);
   assert.equal(shop.externalSource.source, SOURCE);
   assert.equal(shop.externalSource.sellerId, `https://www.facebook.com/marketplace/profile/${SELLER}`);
-  assert.deepEqual(Object.keys(shop.settings), ["facebookUrl"]);
-  assert.equal(shop.settings.facebookUrl, `https://www.facebook.com/marketplace/item/${CHAIR}`);
-  assert.equal(shop.review.facebookUrlFrom, "first-listing");
+  assert.deepEqual(Object.keys(shop.settings).sort(), ["facebookUrl", "slots"]);
+  assert.equal(shop.settings.facebookUrl, `https://www.facebook.com/marketplace/item/${BUNDLE}/`);
+  assert.equal(shop.review.facebookUrl.from, "bundle");
+  assert.equal(shop.review.facebookUrl.listingId, BUNDLE);
   assert.equal(shop.settings.address, undefined);
-  assert.equal(shop.settings.slots, undefined);
+  assert.deepEqual(shop.settings.slots, ["17:30", "19:00", "20:30"]);
   assert.equal(shop.settings.pickupTo, undefined);
   const chair = shop.items.find((it) => it.externalKey === CHAIR);
   const bundle = shop.items.find((it) => it.externalKey === BUNDLE);
@@ -113,13 +114,13 @@ test("convert fills only deterministic fields and holds slots and bundles", asyn
   assert.equal(chair.note, "木製。3月20日まで");
   assert.equal(bundle.price, 6000);
   assert.deepEqual(bundleLines(bundle.note), ["Washing machine - 4000 yen", "Dryer - 2000 yen"]);
-  assert.deepEqual(shop.review.slots.hint, [SLOT_EVENING]);
-  assert.ok(shop.review.address.storedAs.includes("川口市区"));
+  assert.deepEqual(shop.review.slots.slots, ["17:30", "19:00", "20:30"]);
+  assert.ok(shop.review.address.storedAs.includes("川口市"));
   assert.ok(shop.review.address.storedAs.includes("目黒区"));
+  assert.equal(shop.review.address.storedAs.includes("川口市区"), false);
   assert.deepEqual(shop.review.pickupTo.raw, ["3月20日"]);
   assert.deepEqual(shop.review.skipped, [{ id: SOLD, status: "sold" }]);
-  assert.deepEqual(buildBlocked(shop).sort(), ["bundles", "slots"]);
-  shop.settings.slots = ["20:00"];
+  assert.deepEqual(buildBlocked(shop), ["bundles"]);
   shop.review.bundlesDone = true;
   assert.deepEqual(buildBlocked(shop), []);
 });
@@ -135,12 +136,26 @@ test("a clean listing builds with facebookUrl only", () => {
       photos: [{ url: fb(CHAIR, "chair.jpg") }],
     }],
   });
-  assert.equal(shop.settings.facebookUrl, `https://www.facebook.com/marketplace/item/${CHAIR}`);
-  assert.equal(shop.review.facebookUrlFrom, "entry");
+  assert.equal(shop.settings.facebookUrl, `https://www.facebook.com/marketplace/item/${CHAIR}/`);
+  assert.equal(shop.review.facebookUrl.from, "entry");
   assert.equal(shop.review.slots, undefined);
   assert.equal(shop.review.bundles, undefined);
   assert.deepEqual(buildBlocked(shop), []);
   assert.equal("published" in shop, false);
+});
+
+test("a profile prefers a move-out post over the first listing", () => {
+  const shop = convertGrab({
+    entryUrl: `https://www.facebook.com/marketplace/profile/${SELLER}`,
+    sellerId: SELLER,
+    listings: [
+      { id: CHAIR, title: "椅子", price: 100, description: "木製", status: "active" },
+      { id: BUNDLE, title: "退去セール", price: 100, description: "引っ越しのため", status: "active" },
+    ],
+  });
+  assert.equal(shop.review.facebookUrl.from, "move-out");
+  assert.equal(shop.settings.facebookUrl, `https://www.facebook.com/marketplace/item/${BUNDLE}/`);
+  assert.equal(shop.settings.facebookUrl.includes("/profile/"), false);
 });
 
 test("price conflict is left blank", () => {
@@ -151,13 +166,19 @@ test("price conflict is left blank", () => {
 });
 
 test("time phrases", () => {
-  assert.deepEqual(slotConstraint("pickup after 5pm").hint, ["20:00"]);
-  assert.deepEqual(slotConstraint("17時以降").hint, ["20:00"]);
+  assert.deepEqual(slotConstraint("pickup after 5pm").slots, ["17:30", "19:00", "20:30"]);
+  assert.deepEqual(slotConstraint("17時以降").slots, ["17:30", "19:00", "20:30"]);
   assert.equal(slotConstraint("5時以降"), null);
   assert.equal(slotConstraint("午後にお越しください"), null);
   const mixed = slotConstraint("午前のみ、夜のみ");
-  assert.equal(mixed.hint, null);
+  assert.equal(mixed.slots, null);
   assert.equal(mixed.raw.length >= 2, true);
+  const quiet = convertGrab({
+    entryUrl: `https://www.facebook.com/marketplace/item/${CHAIR}`,
+    sellerId: SELLER,
+    listings: [{ id: CHAIR, title: "椅子", price: 100, description: "木製", status: "active" }],
+  });
+  assert.equal(quiet.settings.slots, undefined);
   assert.deepEqual(datePhrases("月末か2026-12-01"), ["月末", "2026-12-01"]);
 });
 
@@ -173,7 +194,9 @@ test("yen, names, bundles", () => {
     "Washing machine - 4000 yen", "Dryer - 2000 yen",
   ]);
   assert.deepEqual(bundleLines("Bought for 20000 yen\nSelling for 4000 yen"), []);
-  assert.equal(wardStored("川口市"), "川口市区");
+  assert.equal(wardStored("川口市"), "川口市");
+  assert.equal(wardStored("川口町"), "川口町");
+  assert.equal(wardStored("田村"), "田村");
   assert.equal(wardStored("目黒"), "目黒区");
   assert.equal(wardStored("目黒区"), "目黒区");
 });
@@ -181,7 +204,7 @@ test("yen, names, bundles", () => {
 test("wardAddress and pickup slots still match the helpers", () => {
   const store = readFileSync(new URL("../lib/store.ts", import.meta.url), "utf8");
   const sale = readFileSync(new URL("../lib/sale.ts", import.meta.url), "utf8");
-  assert.ok(store.includes("return s ? `${s}区` : \"\";"));
+  assert.ok(store.includes("if (/[市町村]$/.test(raw)) return raw;"));
   assert.match(sale, /PICKUP_SLOTS = \["10:00", "14:00", "20:00"\]/);
   assert.equal(SLOT_EVENING, "20:00");
 });
@@ -254,9 +277,9 @@ test("two sellers in one item list are refused", async () => {
 });
 
 test("guards", () => {
-  assert.equal(resolveBase(""), "https://beta.sayonara.tokyo");
-  assert.throws(() => resolveBase("https://sayonara.tokyo"), /production/);
-  assert.equal(resolveBase("https://sayonara.tokyo", true), "https://sayonara.tokyo");
+  assert.equal(resolveBase(""), "https://sayonara.tokyo");
+  assert.equal(resolveBase("", { beta: true }), "https://beta.sayonara.tokyo");
+  assert.equal(resolveBase("https://sayonara.tokyo", { beta: true }), "https://beta.sayonara.tokyo");
   assert.equal(assertLocalCdp("http://127.0.0.1:9222"), "http://127.0.0.1:9222/");
   assert.throws(() => assertLocalCdp("http://1.2.3.4:9222"), /localhost/);
   assert.throws(() => assertGrabUrls([canonicalFacebookUrl("https://www.facebook.com/marketplace/search/?query=sofa")]), /Search/);
@@ -304,10 +327,18 @@ test("verify, ownership, english, send row", () => {
   const ready = sendRow(shop, state, { signals, path: "/tmp/48291.jpg" });
   assert.equal(ready.ready, true);
   assert.equal(ready.threadUrl, shop.settings.facebookUrl);
-  assert.equal(ready.message, messageFor(state.url));
+  assert.equal(ready.shopUrl, state.url);
+  assert.equal("message" in ready, false);
   assert.equal(ready.screenshot, "/tmp/48291.jpg");
   assert.equal(sendRow(shop, state, { signals: { ...signals, cta: false } }).ready, false);
-  assert.equal(ready.message.includes("published"), false);
+  const first = assignVariants([ready, { shopUrl: "https://sayonara.tokyo/s/2" }, { shopUrl: "https://sayonara.tokyo/s/3" }]);
+  assert.deepEqual(first.sends.map((s) => s.variant), ["B", "A", "D"]);
+  assert.equal(first.next, "C");
+  const kept = assignVariants(
+    [{ shopUrl: state.url }, { shopUrl: "https://sayonara.tokyo/s/9" }],
+    { next: first.next, kept: new Map([[state.url, "B"]]) },
+  );
+  assert.deepEqual(kept.sends.map((s) => s.variant), ["B", "C"]);
 });
 
 test("pool keeps input order", async () => {

@@ -3,7 +3,7 @@
  * Build ready shops concurrently, then take English screenshots in one Chrome,
  * then write a Messenger send queue. Does not claim, publish, or message anyone.
  * Does not build a shop that still has an unresolved time constraint or bundle.
- * Refuses production unless --production. Skips shops another agent holds.
+ * Defaults to production. Pass --beta for beta.sayonara.tokyo. Skips shops another agent holds.
  *
  *   node scripts/prospect-batch.mjs data/prospects --concurrency 4
  */
@@ -12,13 +12,18 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
-  SHOT, SOURCE, assertAgentId, buildBlocked, englishOk, otherAgent, outputWarning,
-  parseArgs, pool, redact, resolveBase, sendRow, verifyShop,
+  SHOT, SOURCE, VARIANT_CYCLE, assignVariants, assertAgentId, buildBlocked, englishOk,
+  otherAgent, outputWarning, parseArgs, pool, redact, resolveBase, sendRow, verifyShop,
 } from "./prospect.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+function readJson(file) {
+  try { return JSON.parse(fs.readFileSync(file, "utf8")); }
+  catch { return null; }
+}
 const builder = path.join(repoRoot, "scripts", "shop-builder.mjs");
-const usage = "usage: node scripts/prospect-batch.mjs <shop.json | dir> [more...] [--concurrency 4] [--dry-run] [--production] [--queue file]";
+const usage = "usage: node scripts/prospect-batch.mjs <shop.json | dir> [more...] [--concurrency 4] [--dry-run] [--beta] [--queue file]";
 
 function shopFiles(inputs) {
   const out = [];
@@ -112,7 +117,7 @@ if (a.flags.help || !a._.length) {
 }
 
 let base;
-try { base = resolveBase(process.env.SHOP_BUILDER_API_BASE, a.flags.production === true); }
+try { base = resolveBase(process.env.SHOP_BUILDER_API_BASE, { beta: a.flags.beta === true }); }
 catch (e) {
   console.error(e instanceof Error ? e.message : e);
   process.exit(1);
@@ -234,11 +239,19 @@ for (const row of built) {
 const queueWarn = outputWarning(queuePath, repoRoot);
 if (queueWarn) console.error(queueWarn);
 fs.mkdirSync(path.dirname(queuePath), { recursive: true });
+const variantPath = path.join(path.dirname(queuePath), "variant-next.json");
+const savedNext = readJson(variantPath)?.next;
+const kept = new Map();
+for (const row of readJson(queuePath)?.sends || []) {
+  if (row?.shopUrl && VARIANT_CYCLE.includes(row.variant)) kept.set(row.shopUrl, row.variant);
+}
+const assigned = assignVariants(sends, { next: savedNext, kept });
+if (assigned.sends.length) fs.writeFileSync(variantPath, `${JSON.stringify({ next: assigned.next }, null, 2)}\n`);
 const queue = {
   v: 1,
   createdAt: new Date().toISOString(),
   base,
-  sends,
+  sends: assigned.sends,
   held,
   skipped,
   failed,

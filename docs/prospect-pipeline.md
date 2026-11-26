@@ -29,7 +29,7 @@ Bundle posts are not split. A description with two or more priced lines (`Washin
 `scripts/prospect-convert.mjs` writes shop-builder JSON. It sets only:
 
 - `externalSource` — `facebook_marketplace` plus `https://www.facebook.com/marketplace/profile/<id>` when the page exposes a profile id. Otherwise the entry URL, so a re-run hits the same shop.
-- `settings.facebookUrl` — the entry URL when that URL is an item. When the entry is a profile, the first active listing URL. The reserve form needs this; an empty value means the buyer has no contact.
+- `settings.facebookUrl` — always `https://www.facebook.com/marketplace/item/<id>/`. An item URL in the input is used as given. A profile URL picks the bundle post, then a move-out post, then the first active listing. `review.facebookUrl.from` records which. A profile URL is never stored here.
 - Item `name` and `price` from the listing title when the title carries a yen amount, otherwise the structured yen price. A title price and a listing price that disagree become `price: null` plus a warning. `$` amounts are not treated as yen.
 - Photos — one center square per source image, edge to edge, no padding, long side at most 1600, JPEG quality 82. The shop-builder CLI uploads them as `photoFiles`. Facebook CDN URLs are not sent as `photos`, because the API would rehost the uncropped frame and the URL expires.
 
@@ -37,9 +37,9 @@ It does not set:
 
 | Field | Why it stays empty | How to finish it |
 |---|---|---|
-| `settings.slots` | "after 5pm" is the evening slot only (`20:00`). "5時以降" and a mix of morning and night are ambiguous. Empty slots display as 10:00, 14:00, and 20:00. | Copy `review.slots.hint` into `settings.slots`, or write the times you actually want. The build waits until `settings.slots` is set. |
+| `settings.slots` | No time in the text leaves the shop on 10:00, 14:00, and 20:00. One window is filled: "after 5pm" becomes 17:30, 19:00, 20:30, and `review.slots` records the phrase. Mixed phrases do not use the defaults; the build waits. | Edit `settings.slots` when the generated window is wrong. |
 | Bundle items | One post, many priced lines. The raw description is the item note. | Replace that item with one item per line, then set `review.bundlesDone` to `true`. Or set it true to ship the lump on purpose. The build waits. |
-| `settings.address` | `wardAddress` strips one trailing 区 and always appends 区. `川口市` is stored as `川口市区`. `目黒` becomes `目黒区`, which is what the editor wants. | Leave it empty for a 市. Set it only when you mean a ward. This does not block the build. |
+| `settings.address` | Still not guessed: a seller can name a station, a ward, and a city. `wardAddress` now keeps a name that ends in 市, 町, or 村 (`川口市` stays `川口市`) and still appends 区 to a bare ward (`目黒` → `目黒区`). | Copy `review.address.storedAs` into `settings.address` when it is the pickup area. |
 | `settings.pickupTo` | Pickup window and move-out are the same stored date. "月末" and "3月20日" are not a `YYYY-MM-DD`. | Set `pickupTo` when you know the last day. This does not block the build. |
 
 `review` is local. `scripts/shop-builder.mjs` sends `externalSource`, `settings`, and `items` only.
@@ -74,7 +74,7 @@ node scripts/prospect-convert.mjs data/prospects/seller.json
 
 export SHOP_BUILDER_API_TOKEN=...          # shell only. Never print it. Never commit it.
 export SHOP_BUILDER_AGENT_ID=grok-1
-export SHOP_BUILDER_API_BASE=https://beta.sayonara.tokyo   # this is the default
+# omit SHOP_BUILDER_API_BASE to use https://sayonara.tokyo; add --beta for beta
 
 node scripts/prospect-batch.mjs data/prospects --concurrency 4 --dry-run
 node scripts/prospect-batch.mjs data/prospects --concurrency 4
@@ -82,9 +82,9 @@ node scripts/prospect-batch.mjs data/prospects --concurrency 4
 
 `data/` is gitignored. Grab JSON, photos, screenshots, and the send queue contain seller data. The batch script warns if you point `--out` or `--queue` at a path inside the repo that is not under `data/`.
 
-Batch defaults to beta. `https://sayonara.tokyo` is refused unless `--production` is passed. Builds of different sellers run together (the API is already parallel-safe), capped at 8. Screenshots then run one after another in a Chrome this script launches (`channel: "chrome"`, not the Facebook window): 1280×830, JPEG quality 82, `ss-lang=en` set before the page loads.
+Batch defaults to production (`https://sayonara.tokyo`). `--beta` switches the API host to `https://beta.sayonara.tokyo`. Builds of different sellers run together (the API is already parallel-safe), capped at 8. Screenshots then run one after another in a Chrome this script launches (`channel: "chrome"`, not the Facebook window): 1280×830, JPEG quality 82, `ss-lang=en` set before the page loads.
 
-A shop is not built while `review.slots` is set and `settings.slots` is empty, or while a bundle is still open. Those rows land in `held`. A shop whose `lastAgentId` or live lease belongs to someone else, or that the API says is claimed (exit 3) or leased (exit 2), lands in `skipped` and is not written. Token values are stripped from anything the script prints.
+A shop is not built while a time phrase could not be turned into slots, or while a bundle is still open. Those rows land in `held`. A shop whose `lastAgentId` or live lease belongs to someone else, or that the API says is claimed (exit 3) or leased (exit 2), lands in `skipped` and is not written. Token values are stripped from anything the script prints.
 
 ## Send queue
 
@@ -95,9 +95,9 @@ A shop is not built while `review.slots` is set and `settings.slots` is empty, o
   "sends": [{
     "ready": true,
     "sellerId": "https://www.facebook.com/marketplace/profile/…",
-    "threadUrl": "https://www.facebook.com/marketplace/item/…",
-    "shopUrl": "https://beta.sayonara.tokyo/s/48291",
-    "message": "…",
+    "threadUrl": "https://www.facebook.com/marketplace/item/…/",
+    "shopUrl": "https://sayonara.tokyo/s/48291",
+    "variant": "B",
     "screenshot": "…/shots/48291.jpg",
     "checks": {
       "unclaimed": true,
@@ -113,9 +113,9 @@ A shop is not built while `review.slots` is set and `settings.slots` is empty, o
 }
 ```
 
-`sends` is the back-to-back Messenger list: seller, thread URL, message, screenshot. This repo does not drive Messenger. Sending stays a separate pass in the logged-in Chrome so a bad row cannot be posted by the build script.
+`sends` is the list to work through by hand: seller, thread URL, shop URL, screenshot, and a `variant` letter. This repo does not drive Messenger. Each send is one browser session, with a history check and a read-back.
 
-The message template is one string, `MESSAGE_TEMPLATE` in `scripts/prospect.mjs`. It is a placeholder.
+The letter rotates A, D, C, B. The next letter starts at B (`VARIANT_NEXT`). `variant-next.json` beside the queue remembers the letter after the last new shop, and a shop already in the previous queue keeps its letter. The operator fills the wording from the existing variants. The queue does not contain message text.
 
 ## Verification
 
@@ -147,11 +147,11 @@ A seller with no time constraint and no bundle list does not need a model at all
 
 A grab that returns no listings, or `stopped: "rate"`, is a signal to use the old screenshot pass for that seller. Do not widen the grabber into a search crawl to compensate.
 
-## Open questions
+## Decisions
 
-1. Is the placeholder message the one that should go out, or is there copy already in use?
-2. When the input is a profile, `facebookUrl` is the first active listing, not the profile. The profile URL is the `sellerId`. Should the contact link be the profile instead?
-3. `wardAddress("川口市")` stores `川口市区`, not `川口区`. Which string is showing up in the editor? The pipeline leaves address empty either way.
-4. A post that never mentions a time is built with no `slots`, so the page shows 10:00, 14:00, and 20:00. Is that acceptable on the screenshot we send?
-5. Should a later script paste the queue into Messenger, or does a person send from the queue?
-6. Prospects stay on beta unless `--production` is passed. Is that the rule until you say otherwise?
+1. The queue carries `variant` and `shopUrl`. Copy is filled from the existing variants when sending.
+2. `facebookUrl` is an item URL. A profile input picks bundle, then move-out, then the first active listing, and `review.facebookUrl.from` says which.
+3. `川口市`, `川口町`, and `田村` are stored unchanged. `目黒` is still `目黒区`.
+4. 10:00, 14:00, and 20:00 apply only when the listing text has no time. A named window is generated and flagged.
+5. Sending stays manual.
+6. The batch host is production. Beta is `--beta`.
