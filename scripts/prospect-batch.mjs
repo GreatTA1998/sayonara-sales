@@ -13,7 +13,8 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
   SHOT, SOURCE, VARIANT_CYCLE, assignVariants, assertAgentId, buildBlocked, englishOk,
-  otherAgent, outputWarning, parseArgs, pool, redact, resolveBase, sendRow, verifyShop,
+  otherAgent, outputWarning, parseArgs, pool, redact, resolveBase, sendRow, shotPaintReady,
+  verifyShop,
 } from "./prospect.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -101,6 +102,17 @@ async function shoot(browser, shopUrl, file) {
     }, SHOT.langKey);
     const ok = englishOk(signals);
     if (ok) {
+      try {
+        await page.waitForFunction(shotPaintReady, null, { timeout: 20_000 });
+      } catch { /* still shoot; washed-out miss is worse than a late shot */ }
+      await page.evaluate(async () => {
+        const imgs = [...document.images].filter((img) => {
+          const r = img.getBoundingClientRect();
+          return r.width > 1 && r.height > 1;
+        });
+        await Promise.all(imgs.map((img) => (img.decode ? img.decode() : Promise.resolve()).catch(() => {})));
+      });
+      await new Promise((r) => setTimeout(r, SHOT.settleMs));
       fs.mkdirSync(path.dirname(file), { recursive: true });
       await page.screenshot({ path: file, type: "jpeg", quality: SHOT.quality });
     }

@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /**
  * One pass over one seller's Marketplace listings.
- * Attaches to a Chrome the operator already logged in. Does not launch Chrome,
- * type credentials, close that Chrome, or accept search URLs.
+ * CDP mode attaches to a Chrome the operator already logged in (does not launch Chrome,
+ * type credentials, close that Chrome, or accept search URLs).
+ * Saved mode reads Ctrl+S Webpage Complete .html / .mhtml when CDP misses lazy thumbs.
  *
  *   node scripts/prospect-grab.mjs --cdp http://127.0.0.1:9222 --out data/prospects/seller.json <profile-or-item-url>
+ *   node scripts/prospect-grab.mjs --saved data/prospects/saved --out data/prospects/seller.json
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -12,33 +14,63 @@ import { fileURLToPath } from "node:url";
 import {
   MAX_ITEMS, assertGrabUrls, assertLocalCdp, canonicalFacebookUrl, isGraphqlUrl,
   itemIdFromUrl, outputWarning, paceMs, parseArgs, profileIdFromUrl, runGrab,
+  runGrabSaved, savedPageHtml,
 } from "./prospect.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const usage = "usage: node scripts/prospect-grab.mjs --cdp http://127.0.0.1:9222 --out data/prospects/seller.json <profile-or-item-url> [item-url...]";
+const usage = [
+  "usage:",
+  "  node scripts/prospect-grab.mjs --cdp http://127.0.0.1:9222 --out data/prospects/seller.json <profile-or-item-url> [item-url...]",
+  "  node scripts/prospect-grab.mjs --saved <dir-or-file> --out data/prospects/seller.json",
+].join("\n");
 
 const a = parseArgs(process.argv.slice(2));
-if (a.flags.help || !a._.length) {
+if (a.flags.help || (!a._.length && !a.flags.saved)) {
   console.error(usage);
   process.exit(a.flags.help ? 0 : 1);
 }
 
-let endpoint;
-try {
-  endpoint = assertLocalCdp(String(a.flags.cdp || "http://127.0.0.1:9222"));
-  a._.forEach((u) => assertGrabUrls([canonicalFacebookUrl(u)]));
-} catch (e) {
-  console.error(e instanceof Error ? e.message : e);
-  process.exit(1);
-}
-
-const id = profileIdFromUrl(a._[0]) || itemIdFromUrl(a._[0]) || "seller";
-const out = path.resolve(String(a.flags.out || path.join(repoRoot, "data", "prospects", `${id}.json`)));
-const warn = outputWarning(out, repoRoot);
-if (warn) console.error(warn);
-
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function savedFiles(root) {
+  const abs = path.resolve(String(root));
+  const st = fs.statSync(abs);
+  if (!st.isDirectory()) return /\.(html?|mht(?:ml)?)$/i.test(abs) ? [abs] : [];
+  return fs.readdirSync(abs).sort()
+    .map((name) => path.join(abs, name))
+    .filter((p) => fs.statSync(p).isFile() && /\.(html?|mht(?:ml)?)$/i.test(p));
+}
+
+async function fetchPhoto(url) {
+  const res = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(20_000) });
+  if (!res.ok) return null;
+  const type = (res.headers.get("content-type") || "").toLowerCase();
+  if (type && !type.startsWith("image/")) return null;
+  const buf = Buffer.from(await res.arrayBuffer());
+  return buf.length >= 800 ? buf : null;
+}
+
+async function writeGrab(grab, out, download = fetchPhoto) {
+  const dir = path.dirname(out);
+  fs.mkdirSync(dir, { recursive: true });
+  for (const listing of grab.listings) {
+    if (listing.status !== "active") continue;
+    for (let i = 0; i < listing.photos.length; i++) {
+      let buf = null;
+      try { buf = await download(listing.photos[i].url); }
+      catch { buf = null; }
+      if (!buf) continue;
+      const rel = `photos/${listing.id}-${i}.jpg`;
+      fs.mkdirSync(path.join(dir, "photos"), { recursive: true });
+      fs.writeFileSync(path.join(dir, rel), buf);
+      listing.photos[i].file = rel;
+    }
+  }
+  fs.writeFileSync(out, `${JSON.stringify(grab, null, 2)}\n`);
+  const bundles = grab.listings.filter((l) => l.bundleHint).length;
+  console.log(`${out}  listings=${grab.listings.length}  bundles=${bundles}${grab.stopped ? `  stopped=${grab.stopped}` : ""}`);
 }
 
 async function connect(cdp) {
@@ -95,6 +127,41 @@ async function connect(cdp) {
   };
 }
 
+if (a.flags.saved) {
+  try {
+    const files = savedFiles(a.flags.saved);
+    if (!files.length) throw new Error("No .html / .mhtml files in --saved path");
+    const pages = files.map((file) => {
+      const parsed = savedPageHtml(fs.readFileSync(file, "utf8"), path.basename(file));
+      return { html: parsed.html, url: parsed.url };
+    });
+    const grab = runGrabSaved(pages, { max: Number(a.flags.max) || MAX_ITEMS });
+    const id = grab.sellerId || itemIdFromUrl(grab.entryUrl) || "seller";
+    const out = path.resolve(String(a.flags.out || path.join(repoRoot, "data", "prospects", `${id}.json`)));
+    const warn = outputWarning(out, repoRoot);
+    if (warn) console.error(warn);
+    await writeGrab(grab, out);
+  } catch (e) {
+    console.error(e instanceof Error ? e.message : e);
+    process.exit(e?.code === "sellers" ? 6 : 1);
+  }
+  process.exit(0);
+}
+
+let endpoint;
+try {
+  endpoint = assertLocalCdp(String(a.flags.cdp || "http://127.0.0.1:9222"));
+  a._.forEach((u) => assertGrabUrls([canonicalFacebookUrl(u)]));
+} catch (e) {
+  console.error(e instanceof Error ? e.message : e);
+  process.exit(1);
+}
+
+const id = profileIdFromUrl(a._[0]) || itemIdFromUrl(a._[0]) || "seller";
+const out = path.resolve(String(a.flags.out || path.join(repoRoot, "data", "prospects", `${id}.json`)));
+const warn = outputWarning(out, repoRoot);
+if (warn) console.error(warn);
+
 let conn;
 try {
   conn = await connect(endpoint);
@@ -105,24 +172,13 @@ try {
     maxScrolls: a.flags.scrolls == null ? undefined : Number(a.flags.scrolls),
     sleep: () => wait(paceMs()),
   });
-  const dir = path.dirname(out);
-  fs.mkdirSync(dir, { recursive: true });
-  for (const listing of grab.listings) {
-    if (listing.status !== "active") continue;
-    for (let i = 0; i < listing.photos.length; i++) {
-      let buf = null;
-      try { buf = await conn.session.download(listing.photos[i].url); }
-      catch { buf = null; }
-      if (!buf) continue;
-      const rel = `photos/${listing.id}-${i}.jpg`;
-      fs.mkdirSync(path.join(dir, "photos"), { recursive: true });
-      fs.writeFileSync(path.join(dir, rel), buf);
-      listing.photos[i].file = rel;
-    }
-  }
-  fs.writeFileSync(out, `${JSON.stringify(grab, null, 2)}\n`);
-  const bundles = grab.listings.filter((l) => l.bundleHint).length;
-  console.log(`${out}  listings=${grab.listings.length}  bundles=${bundles}${grab.stopped ? `  stopped=${grab.stopped}` : ""}`);
+  await writeGrab(grab, out, async (url) => {
+    try {
+      const via = await conn.session.download(url);
+      if (via) return via;
+    } catch { /* fall through */ }
+    return fetchPhoto(url);
+  });
   process.exitCode = grab.stopped === "rate" ? 4 : 0;
 } catch (e) {
   const code = e && e.code;

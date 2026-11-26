@@ -8,7 +8,8 @@ import {
   assertGrabUrls, assertLocalCdp, assignVariants, buildBlocked, bundleLines, canonicalFacebookUrl,
   convertGrab, datePhrases, englishOk, extractNodes, isGraphqlUrl, itemFieldsFromListing,
   nameFromTitle, otherAgent, outputWarning, paceMs, pageBlock, pool,
-  redact, resolveBase, runGrab, sendRow, slotConstraint, verifyShop, wardStored, yenMarked,
+  redact, resolveBase, runGrab, runGrabSaved, savedPageHtml, sendRow, shotPaintReady,
+  slotConstraint, verifyShop, wardStored, yenMarked,
 } from "./prospect.mjs";
 
 const SELLER = "100000000100";
@@ -207,6 +208,50 @@ test("wardAddress and pickup slots still match the helpers", () => {
   assert.ok(store.includes("if (/[市町村]$/.test(raw)) return raw;"));
   assert.match(sale, /PICKUP_SLOTS = \["10:00", "14:00", "20:00"\]/);
   assert.equal(SLOT_EVENING, "20:00");
+});
+
+test("saved html/mhtml extracts photos and Japanese description", () => {
+  const photo = fb(CHAIR, "chair-full.jpg");
+  const node = listingNode({
+    id: CHAIR, title: "椅子", price: "¥1,500",
+    description: "木製の椅子です。目黒区で受け取れます。",
+    city: "目黒区", photo, w: 1200, h: 1200,
+  });
+  const html = `<html><head><meta property="og:url" content="https://www.facebook.com/marketplace/item/${CHAIR}/"></head><body><script type="application/json">${JSON.stringify({ data: { listing: node } })}</script></body></html>`;
+  const grab = runGrabSaved([{ html, url: `https://www.facebook.com/marketplace/item/${CHAIR}` }]);
+  assert.equal(grab.listings.length, 1);
+  assert.equal(grab.listings[0].description.includes("木製の椅子"), true);
+  assert.deepEqual(grab.listings[0].photos.map((p) => p.url), [photo]);
+  assert.equal(grab.sellerId, SELLER);
+
+  const bundleJson = JSON.stringify({
+    data: {
+      listing: listingNode({
+        id: BUNDLE, title: "まとめ", price: "¥6,000",
+        description: "洗濯機 - 4000 yen\n乾燥機 - 2000 yen",
+        photo: fb(BUNDLE, "b.jpg"), w: 1600, h: 1200,
+      }),
+    },
+  });
+  const mhtml = [
+    "From: <Saved by Blink>",
+    'Content-Type: multipart/related; boundary="----=_NextPart"',
+    "",
+    "------=_NextPart",
+    "Content-Type: text/html; charset=utf-8",
+    `Content-Location: https://www.facebook.com/marketplace/item/${BUNDLE}/`,
+    "Content-Transfer-Encoding: quoted-printable",
+    "",
+    `<script>${bundleJson}</script>`,
+    "------=_NextPart--",
+  ].join("\r\n");
+  const parsed = savedPageHtml(mhtml, "item.mhtml");
+  assert.match(parsed.url, new RegExp(BUNDLE));
+  const fromMhtml = runGrabSaved([parsed]);
+  assert.equal(fromMhtml.listings[0].id, BUNDLE);
+  assert.equal(fromMhtml.listings[0].bundleHint, true);
+  assert.equal(typeof shotPaintReady, "function");
+  assert.equal(SHOT.settleMs > 0, true);
 });
 
 test("graphql and dom fallbacks", () => {
