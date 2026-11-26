@@ -6,6 +6,7 @@ import { byPrice, Listings, ListingTools, Seg, useDense, usePriceDir, useShowSol
 import SquareCam from "@/components/square-cam";
 import { PhotoLightbox } from "@/components/photo-lightbox";
 import { Snack, useBodyScrollLock, useMaskDismiss, useSnack } from "@/components/snack";
+import { TimePicker } from "@/components/time-picker";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { dayLbl, daysBetween, tokyoYmd } from "@/lib/days";
 import { DECLINE_PRESETS, DEF_LEAD, DEF_OFF, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
@@ -18,7 +19,7 @@ import {
   adoptShop, forgetShop, getLineUid, getName, openShop, subscribeAuth,
 } from "@/lib/shop";
 import {
-  ELTON_SHOP, itemFlags, pickupDays, shopItemOff, shopPublished, uid,
+  ELTON_SHOP, itemFlags, pickupDays, shopItemOff, shopPublished, shopSlots, slotTime, uid,
   wardAddress as kuFull, wardStem as kuStem,
   type Store,
 } from "@/lib/store";
@@ -39,7 +40,6 @@ type AdminState = {
   items: Item[]; claims: Claim[];
 };
 type Props = { shop: string; name: string };
-const fmtSlot = (a: string, b: string) => `${a}–${b}`;
 type ContactMode = "jimoty" | "line" | "phone" | "facebook";
 const CONTACT_OPTS: [string, string][] = [
   ["jimoty", "ジモティー"], ["facebook", "Facebook"], ["line", "LINE"], ["phone", "電話"],
@@ -69,7 +69,7 @@ function ClaimRow({ c, items, onOpen }: { c: Claim; items: Item[]; onOpen: (id: 
   return (
     <li>
       <button type="button" className="tl-r" onClick={() => onOpen(c.id)}>
-        <span className="tl-when">{dayLbl(c.day)} {c.slot || "—"}{c.status === "picked_up" ? " · 引取済" : ""}
+        <span className="tl-when">{dayLbl(c.day)} {slotTime(c.slot) || "—"}{c.status === "picked_up" ? " · 引取済" : ""}
           {soon ? <span className="tl-soon">{soon}</span> : null}</span>
         <span className="tl-goods">{its.flatMap((it) => it.photos?.[0] ? [<img key={it.id} src={it.photos[0]} alt="" />] : []).slice(0, 4)}
           <span className="tl-sum">{[claimWho(c), its.filter((it) => !it.photos?.[0]).map(itemLabel).join("、")].filter(Boolean).join(" · ")}</span></span>
@@ -155,8 +155,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [phone, setPhone] = useState("");
   const [contactMode, setContactMode] = useState<ContactMode>("jimoty");
   const [slots, setSlots] = useState<string[]>([...PICKUP_SLOTS]);
-  const [slotA, setSlotA] = useState("11:00");
-  const [slotB, setSlotB] = useState("11:15");
+  const [slotOpen, setSlotOpen] = useState(false);
   const [pickupTo, setPickupTo] = useState("");
   const [leadDays, setLeadDays] = useState(DEF_LEAD);
   const [itemOff, setItemOff] = useState(DEF_OFF);
@@ -216,7 +215,7 @@ export default function ShopAdminView({ shop, name }: Props) {
       (j.trim() && "jimoty") || (f.trim() && "facebook") || (l.trim() && "line")
         || (p.trim() && "phone") || "jimoty",
     );
-    setSlots(body.slots?.length ? body.slots : [...PICKUP_SLOTS]);
+    setSlots(shopSlots(body));
     setPickupTo(body.pickupTo || body.moveOut || "");
     setLeadDays(body.leadDays ?? DEF_LEAD);
     setItemOff(shopItemOff(body));
@@ -793,7 +792,7 @@ export default function ShopAdminView({ shop, name }: Props) {
   function closeClaim() { setPane(null); setRsOk(false); setKeep([]); setClaimId(null); }
   function openResched(c: Claim) {
     setRsDay(c.day || rsDays[0] || "");
-    setRsSlot(c.slot || null); setRsOk(false); setPane("resched");
+    setRsSlot(slotTime(c.slot) || null); setRsOk(false); setPane("resched");
   }
   function toggleKeep(id: string) {
     setKeep((k) => (k.includes(id) ? (k.length <= 1 ? k : k.filter((x) => x !== id)) : [...k, id]));
@@ -1159,29 +1158,14 @@ export default function ShopAdminView({ shop, name }: Props) {
                 void saveSlots(slots.filter((x) => x !== s));
               }}>{s} ×</button>
           ))}
-          <span className="slot-add-wrap">
-            <button type="button" className="slot" popoverTarget="ss-slot-pop">時間を追加</button>
-            <div id="ss-slot-pop" popover="auto" className="slot-pop" role="dialog" aria-label="時間を追加"
-              onToggle={(e) => {
-                if (e.newState !== "open") return;
-                const p = e.currentTarget, r = (p.previousElementSibling as HTMLElement).getBoundingClientRect();
-                const top = r.bottom + 4 + p.offsetHeight > innerHeight - 8 ? r.top - 4 - p.offsetHeight : r.bottom + 4;
-                p.style.top = `${Math.max(8, top)}px`;
-                p.style.left = `${Math.max(8, Math.min(r.left, innerWidth - p.offsetWidth - 8))}px`;
-              }}>
-              <input type="time" aria-label="開始" value={slotA} onChange={(e) => setSlotA(e.target.value)} />
-              <span aria-hidden="true">〜</span>
-              <input type="time" aria-label="終了" value={slotB} onChange={(e) => setSlotB(e.target.value)} />
-              <button type="button" className="slot" disabled={!slotA || !slotB || slotB <= slotA}
-                onClick={(e) => {
-                  const label = fmtSlot(slotA, slotB);
-                  if (slots.includes(label)) { show("すでにあります", "err"); return; }
-                  void saveSlots([...slots, label].sort());
-                  (e.currentTarget.closest("[popover]") as HTMLElement | null)?.hidePopover();
-                }}>追加</button>
-            </div>
-          </span>
+          <button type="button" className="slot" onClick={() => setSlotOpen(true)}>時間を追加</button>
         </div>
+        <TimePicker open={slotOpen} value="11:00" onClose={() => setSlotOpen(false)}
+          onPick={(t) => {
+            if (slots.includes(t)) { show("すでにあります", "err"); return; }
+            void saveSlots([...slots, t].sort());
+            setSlotOpen(false);
+          }} />
         <label className="float"><span>内見動画 任意</span>
           <input value={youtube} onChange={(e) => setYoutube(e.target.value)}
             onBlur={() => void persistProfile(bio, jimoty, youtube)}
@@ -1193,7 +1177,7 @@ export default function ShopAdminView({ shop, name }: Props) {
         <div className="mask" role="dialog" aria-modal="true" aria-label="予約詳細"
           onClick={closeClaim}>
           <div className="sheet claim-sheet" onClick={(e) => e.stopPropagation()}>
-            <p className="tl-when">{dayLbl(claimOpen.day)} {claimOpen.slot || "—"}{claimOpen.status === "picked_up" ? " · 引取済" : ""}</p>
+            <p className="tl-when">{dayLbl(claimOpen.day)} {slotTime(claimOpen.slot) || "—"}{claimOpen.status === "picked_up" ? " · 引取済" : ""}</p>
             {claimWho(claimOpen) ? <p className="hint">{claimWho(claimOpen)}</p> : null}
             {claimOpen.contactMethod ? <div className="text-sm text-muted" style={{ marginBottom: 8 }}>{methodJa(claimOpen.contactMethod)}</div> : null}
             {claimOpen.spotName ? (
