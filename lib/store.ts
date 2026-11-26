@@ -99,7 +99,7 @@ export function shopContact(shop: string, s: Store) {
 
 export const hasBuyerContact = (shop: string, s: Store) => {
   const c = shopContact(shop, s);
-  return !!(c.jimotyUrl || c.lineInviteUrl || c.phone);
+  return !!(c.jimotyUrl || c.lineInviteUrl || c.phone || (s.facebookUrl || "").trim());
 };
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
