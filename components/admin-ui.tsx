@@ -1161,7 +1161,14 @@ export default function ShopAdminView({ shop, name }: Props) {
           ))}
           <span className="slot-add-wrap">
             <button type="button" className="slot" popoverTarget="ss-slot-pop">時間を追加</button>
-            <div id="ss-slot-pop" popover="auto" className="slot-pop" role="dialog" aria-label="時間を追加">
+            <div id="ss-slot-pop" popover="auto" className="slot-pop" role="dialog" aria-label="時間を追加"
+              onToggle={(e) => {
+                if (e.newState !== "open") return;
+                const p = e.currentTarget, r = (p.previousElementSibling as HTMLElement).getBoundingClientRect();
+                const top = r.bottom + 4 + p.offsetHeight > innerHeight - 8 ? r.top - 4 - p.offsetHeight : r.bottom + 4;
+                p.style.top = `${Math.max(8, top)}px`;
+                p.style.left = `${Math.max(8, Math.min(r.left, innerWidth - p.offsetWidth - 8))}px`;
+              }}>
               <input type="time" aria-label="開始" value={slotA} onChange={(e) => setSlotA(e.target.value)} />
               <span aria-hidden="true">〜</span>
               <input type="time" aria-label="終了" value={slotB} onChange={(e) => setSlotB(e.target.value)} />
