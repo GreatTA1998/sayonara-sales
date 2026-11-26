@@ -20,6 +20,8 @@ The grabber listens to `/api/graphql` responses, parses embedded JSON in the HTM
 
 A profile scroll stops after two passes with no new listings, or six scrolls, or 40 listings (the shop-builder cap). Listings that already have a description and a large photo are not opened again. Thin grid cards are opened once, 1.8–3.2 seconds apart. Sold and pending rows are kept in the grab file and dropped at convert. Other sellers' "related" cards are dropped.
 
+When CDP cannot load lazy Marketplace thumbs (common on profile grids), use **saved mode** instead: in the logged-in Chrome open each item page, Ctrl+S → **Webpage, Complete** (`.html`) or **Webpage, Single File** / MHTML (`.mhtml`), drop the files in one folder, then run `--saved`. That path reads the embedded Relay JSON for every photo URL and the full description (including Japanese). Output is the same grab JSON `prospect-convert.mjs` already takes. No CDP port, no login automation.
+
 If Facebook redirects to `/login` or `/checkpoint`, the run stops and does not type anything. If the page says the account is going too fast, the run writes what it has with `stopped: "rate"` and exits 4. Many grabbers at once on the same account are out of scope.
 
 Bundle posts are not split. A description with two or more priced lines (`Washing machine - 4000 yen`) is stored whole, and `bundleHint` is set. Splitting is a later edit.
@@ -69,6 +71,11 @@ node scripts/prospect-grab.mjs \
   'https://www.facebook.com/marketplace/profile/SELLER_ID'
 # or a list of item URLs, no profile
 
+# When CDP misses photos/descriptions: Ctrl+S each item page into a folder, then:
+node scripts/prospect-grab.mjs \
+  --saved data/prospects/saved-pages \
+  --out data/prospects/seller.json
+
 node scripts/prospect-convert.mjs data/prospects/seller.json
 # edit data/prospects/<sellerId>/shop.json — slots, bundles, address
 
@@ -82,7 +89,7 @@ node scripts/prospect-batch.mjs data/prospects --concurrency 4
 
 `data/` is gitignored. Grab JSON, photos, screenshots, and the send queue contain seller data. The batch script warns if you point `--out` or `--queue` at a path inside the repo that is not under `data/`.
 
-Batch defaults to production (`https://sayonara.tokyo`). `--beta` switches the API host to `https://beta.sayonara.tokyo`. Builds of different sellers run together (the API is already parallel-safe), capped at 8. Screenshots then run one after another in a Chrome this script launches (`channel: "chrome"`, not the Facebook window): 1280×830, JPEG quality 82, `ss-lang=en` set before the page loads.
+Batch defaults to production (`https://sayonara.tokyo`). `--beta` switches the API host to `https://beta.sayonara.tokyo`. Builds of different sellers run together (the API is already parallel-safe), capped at 8. Screenshots then run one after another in a Chrome this script launches (`channel: "chrome"`, not the Facebook window): 1280×830, JPEG quality 82, `ss-lang=en` set before the page loads. Before each shot it waits until visible images are complete and decoded, non-loop opacity transitions (the `.shop-in` fade) have finished, then a short settle delay — so the JPEG is not washed out mid-fade.
 
 A shop is not built while a time phrase could not be turned into slots, or while a bundle is still open. Those rows land in `held`. A shop whose `lastAgentId` or live lease belongs to someone else, or that the API says is claimed (exit 3) or leased (exit 2), lands in `skipped` and is not written. Token values are stripped from anything the script prints.
 

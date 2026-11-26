@@ -13,7 +13,7 @@ export const PACE_MAX = 3200;
 export const SLOT_MORNING = "10:00";
 export const SLOT_AFTERNOON = "14:00";
 export const SLOT_EVENING = "20:00";
-export const SHOT = { width: 1280, height: 830, quality: 82, langKey: "ss-lang" };
+export const SHOT = { width: 1280, height: 830, quality: 82, langKey: "ss-lang", settleMs: 150 };
 /** Messenger copy lives with the operator. The queue only names the next letter. */
 export const VARIANT_CYCLE = ["A", "D", "C", "B"];
 /** Elton, 2026-11-26: the next send is B. */
@@ -487,16 +487,125 @@ export function domListing(html, pageUrl) {
   };
 }
 
+function parseScriptJson(body) {
+  let s = String(body || "").trim();
+  if (s.startsWith("for (;;);")) s = s.slice(9).trim();
+  if (!s || (s[0] !== "{" && s[0] !== "[")) {
+    const i = s.search(/[\[{]/);
+    if (i < 0) return null;
+    s = s.slice(i);
+  }
+  if (!s.includes("marketplace_listing_title") && !s.includes("listing_price")) return null;
+  try { return JSON.parse(s); }
+  catch { return null; }
+}
+
 export function blobsFromHtml(html) {
   const out = [];
   for (const m of String(html || "").matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)) {
-    const body = m[1].trim();
-    if (!body || body.length > 8_000_000 || (body[0] !== "{" && body[0] !== "[")) continue;
-    if (!body.includes("marketplace_listing_title") && !body.includes("listing_price")) continue;
-    try { out.push(JSON.parse(body)); }
-    catch { /* FB sometimes wraps JSON in JS */ }
+    if (m[1].length > 8_000_000) continue;
+    const parsed = parseScriptJson(m[1]);
+    if (parsed) out.push(parsed);
   }
   return out;
+}
+
+function decodeQuotedPrintable(raw) {
+  return String(raw || "")
+    .replace(/=\r?\n/g, "")
+    .replace(/=([0-9A-Fa-f]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+}
+
+/** Chrome Ctrl+S Webpage Complete (.html) or MHTML → `{ html, url }`. */
+export function savedPageHtml(raw, name = "") {
+  const text = String(raw || "");
+  const head = text.slice(0, 2500);
+  const mhtml = /\.mht(ml)?$/i.test(name) || /^From:\s*/m.test(head) || /Content-Type:\s*multipart\/related/i.test(head);
+  if (!mhtml) {
+    return { html: text, url: meta(text, "og:url") || "" };
+  }
+  const bm = head.match(/boundary="?([^"\r\n;]+)"?/i);
+  if (!bm) return { html: text, url: meta(text, "og:url") || "" };
+  const parts = text.split(`--${bm[1]}`);
+  for (const part of parts) {
+    if (!/Content-Type:\s*text\/html/i.test(part)) continue;
+    const loc = part.match(/Content-Location:\s*(\S+)/i)?.[1]?.trim() || "";
+    const sep = part.search(/\r?\n\r?\n/);
+    if (sep < 0) continue;
+    let body = part.slice(sep).replace(/^\r?\n\r?\n/, "");
+    const enc = (part.match(/Content-Transfer-Encoding:\s*(\S+)/i) || [])[1]?.toLowerCase() || "";
+    if (enc === "base64") body = Buffer.from(body.replace(/\s+/g, ""), "base64").toString("utf8");
+    else if (enc === "quoted-printable") body = decodeQuotedPrintable(body);
+    return { html: body, url: loc || meta(body, "og:url") || "" };
+  }
+  return { html: text, url: "" };
+}
+
+/**
+ * Build the same grab JSON as `runGrab` from browser-saved listing pages
+ * (Ctrl+S Webpage Complete .html / .mhtml). No CDP.
+ */
+export function runGrabSaved(pages, opts = {}) {
+  const now = opts.now || (() => new Date().toISOString());
+  const max = Math.min(MAX_ITEMS, Math.max(1, Number(opts.max) || MAX_ITEMS));
+  const list = Array.isArray(pages) ? pages : [];
+  if (!list.length) throw new Error("Pass at least one saved .html or .mhtml listing page");
+  let listings = [];
+  let entryUrl = "";
+  for (const page of list) {
+    const url = page?.url || meta(page?.html || "", "og:url") || "";
+    if (!entryUrl && url) {
+      try { entryUrl = canonicalFacebookUrl(url); }
+      catch { entryUrl = url; }
+    }
+    const itemId = itemIdFromUrl(url);
+    const profileId = profileIdFromUrl(url);
+    listings = mergeAll(listings, absorb({ html: page?.html || "", url, graphql: [] }, profileId, itemId));
+  }
+  if (!listings.length) throw new Error("No Marketplace listings found in the saved pages");
+  const sellerIds = [...new Set(listings.map((l) => l.sellerId).filter(Boolean))];
+  if (sellerIds.length > 1) {
+    throw Object.assign(new Error("These saved pages belong to more than one seller. Grab one seller at a time."), { code: "sellers" });
+  }
+  const profileEntry = profileIdFromUrl(entryUrl);
+  if (profileEntry) listings = listings.filter((l) => !l.sellerId || l.sellerId === profileEntry);
+  let stopped = null;
+  if (listings.length > max) {
+    listings = listings.slice(0, max);
+    stopped = "cap";
+  }
+  const sellerId = profileEntry || sellerIds[0] || "";
+  if (!entryUrl && listings[0]?.url) entryUrl = listings[0].url;
+  return {
+    v: 1,
+    grabbedAt: now(),
+    entryUrl: entryUrl || "",
+    profileUrl: sellerId ? `https://www.facebook.com/marketplace/profile/${sellerId}` : "",
+    sellerId,
+    sellerName: listings.map((l) => l.sellerName).find(Boolean) || "",
+    stopped,
+    listings: listings.map(publishListing),
+  };
+}
+
+/** True in-page when visible imgs are loaded and non-loop opacity animations finished. */
+export function shotPaintReady() {
+  const imgs = [...document.images].filter((img) => {
+    const r = img.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) return false;
+    const s = getComputedStyle(img);
+    return s.visibility !== "hidden" && s.display !== "none" && Number(s.opacity) > 0.01;
+  });
+  if (!imgs.every((img) => img.complete && img.naturalWidth > 0)) return false;
+  const root = document.querySelector(".buy") || document.body;
+  if (Number(getComputedStyle(root).opacity) < 0.99) return false;
+  const anims = typeof document.getAnimations === "function" ? document.getAnimations({ subtree: true }) : [];
+  for (const a of anims) {
+    const t = a.effect?.getComputedTiming?.();
+    if (t && (t.iterations === Infinity || t.duration === Infinity)) continue;
+    if (a.playState === "running" || a.playState === "pending") return false;
+  }
+  return true;
 }
 
 export function itemIdsFromHtml(html) {
