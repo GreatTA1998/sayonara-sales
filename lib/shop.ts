@@ -7,7 +7,6 @@ const ID_KEY = "ss-shop-id";
 const MAP_KEY = "ss-shop-map";
 const UID_KEY = "ss-line-uid";
 const UID_MAP = "ss-line-uid-map";
-const PROF_KEY = "ss-profile";
 export const AUTH_EVT = "ss-auth";
 
 export const ELTON_ID = "elton";
@@ -84,25 +83,6 @@ export const notifyAuth = () => { if (typeof window !== "undefined") window.disp
 export const subscribeAuth = (cb: () => void) => {
   window.addEventListener(AUTH_EVT, cb);
   return () => window.removeEventListener(AUTH_EVT, cb);
-};
-
-export type Profile = { bio: string; jimotyUrl: string; youtubeUrl: string; facebookUrl: string };
-export const getProfile = (): Profile => {
-  if (typeof window === "undefined") return { bio: "", jimotyUrl: "", youtubeUrl: "", facebookUrl: "" };
-  try {
-    const p = JSON.parse(localStorage.getItem(PROF_KEY) || "{}") as Partial<Profile>;
-    return {
-      bio: String(p.bio || ""), jimotyUrl: String(p.jimotyUrl || ""),
-      youtubeUrl: String(p.youtubeUrl || ""), facebookUrl: String(p.facebookUrl || ""),
-    };
-  } catch { return { bio: "", jimotyUrl: "", youtubeUrl: "", facebookUrl: "" }; }
-};
-export const saveProfile = (p: Profile) => {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(PROF_KEY, JSON.stringify({
-    bio: p.bio.trim(), jimotyUrl: p.jimotyUrl.trim(), youtubeUrl: p.youtubeUrl.trim(),
-    facebookUrl: p.facebookUrl.trim(),
-  }));
 };
 
 /** Guest shop id so admin UI works before soft-save. */

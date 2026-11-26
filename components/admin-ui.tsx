@@ -15,7 +15,7 @@ import { adminAct, claimShop, listenShop } from "@/lib/live";
 import { notifyLine } from "@/lib/notify";
 import { t, useLang } from "@/lib/lang";
 import {
-  adoptShop, forgetShop, getLineUid, getName, getProfile, openShop, saveProfile, subscribeAuth,
+  adoptShop, forgetShop, getLineUid, getName, openShop, subscribeAuth,
 } from "@/lib/shop";
 import {
   ELTON_SHOP, itemFlags, pickupDays, shopItemOff, shopPublished, uid,
@@ -205,14 +205,14 @@ export default function ShopAdminView({ shop, name }: Props) {
       addrDraftRef.current = stem;
       setAddrDraft(stem);
     }
-    const local = getProfile();
-    const bioVal = body.bio || local.bio || "";
+    // Shop doc only — never ss-profile / soft-login / prior-shop bleed (SS-423).
+    const bioVal = body.bio || "";
     setBio(bioVal);
-    const j = body.jimotyUrl || local.jimotyUrl || "";
+    const j = body.jimotyUrl || "";
     const l = body.lineInviteUrl || "", p = body.phone || "";
-    const f = body.facebookUrl || local.facebookUrl || "";
+    const f = body.facebookUrl || "";
     setJimoty(j); setLineInvite(l); setPhone(p); setFacebook(f);
-    setYoutube(body.youtubeUrl || ytUrl(bioVal) || local.youtubeUrl || "");
+    setYoutube(body.youtubeUrl || ytUrl(bioVal) || "");
     setContactMode(
       (j.trim() && "jimoty") || (f.trim() && "facebook") || (l.trim() && "line")
         || (p.trim() && "phone") || "jimoty",
@@ -344,7 +344,6 @@ export default function ShopAdminView({ shop, name }: Props) {
     nextLine = lineInvite, nextPhone = phone, nextFb = facebook,
   ) {
     const yt = nextYt.trim() || ytUrl(nextBio);
-    saveProfile({ bio: nextBio, jimotyUrl: nextJimoty, youtubeUrl: yt, facebookUrl: nextFb });
     await act({
       action: "profile", bio: nextBio, jimotyUrl: nextJimoty, youtubeUrl: yt,
       facebookUrl: nextFb, lineInviteUrl: nextLine, phone: nextPhone,
@@ -623,7 +622,6 @@ export default function ShopAdminView({ shop, name }: Props) {
       if (data.name) openShop(data.name);
       const url = data.url || prev.url;
       setJimoty(url);
-      saveProfile({ bio, jimotyUrl: url, youtubeUrl: youtube, facebookUrl: facebook });
       const ok = await act(
         { action: "import", items: data.items || [], jimotyUrl: url },
         `${data.items?.length || 0}件取り込みました`,
