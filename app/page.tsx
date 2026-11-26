@@ -48,8 +48,7 @@ export default function HomePage() {
           <li key={line}>{line}</li>
         ))}
       </ul>
-      <div className={panelReady ? "shop-panel in" : "shop-panel"} aria-busy={!panelReady}
-        aria-hidden={!panelReady}>
+      <div className={`shop-panel${panelReady ? " in" : ""}`} aria-busy={!panelReady} aria-label={panelReady ? undefined : t("home.loading", lang)}>
         <div className="home-browse">
           <div className="shop-tabs" role="tablist" aria-label={t("home.tabs", lang)}>
             {cards.map((c) => (
