@@ -18,10 +18,10 @@ export function useLineOAuthReturn(onDone?: () => void) {
     const dirty = u.searchParams.has("line_ok") || u.searchParams.has("line_err");
     void applyLineSession().then((s) => {
       if (dirty) cleanUrl();
-      // Stale dig5 path after LINE → stamped shop (ownerLineUid).
+      // Only remap on LINE OAuth return — never yank open unclaimed /admin (claim URL).
       const id = s?.shop || getId();
       const m = window.location.pathname.match(/^\/s\/([^/]+)(\/admin)?/);
-      if (id && m?.[1] && m[1] !== id && (dirty || m[2])) {
+      if (dirty && id && m?.[1] && m[1] !== id) {
         window.location.replace(m[2] ? `/s/${id}/admin` : `/s/${id}`);
         return;
       }
