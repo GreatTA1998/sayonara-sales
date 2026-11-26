@@ -236,7 +236,7 @@ export async function listPublishedShops(): Promise<{ id: string; ward: string; 
 
 export type UnclaimedShop = {
   id: string; address: string; published: boolean; updatedAt: string;
-  facebookUrl?: string; jimotyUrl?: string;
+  facebookUrl?: string; jimotyUrl?: string; otherUrl?: string;
 };
 
 /** Elton /admin — dig5 shops with no ownerUid (claimable handoffs / Muse imports). */
@@ -248,6 +248,7 @@ export async function listUnclaimedShops(): Promise<UnclaimedShop[]> {
       const x = d.data() || {};
       const fb = String(x.facebookUrl || "").trim();
       const jm = String(x.jimotyUrl || "").trim();
+      const ot = String(x.otherUrl || "").trim();
       return {
         id: d.id,
         address: String(x.address || "").trim(),
@@ -255,6 +256,7 @@ export async function listUnclaimedShops(): Promise<UnclaimedShop[]> {
         updatedAt: String(x.updatedAt || ""),
         ...(fb ? { facebookUrl: fb } : {}),
         ...(jm ? { jimotyUrl: jm } : {}),
+        ...(ot ? { otherUrl: ot } : {}),
       };
     })
     .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || "") || a.id.localeCompare(b.id));
@@ -461,11 +463,13 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       if ("facebookUrl" in body) patch.facebookUrl = String(body.facebookUrl || "").trim();
       if ("lineInviteUrl" in body) patch.lineInviteUrl = String(body.lineInviteUrl || "").trim();
       if ("phone" in body) patch.phone = String(body.phone || "").trim();
+      if ("otherUrl" in body) patch.otherUrl = String(body.otherUrl || "").trim();
       await updateDoc(shopRef, patch);
       return {
         bio: String(patch.bio ?? ""), jimotyUrl: String(patch.jimotyUrl ?? ""),
         youtubeUrl: String(patch.youtubeUrl ?? ""), facebookUrl: String(patch.facebookUrl ?? ""),
         lineInviteUrl: String(patch.lineInviteUrl ?? ""), phone: String(patch.phone ?? ""),
+        otherUrl: String(patch.otherUrl ?? ""),
       };
     }
     case "dates": {
@@ -497,7 +501,7 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       const meta = (await getDoc(shopRef)).data() || {};
       const s = storeFromDocs(meta as Record<string, unknown>, [], []);
       if (!hasBuyerContact(shop, s)) {
-        throw new Error("Jimoty・Facebook・LINE・電話のいずれかを入力してください");
+        throw new Error("Jimoty・Facebook・LINE・電話・その他のいずれかを入力してください");
       }
       await updateDoc(shopRef, { published: true, updatedAt: new Date().toISOString() });
       return { published: true };
@@ -631,7 +635,7 @@ export async function leaveWaitLive(shopRaw: string, itemId: string, accounts: s
 
 /** Buyer book — creates requested claim; snapshot reconciles. */
 export async function bookShop(shopRaw: string, body: {
-  day: string; slot: string; itemIds: string[]; contact: string; contactMethod: "jimoty" | "line" | "phone" | "facebook";
+  day: string; slot: string; itemIds: string[]; contact: string; contactMethod: "jimoty" | "line" | "phone" | "facebook" | "other";
   lineUid?: string;
 }): Promise<{ code: string; day: string; slot: string; address: string; contact: string; contactMethod: string; total: number; items: string[] }> {
   const shop = parseShop(shopRaw);

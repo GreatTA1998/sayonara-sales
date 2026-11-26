@@ -14,7 +14,7 @@ export type Item = {
 export type PickupSpot = { id: string; name: string; mapsUrl: string };
 export type Claim = {
   id: string; code: string; day: string; slot: string; itemIds: string[];
-  contact?: string; contactMethod?: "jimoty" | "line" | "phone" | "facebook";
+  contact?: string; contactMethod?: "jimoty" | "line" | "phone" | "facebook" | "other";
   /** Snapshot at book — survives admin spot edits/deletes. */
   spotId?: string; spotName?: string; spotMapsUrl?: string;
   /** requested = pending; booked = 予約済; picked_up = 引取済 (sold). */
@@ -27,7 +27,7 @@ export type Claim = {
 };
 export type Store = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string; facebookUrl?: string;
-  lineInviteUrl?: string; phone?: string;
+  lineInviteUrl?: string; phone?: string; otherUrl?: string;
   slots?: string[];
   pickupSpots?: PickupSpot[];
   pickupFrom?: string; pickupTo?: string; moveOut?: string;
@@ -52,7 +52,7 @@ export type Store = {
 /** Keys the shop editor persists. The shop-builder contract uses this list. */
 export const SHOP_SETTING_KEYS = [
   "address", "bio", "jimotyUrl", "youtubeUrl", "facebookUrl",
-  "lineInviteUrl", "phone", "slots", "pickupSpots",
+  "lineInviteUrl", "phone", "otherUrl", "slots", "pickupSpots",
   "pickupTo", "leadDays", "itemOff",
 ] as const;
 
@@ -102,7 +102,8 @@ export function shopContact(shop: string, s: Store) {
 
 export const hasBuyerContact = (shop: string, s: Store) => {
   const c = shopContact(shop, s);
-  return !!(c.jimotyUrl || c.lineInviteUrl || c.phone || (s.facebookUrl || "").trim());
+  return !!(c.jimotyUrl || c.lineInviteUrl || c.phone
+    || (s.facebookUrl || "").trim() || (s.otherUrl || "").trim());
 };
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
@@ -205,7 +206,7 @@ export function applyShopSettings(current: Store, raw: Record<string, unknown>):
   };
   if ("address" in raw) next.address = wardAddress(raw.address);
   if ("bio" in raw) next.bio = String(raw.bio || "").trim();
-  for (const k of ["jimotyUrl", "youtubeUrl", "facebookUrl", "lineInviteUrl", "phone"] as const) {
+  for (const k of ["jimotyUrl", "youtubeUrl", "facebookUrl", "lineInviteUrl", "phone", "otherUrl"] as const) {
     if (k in raw) next[k] = String(raw[k] || "").trim();
   }
   if ("slots" in raw) next.slots = normalizeSlots(raw.slots);
@@ -227,7 +228,7 @@ export function settingsUpdate(current: Store, raw: Record<string, unknown>): Re
   const patch: Record<string, unknown> = {};
   if ("address" in raw) patch.address = next.address;
   if ("bio" in raw) patch.bio = next.bio || "";
-  for (const k of ["jimotyUrl", "youtubeUrl", "facebookUrl", "lineInviteUrl", "phone"] as const) {
+  for (const k of ["jimotyUrl", "youtubeUrl", "facebookUrl", "lineInviteUrl", "phone", "otherUrl"] as const) {
     if (k in raw) patch[k] = next[k] || "";
   }
   if ("slots" in raw) patch.slots = next.slots || [];
@@ -316,6 +317,7 @@ export function shopFields(s: Store): Record<string, unknown> {
     facebookUrl: s.facebookUrl || "",
     lineInviteUrl: s.lineInviteUrl || "",
     phone: s.phone || "",
+    otherUrl: s.otherUrl || "",
     slots: s.slots?.length ? s.slots : [],
     pickupSpots: s.pickupSpots || [],
     pickupFrom: s.pickupFrom || "",
@@ -409,6 +411,7 @@ export function storeFromDocs(
   if (shop.facebookUrl) s.facebookUrl = String(shop.facebookUrl);
   if (shop.lineInviteUrl) s.lineInviteUrl = String(shop.lineInviteUrl);
   if (shop.phone) s.phone = String(shop.phone);
+  if (shop.otherUrl) s.otherUrl = String(shop.otherUrl);
   if (Array.isArray(shop.slots) && shop.slots.length) s.slots = shop.slots.map(String);
   if (Array.isArray(shop.pickupSpots) && shop.pickupSpots.length) {
     try { s.pickupSpots = normalizeSpots(shop.pickupSpots); } catch { /* ignore bad snap */ }

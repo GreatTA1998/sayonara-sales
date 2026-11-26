@@ -134,6 +134,7 @@ export default function AdminInbox() {
                   {s.updatedAt ? new Date(s.updatedAt).toLocaleString("ja-JP") : "—"}
                   {s.facebookUrl ? " · FB" : ""}
                   {s.jimotyUrl ? " · ジモティ" : ""}
+                  {s.otherUrl ? " · 他" : ""}
                 </span>
                 <div className="inbox-shop-acts">
                   <a className="share" href={`/s/${s.id}`}>見る</a>

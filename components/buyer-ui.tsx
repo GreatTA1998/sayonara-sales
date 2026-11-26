@@ -16,7 +16,7 @@ import {
   bookableDays, cartAfter, cartDiscount, cartRule, itemFlags, shopContact, shopItemOff,
   shopPublished, shopSlots, slotTime, takenSlots, type Store,
 } from "@/lib/store";
-import { telHref, ytUrl } from "@/lib/sale";
+import { extHref, telHref, ytUrl } from "@/lib/sale";
 
 type Item = {
   id: string; name: string; price: number | null; note?: string;
@@ -29,12 +29,13 @@ type State = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string; facebookUrl?: string;
   days: string[]; slots: string[]; taken: Record<string, string[]>;
   moveOut?: string;
-  lineInviteUrl?: string | null; phone?: string | null; items: Item[];
+  lineInviteUrl?: string | null; phone?: string | null; otherUrl?: string;
+  items: Item[];
   itemOff?: number; rule?: string | null;
   published?: boolean; ownerUid?: string; ownerLineUid?: string;
 };
 type Receipt = { day: string; slot: string; total?: number };
-type Method = "jimoty" | "line" | "phone" | "facebook";
+type Method = "jimoty" | "line" | "phone" | "facebook" | "other";
 type Props = {
   shop: string; /** Flatten padding when embedded on home. */ embed?: boolean;
   onReady?: () => void;
@@ -44,6 +45,7 @@ const CH = {
   line: ["LINE", "友だち追加してメッセージ済み", "LINE名"],
   phone: ["電話", "メッセージ済み", "電話番号"],
   facebook: ["Facebook", "メッセージ済み", "Facebook名"],
+  other: ["その他", "メッセージ済み", "お名前"],
 } as const;
 
 /** Confirmed only — pending is disclaimer + still 依頼可. */
@@ -61,7 +63,7 @@ function toBuyerState(shop: string, s: Store): State {
   for (const d of days) taken[d] = takenSlots(s, d);
   return {
     address: s.address, bio: s.bio || "", jimotyUrl: s.jimotyUrl || "", youtubeUrl: s.youtubeUrl || "",
-    facebookUrl: s.facebookUrl || "",
+    facebookUrl: s.facebookUrl || "", otherUrl: s.otherUrl || "",
     days, slots, taken,
     moveOut: s.moveOut || s.pickupTo || "",
     lineInviteUrl: contact.lineInviteUrl || null, phone: contact.phone || null,
@@ -111,10 +113,20 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
   const facebookUrl = (state?.facebookUrl || "").trim();
   const lineUrl = (state?.lineInviteUrl || "").trim();
   const phoneDisp = (state?.phone || "").trim();
+  const otherUrl = (state?.otherUrl || "").trim();
+  const otherHref = extHref(otherUrl);
   const canJimoty = !!jimotyUrl, canLine = !!lineUrl, canPhone = !!phoneDisp, canFb = !!facebookUrl;
+  const canOther = !!otherUrl;
   const methodOpts = (
-    [["jimoty", canJimoty], ["facebook", canFb], ["line", canLine], ["phone", canPhone]] as const
+    [["jimoty", canJimoty], ["facebook", canFb], ["line", canLine], ["phone", canPhone], ["other", canOther]] as const
   ).filter(([, ok]) => ok).map(([id]) => [id, CH[id][0]] as [Method, string]);
+  const chanHref: Record<Method, string> = {
+    jimoty: jimotyUrl, facebook: facebookUrl, line: lineUrl, phone: telHref(phoneDisp), other: otherHref,
+  };
+  const chanLbl: Record<Method, string> = {
+    jimoty: "出品者のジモティー", facebook: "Facebook Marketplace", line: "LINE招待リンク",
+    phone: phoneDisp, other: otherHref ? "その他の連絡先" : otherUrl,
+  };
   const barMove = moveOutLeft(state?.moveOut ? [state.moveOut] : []);
   const loggedIn = !!(knownName || lineUid);
   const hardLine = !!lineUid;
@@ -219,7 +231,7 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
   const cartOff = cartDiscount(pickedItems.length, itemOff);
   const cartTotal = Math.max(0, cartSub - cartOff);
   const canSend = !!slot && !!method && !!contactVal && chanOk && pickedItems.length > 0
-    && ({ jimoty: canJimoty, facebook: canFb, line: canLine, phone: canPhone }[method])
+    && ({ jimoty: canJimoty, facebook: canFb, line: canLine, phone: canPhone, other: canOther }[method])
     && (!after || day >= after);
   const rule = state?.rule || null;
 
@@ -345,7 +357,8 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
             const n = getName();
             if (n) setLineName(n);
             setOpenId(null); setSlot(null);
-            setMethod(canJimoty ? "jimoty" : canFb ? "facebook" : canLine ? "line" : canPhone ? "phone" : null);
+            setMethod(canJimoty ? "jimoty" : canFb ? "facebook" : canLine ? "line"
+              : canPhone ? "phone" : canOther ? "other" : null);
             setChanOk(false); setErr(null); setCheckout(true);
           }}>
           {pickedItems.length
@@ -354,19 +367,20 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
         </button>
       </header>
       {bioShow ? <p className="hint bio">{bioShow}</p> : null}
-      {(state?.jimotyUrl || state?.facebookUrl || rule) ? (
+      {(jimotyUrl || facebookUrl || otherUrl || rule) ? (
         <p className="ext-links">
-          {state?.jimotyUrl ? (
-            <a className="ext-link" href={state.jimotyUrl} target="_blank" rel="noopener noreferrer">
-              ジモティー
-            </a>
+          {jimotyUrl ? (
+            <a className="ext-link" href={jimotyUrl} target="_blank" rel="noopener noreferrer">ジモティー</a>
           ) : null}
           {rule ? <span className="ask">{rule}</span> : null}
-          {state?.facebookUrl ? (
-            <a className="ext-link fb" href={state.facebookUrl} target="_blank" rel="noopener noreferrer">
+          {facebookUrl ? (
+            <a className="ext-link fb" href={facebookUrl} target="_blank" rel="noopener noreferrer">
               Facebook Marketplace
             </a>
           ) : null}
+          {otherUrl ? (otherHref ? (
+            <a className="ext-link" href={otherHref} target="_blank" rel="noopener noreferrer">その他</a>
+          ) : <span className="ext-link">{otherUrl}</span>) : null}
           {/* 内見動画 temporarily hidden (SS-315); admin youtubeUrl kept. */}
         </p>
       ) : null}
@@ -470,12 +484,10 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
                     opts={methodOpts} />
                   {method && <>
                     <div className="linebox">
-                      <a className={`linelink${method === "facebook" ? " fb" : ""}`} target="_blank" rel="noopener noreferrer"
-                        href={method === "jimoty" ? jimotyUrl : method === "line" ? lineUrl
-                          : method === "facebook" ? facebookUrl : telHref(phoneDisp)}>
-                        {method === "jimoty" ? "出品者のジモティー" : method === "line" ? "LINE招待リンク"
-                          : method === "facebook" ? "Facebook Marketplace" : phoneDisp}
-                      </a>
+                      {chanHref[method] ? (
+                        <a className={`linelink${method === "facebook" ? " fb" : ""}`} target="_blank" rel="noopener noreferrer"
+                          href={chanHref[method]}>{chanLbl[method]}</a>
+                      ) : <span className="linelink">{chanLbl[method]}</span>}
                       <label className="late-check"><input type="checkbox" checked={chanOk}
                         onChange={(e) => setChanOk(e.target.checked)} />{CH[method][1]}</label>
                     </div>
