@@ -37,7 +37,7 @@ service cloud.firestore {
     }
 
     match /shops/{shopId} {
-      // Public reads: unpublished = private link preview; home filters published client-side.
+      // Public reads: unpublished = private link preview; home queries published==true.
       allow read: if true;
 
       // Create does not claim or publish. Any signed-in uid, including anonymous.

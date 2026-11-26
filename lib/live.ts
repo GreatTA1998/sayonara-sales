@@ -214,19 +214,24 @@ export function listenPendingRequests(shopRaw: string, onN: (n: number) => void)
   return () => { dead = true; stop?.(); };
 }
 
-/** Home tabs — caller filters published; drafts stay off `/`. */
-export async function peekShop(shopRaw: string): Promise<{ address: string; count: number; published: boolean }> {
-  const shop = parseShop(shopRaw);
+/** Public home tabs — Firestore `published==true` (not soft-login local map). */
+export async function listPublishedShops(): Promise<{ id: string; ward: string; count: number }[]> {
   const db = getDb();
-  const [meta, items] = await Promise.all([
-    getDoc(doc(db, "shops", shop)),
-    getDocs(collection(db, "shops", shop, "items")),
-  ]);
-  return {
-    address: String(meta.data()?.address || ""),
-    count: items.docs.filter((d) => !d.data().paused).length,
-    published: shop === ELTON_SHOP || !!meta.data()?.published,
-  };
+  const snap = await getDocs(query(collection(db, "shops"), where("published", "==", true)));
+  const rows = await Promise.all(snap.docs.map(async (d) => {
+    const items = await getDocs(collection(db, "shops", d.id, "items"));
+    return {
+      id: d.id,
+      ward: String(d.data()?.address || "").trim(),
+      count: items.docs.filter((x) => !x.data().paused).length,
+      at: String(d.data()?.updatedAt || ""),
+    };
+  }));
+  rows.sort((a, b) =>
+    (a.id === ELTON_SHOP ? 0 : 1) - (b.id === ELTON_SHOP ? 0 : 1)
+    || (b.at || "").localeCompare(a.at || "")
+    || a.id.localeCompare(b.id));
+  return rows.map(({ id, ward, count }) => ({ id, ward, count }));
 }
 
 export type UnclaimedShop = {

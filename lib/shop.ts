@@ -11,7 +11,6 @@ export const AUTH_EVT = "ss-auth";
 
 export const ELTON_ID = "elton";
 export const ELTON_LABEL = "エルトン";
-export const DEFAULT_WARD = "目黒区";
 
 /** Name variants → reserved shop (not a fresh dig5). */
 const KNOWN: Record<string, string> = {
@@ -29,11 +28,6 @@ const knownId = (n: string) => {
   return k
     ? (Object.entries(KNOWN).find(([l]) => { const x = norm(l); return k === x || k.startsWith(x); }) || [])[1] || ""
     : "";
-};
-
-export type SaleRow = {
-  id: string; name: string; ward: string; href: string; mine: boolean;
-  count?: number;
 };
 
 const readMap = (): Record<string, string> => {
@@ -233,7 +227,7 @@ export const adoptShop = (id: string) => {
   notifyAuth();
 };
 
-/** Drop a shop from local map/pointer (home tabs + 投稿一覧). Does not touch Firestore. */
+/** Drop a shop from local map/pointer (投稿一覧). Does not touch Firestore. */
 export const forgetShop = (id: string) => {
   if (typeof window === "undefined" || !isShop(id) || id === ELTON_ID) return;
   const map = readMap();
@@ -244,27 +238,4 @@ export const forgetShop = (id: string) => {
   localStorage.setItem(UID_MAP, JSON.stringify(umap));
   if (stored(ID_KEY) === id) localStorage.removeItem(ID_KEY);
   notifyAuth();
-};
-
-/** Hub sales: Elton in 目黒区 + local soft-identity shops. */
-export const listSales = (): SaleRow[] => {
-  if (typeof window === "undefined") {
-    return [{ id: ELTON_ID, name: ELTON_LABEL, ward: DEFAULT_WARD, href: "/s/elton", mine: false }];
-  }
-  const map = readMap();
-  const mine = getId();
-  const mineName = getName();
-  const rows: SaleRow[] = [
-    { id: ELTON_ID, name: ELTON_LABEL, ward: DEFAULT_WARD, href: "/s/elton", mine: mine === ELTON_ID },
-  ];
-  const seen = new Set<string>([ELTON_ID]);
-  for (const [name, id] of Object.entries(map)) {
-    if (!dig5(id) || seen.has(id)) continue;
-    seen.add(id);
-    rows.push({ id, name, ward: "", href: `/s/${id}`, mine: id === mine });
-  }
-  if (dig5(mine) && !seen.has(mine)) {
-    rows.push({ id: mine, name: mineName || mine, ward: "", href: `/s/${mine}`, mine: true });
-  }
-  return rows;
 };
