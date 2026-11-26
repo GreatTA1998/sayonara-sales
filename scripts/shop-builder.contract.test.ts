@@ -145,6 +145,29 @@ async function rawShop(id: string) {
 }
 
 {
+  const city = await call("POST", "/api/shop-builder/shops", {
+    agent: "agent-a",
+    body: src("seller-kawaguchi", { settings: { address: "川口市" } }),
+  });
+  check("city stored as-is", city.status === 200 && city.json?.settings?.address === "川口市", city.json?.settings);
+  const town = await call("POST", "/api/shop-builder/shops", {
+    agent: "agent-a",
+    body: src("seller-town", { settings: { address: "川口町" } }),
+  });
+  check("town stored as-is", town.status === 200 && town.json?.settings?.address === "川口町", town.json?.settings);
+  const village = await call("POST", "/api/shop-builder/shops", {
+    agent: "agent-a",
+    body: src("seller-village", { settings: { address: "田村" } }),
+  });
+  check("village stored as-is", village.status === 200 && village.json?.settings?.address === "田村", village.json?.settings);
+  const ward = await call("POST", "/api/shop-builder/shops", {
+    agent: "agent-a",
+    body: src("seller-meguro-bare", { settings: { address: "目黒" } }),
+  });
+  check("bare ward still gains 区", ward.status === 200 && ward.json?.settings?.address === "目黒区", ward.json?.settings);
+}
+
+{
   const body = (agent: string, bio: string, lease = false) => src("seller-parallel", {
     lease, settings: { bio }, items: [{ externalKey: "lamp", name: "ランプ", price: 100 }],
   });

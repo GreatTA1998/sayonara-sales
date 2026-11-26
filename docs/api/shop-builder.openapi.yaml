@@ -13,7 +13,8 @@ info:
 
     Settings use the shop editor's field names. There is no stored display name
     or language (language is a viewer preference). Pickup notes and availability
-    notes belong in `bio`. `address` is the ward, stored with a trailing 区.
+    notes belong in `bio`. `address` is the area: a bare ward gains 区, and a
+    name ending in 市, 町, or 村 is stored unchanged.
     Items have no separate condition field; put that text in `note`. `paused`
     is the seller hold. `sold` is read-only and comes from a pickup claim.
 
@@ -554,7 +555,7 @@ components:
       properties:
         address:
           type: string
-          description: Ward or area. Stored with a trailing 区, same as the editor.
+          description: Area. A bare ward is stored with a trailing 区 (目黒 → 目黒区). A name ending in 市, 町, or 村 is stored unchanged.
         bio:
           type: string
           description: Shop memo. Pickup notes, why they are selling, delivery, negotiable prices.

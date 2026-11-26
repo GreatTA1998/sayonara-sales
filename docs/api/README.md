@@ -76,7 +76,7 @@ curl -sS "$BASE/api/shop-builder/shops/48291/photos" \
 
 `?dryRun=true` validates and does not write. Release the lease when the build is done: `DELETE /api/shop-builder/shops/48291/lease` with `If-Match`.
 
-`address` is the ward (`目黒` is stored as `目黒区`). `bio` is the shop memo (pickup notes, why they are selling). There is no display-name or language field. Item condition goes in `note`. `paused` is the seller hold. `sold` in the response is read-only.
+`address` is the area (`目黒` is stored as `目黒区`; `川口市` stays `川口市`). `bio` is the shop memo (pickup notes, why they are selling). There is no display-name or language field. Item condition goes in `note`. `paused` is the seller hold. `sold` in the response is read-only.
 
 ## CLI
 
@@ -112,3 +112,5 @@ node scripts/shop-builder.mjs seller.json
 ```
 
 `photoFiles` are paths relative to the JSON file. They are not part of the HTTP contract. Exit `2` if another agent holds the lease, `3` if the shop is claimed. `--dry-run` only validates.
+
+Facebook prospects (grab a seller, convert, batch-build, English screenshots, send queue): [`docs/prospect-pipeline.md`](../prospect-pipeline.md).
