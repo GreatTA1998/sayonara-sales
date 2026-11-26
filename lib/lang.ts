@@ -27,7 +27,7 @@ const S: Record<string, [string, string]> = {
   "login.jimoty": ["ジモティー名", "Jimoty"],
   "login.line": ["LINE名", "LINE"],
   "login.facebook": ["Facebook名", "Facebook"],
-  "login.signIn": ["サインイン", "Sign in"],
+  "login.signIn": ["パスワードなしでサインイン", "Sign in without a password"],
   "login.or": ["または", "or"],
   "login.lineNeed": ["このアカウントはLINEログインが必要です", "This account requires LINE login"],
   "login.hint": ["任意：あとでLINEでアカウントを保護できます", "Optional: secure this account with LINE later"],

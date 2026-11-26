@@ -20,7 +20,6 @@ export function SoftLoginForm({
   const [names, setNames] = useState({ jimoty: "", line: "", facebook: "" });
   const [err, setErr] = useState("");
   const ok = Object.values(names).some((v) => v.trim());
-  const label = t(`login.${mode}`, lang);
   return (
     <form className={className}
       onSubmit={(e) => {
@@ -39,7 +38,7 @@ export function SoftLoginForm({
           ["facebook", t("login.facebook", lang)]]} />
       <input value={names[mode]}
         onChange={(e) => setNames((n) => ({ ...n, [mode]: e.target.value }))}
-        placeholder={label} autoComplete="nickname" autoFocus={autoFocus} />
+        autoComplete="nickname" autoFocus={autoFocus} />
       <button type="submit" className="cta go" disabled={!ok}>{t("login.signIn", lang)}</button>
       {err ? <p className="sw">{err}</p> : null}
       <p className="or" role="separator">{t("login.or", lang)}</p>
