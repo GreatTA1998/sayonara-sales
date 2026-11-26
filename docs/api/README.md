@@ -112,3 +112,5 @@ node scripts/shop-builder.mjs seller.json
 ```
 
 `photoFiles` are paths relative to the JSON file. They are not part of the HTTP contract. Exit `2` if another agent holds the lease, `3` if the shop is claimed. `--dry-run` only validates.
+
+Facebook prospects (grab a seller, convert, batch-build, English screenshots, send queue): [`docs/prospect-pipeline.md`](../prospect-pipeline.md).
