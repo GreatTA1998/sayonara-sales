@@ -133,10 +133,8 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
   /** Own shop (ownerUid / soft pointer / LINE uid) → 出品を管理. */
   const isMine = ownedId === shop || myShop === shop
     || (!!lineUid && state?.ownerLineUid === lineUid);
-  /** Soft identity (incl. Facebook名) covers Jimoty/LINE/FB contact; phone still typed. */
-  const useStored = method === "phone" ? false
-    : method === "line" ? (hardLine || loggedIn) : loggedIn;
-  const contactVal = (useStored ? knownName : lineName).trim();
+  /** Name field always shown — typing soft-logs (openShop); phone is typed as-is. */
+  const contactVal = lineName.trim();
 
   useEffect(() => {
     setOpenId(null); setCheckout(false); setReceipt(null); setViewPic(null); setBusy(false); setErr(null);
@@ -309,7 +307,7 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
         lineUid: lineUid || undefined,
       });
       if (method === "jimoty" || method === "facebook"
-        || (method === "line" && !hardLine && !loggedIn)) {
+        || (method === "line" && !hardLine)) {
         openShop(contactVal, method);
       }
       pushBuy({
@@ -503,13 +501,19 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
                         <a className="cta line" href={lineLoginHref()}>LINEでログイン</a>
                       </>
                     )}
-                    {!useStored && (
-                      <label className="float"><span>{CH[method][2]}</span>
-                        <input value={lineName} onChange={(e) => setLineName(e.target.value)}
-                          placeholder={method === "phone" ? "080-0000-0000" : "表示名"}
-                          inputMode={method === "phone" ? "tel" : "text"} autoComplete="nickname"
-                          enterKeyHint="done" /></label>
-                    )}
+                    <label className="float"><span>{CH[method][2]}</span>
+                      <input value={lineName} onChange={(e) => {
+                        const v = e.target.value;
+                        setLineName(v);
+                        const n = v.trim();
+                        if (n && method !== "phone" && method !== "other"
+                          && !(method === "line" && hardLine)) {
+                          openShop(n, method);
+                        }
+                      }}
+                        placeholder={method === "phone" ? "080-0000-0000" : "表示名"}
+                        inputMode={method === "phone" ? "tel" : "text"} autoComplete="nickname"
+                        enterKeyHint="done" /></label>
                   </>}
                 </>
               )}
