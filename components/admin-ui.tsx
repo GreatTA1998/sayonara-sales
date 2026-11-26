@@ -235,7 +235,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
   }, []);
 
-  /** Unclaimed dig5 — claim CTA on admin only (buyer `/s/{id}` is a normal shop). */
+  /** Unclaimed dig5 — claim banner on admin only (buyer `/s/{id}` is a normal shop). */
   const unbound = shop !== ELTON_SHOP && !!data && !data.ownerUid;
   async function doClaim() {
     setOwnBusy(true); setErr(null);
@@ -254,7 +254,7 @@ export default function ShopAdminView({ shop, name }: Props) {
       setErr(msg); show(msg, "err");
     } finally { setOwnBusy(false); }
   }
-  /** After claim CTA LINE OAuth — adopt + claim once. */
+  /** After claim-banner LINE OAuth — adopt + claim once. */
   useEffect(() => {
     let raw = "";
     try { raw = sessionStorage.getItem(CLAIM_KEY) || ""; } catch { return; }
@@ -886,9 +886,9 @@ export default function ShopAdminView({ shop, name }: Props) {
               <SoftLoginForm claimShopId={shop} onDone={() => { void doClaim(); }} />
             </div>
           ) : (
-            <button type="button" className="cta go" disabled={ownBusy}
+            <button type="button" className="note" disabled={ownBusy}
               onClick={() => { if (logged) void doClaim(); else setOwnOpen(true); }}>
-              {ownBusy ? t("claim.busy", lang) : t("claim.cta", lang)}
+              {ownBusy ? t("claim.busy", lang) : "このショップはまだ未クレームです。オーナーならクレーム"}
             </button>
           )}
         </div>
