@@ -37,7 +37,6 @@ const S: Record<string, [string, string]> = {
   "home.copy": ["URLコピー", "Copy URL"],
   "home.copied": ["コピーしました", "Copied"],
   "home.loading": ["読み込み中…", "Loading…"],
-  "claim.cta": ["私の引越しセールです", "This is my move-out sale"],
   "claim.busy": ["クレーム中…", "Claiming…"],
   "claim.taken": ["すでに他の人がクレーム済みです", "Someone else already claimed this shop"],
   "claim.other": ["すでに別のショップをクレーム済みです（1アカウント1ショップ）", "You already claimed another shop (one shop per account)"],
