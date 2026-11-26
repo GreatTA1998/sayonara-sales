@@ -32,7 +32,7 @@ const S: Record<string, [string, string]> = {
   "login.lineNeed": ["このアカウントはLINEログインが必要です", "This account requires LINE login"],
   "login.hint": ["任意：あとでLINEでアカウントを保護できます", "Optional: secure this account with LINE later"],
   "home.slogan": ["効率的なお引越しセール", "Efficient move-out sales"],
-  "home.bullets": ["出品を元のプラットフォームから自動取り込み\nどこにでもシェアできるリンク\n予約済がリアルタイムで見える。まとめ買いの予定も衝突なし\n確定したら、場所と連絡はいつものジモティーなどで", "Auto-import listings from the original platform\nA link you can share anywhere\nSee reservations live. Bulk pickups stay clash-free\nOnce set, arrange place & contact on Jimoty etc."],
+  "home.bullets": ["出品を元のプラットフォームから自動取り込み\nどこにでもシェアできるリンク\n予約済がすぐ見える。まとめ買いの予定も衝突なし\n確定したら、場所と連絡はいつものジモティーなどで", "Auto-import listings from the original platform\nA link you can share anywhere\nSee what's reserved right away. Bulk pickups stay clash-free\nOnce set, arrange place & contact on Jimoty etc."],
   "home.tabs": ["ショップ一覧", "Shops"],
   "home.copy": ["URLコピー", "Copy URL"],
   "home.copied": ["コピーしました", "Copied"],
