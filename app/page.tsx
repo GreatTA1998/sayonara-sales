@@ -32,7 +32,6 @@ export default function HomePage() {
   const active = cards.find((c) => c.id === selected) || cards[0];
   const shopId = active?.id || ELTON_ID;
   const panelReady = cards.length > 0 && readyShop !== null;
-  const onShopReady = useCallback(() => setReadyShop(shopId), [shopId]);
   const copyUrl = (e: { stopPropagation(): void }) => {
     e.stopPropagation();
     const url = `${SITE_URL}/s/${shopId}`;
@@ -63,8 +62,8 @@ export default function HomePage() {
               </button>
             ))}
           </div>
-          <div className="home-shop">
-            <ShopBuyerView key={shopId} shop={shopId} embed onReady={onShopReady} />
+          <div className={`home-shop${readyShop === shopId ? " in" : ""}`}>
+            <ShopBuyerView shop={shopId} embed onReady={() => setReadyShop(shopId)} />
           </div>
         </div>
         <footer className="soft-promo hint">Made by エルトン</footer>

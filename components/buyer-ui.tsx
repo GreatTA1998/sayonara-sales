@@ -139,6 +139,7 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
   const contactVal = (useStored ? knownName : lineName).trim();
 
   useEffect(() => {
+    setOpenId(null); setCheckout(false); setReceipt(null); setViewPic(null); setBusy(false); setErr(null);
     try {
       const raw = JSON.parse(localStorage.getItem(cartKey) || "[]");
       if (Array.isArray(raw)) setPicked(new Set(raw.map(String)));
