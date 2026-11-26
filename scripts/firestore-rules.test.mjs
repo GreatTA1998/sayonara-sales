@@ -1,5 +1,5 @@
 /**
- * Unclaimed shops are editable by any signed-in or anonymous user.
+ * Unclaimed shops are editable/publishable by any signed-in or anonymous user.
  * Claimed shops are owner-only. Claim still works after those edits.
  * Run: npm run test:rules
  */
@@ -56,7 +56,8 @@ await testEnv.clearFirestore();
   const saved = await getDoc(shop(other.db, "10001"));
   check("edit did not claim or publish", !saved.data().ownerUid && saved.data().published === false && saved.data().address === "目黒区");
   check("edit cannot set ownerUid", (await outcome(updateDoc(shop(other.db, "10001"), { ownerUid: other.uid }))).startsWith("DENY"));
-  check("edit cannot publish", (await outcome(updateDoc(shop(other.db, "10001"), { published: true }))).startsWith("DENY"));
+  check("unclaimed can publish", (await outcome(updateDoc(shop(other.db, "10001"), { published: true }))) === "ALLOW");
+  check("publish did not claim", !(await getDoc(shop(other.db, "10001"))).data().ownerUid);
 
   const seller = user("seller", "anonymous");
   const ref = shop(seller.db, "10001");

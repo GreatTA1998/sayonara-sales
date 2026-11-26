@@ -236,7 +236,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     if (editTimer.current) { clearTimeout(editTimer.current); editTimer.current = null; }
   }, []);
 
-  /** Seller create/投稿 — unbound until login+bind; claim banner is buyer `/s/{id}` only. */
+  /** Unclaimed dig5 — claim CTA on admin only (buyer `/s/{id}` is a normal shop). */
   const unbound = shop !== ELTON_SHOP && !!data && !data.ownerUid;
   async function doClaim() {
     setOwnBusy(true); setErr(null);
@@ -255,7 +255,7 @@ export default function ShopAdminView({ shop, name }: Props) {
       setErr(msg); show(msg, "err");
     } finally { setOwnBusy(false); }
   }
-  /** After ログインして保存 LINE OAuth — adopt + claim once. */
+  /** After claim CTA LINE OAuth — adopt + claim once. */
   useEffect(() => {
     let raw = "";
     try { raw = sessionStorage.getItem(CLAIM_KEY) || ""; } catch { return; }
@@ -874,26 +874,27 @@ export default function ShopAdminView({ shop, name }: Props) {
           <span aria-hidden="true">区</span>
         </label>
         <span className="spacer" aria-hidden="true" />
-        {!unbound && logged && <button type="button" className="share" onClick={() => copyText(`${SITE_URL}/s/${shop}`)}>URLコピー</button>}
-        {unbound ? (
-          <span className="save-more">
-            <button type="button" className="req" disabled={ownBusy}
-              onClick={() => { if (logged) void doClaim(); else setOwnOpen((v) => !v); }}>
-              {ownBusy ? t("claim.busy", lang) : "ログインして保存"}
-            </button>
-            {ownOpen && !logged && (
-              <div className="menu-pop pane" role="dialog" aria-label="ログインして保存">
-                <SoftLoginForm claimShopId={shop} onDone={() => { void doClaim(); }} />
-              </div>
-            )}
-          </span>
-        ) : (
-          <button type="button" className="req"
-            onClick={pub === "on" ? () => router.push(`/s/${shop}`) : publish}>
-            {pub === "on" ? "店舗を見る" : "公開する"}
-          </button>
-        )}
+        {pub === "on" && <button type="button" className="share" onClick={() => copyText(`${SITE_URL}/s/${shop}`)}>URLコピー</button>}
+        <button type="button" className="req"
+          onClick={pub === "on" ? () => router.push(`/s/${shop}`) : publish}>
+          {pub === "on" ? "店舗を見る" : "公開する"}
+        </button>
       </header>
+
+      {unbound && (
+        <div className="claim-banner">
+          {ownOpen && !logged ? (
+            <div className="claim-login">
+              <SoftLoginForm claimShopId={shop} onDone={() => { void doClaim(); }} />
+            </div>
+          ) : (
+            <button type="button" className="cta go" disabled={ownBusy}
+              onClick={() => { if (logged) void doClaim(); else setOwnOpen(true); }}>
+              {ownBusy ? t("claim.busy", lang) : t("claim.cta", lang)}
+            </button>
+          )}
+        </div>
+      )}
 
       {err && <div className="err">{err}</div>}
       {!data && !err && <p className="text-sm text-muted pad">読み込み中…</p>}

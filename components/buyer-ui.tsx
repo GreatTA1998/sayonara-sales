@@ -3,15 +3,14 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { byPrice, Listings, ListingTools, money, Seg, useDense, usePriceDir, useShowSold } from "@/components/photo-listing";
 import { PhotoLightbox } from "@/components/photo-lightbox";
-import { SoftLoginForm } from "@/components/soft-login";
 import { useBodyScrollLock, useMaskDismiss } from "@/components/snack";
 import { afterLbl, dayLbl, moveOutLeft, tokyoYmd } from "@/lib/days";
-import { CLAIM_KEY, lineLoginHref, WL_KEY } from "@/components/line-oauth";
-import { bookShop, claimShop, findOwnedShop, joinWaitLive, leaveWaitLive, listenShop } from "@/lib/live";
+import { lineLoginHref, WL_KEY } from "@/components/line-oauth";
+import { bookShop, findOwnedShop, joinWaitLive, leaveWaitLive, listenShop } from "@/lib/live";
 import { t, useLang } from "@/lib/lang";
 import { notifyLine } from "@/lib/notify";
 import {
-  adoptShop, adminPath, applyLineSession, getId, getLineUid, getName, openShop, pushBuy, subscribeAuth,
+  adminPath, applyLineSession, getId, getLineUid, getName, openShop, pushBuy, subscribeAuth,
 } from "@/lib/shop";
 import {
   bookableDays, cartAfter, cartDiscount, cartRule, itemFlags, shopContact, shopItemOff,
@@ -103,8 +102,6 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
   const [priceDir, setPriceDir] = usePriceDir();
   const [dense, setDense] = useDense();
   const [showSold, setShowSold] = useShowSold();
-  const [claimOpen, setClaimOpen] = useState(false);
-  const [claimBusy, setClaimBusy] = useState(false);
   const [ownedId, setOwnedId] = useState("");
   const onReadyRef = useRef(onReady);
   onReadyRef.current = onReady;
@@ -121,11 +118,9 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
   const barMove = moveOutLeft(state?.moveOut ? [state.moveOut] : []);
   const loggedIn = !!(knownName || lineUid);
   const hardLine = !!lineUid;
-  /** Own shop (ownerUid / soft pointer / LINE uid) → 出品を管理, not Claim. */
+  /** Own shop (ownerUid / soft pointer / LINE uid) → 出品を管理. */
   const isMine = ownedId === shop || myShop === shop
     || (!!lineUid && state?.ownerLineUid === lineUid);
-  /** Buyer `/s/{id}` only: unpublished + unclaimed + not logged in (FB pre-built shops). */
-  const claimable = !!state && !state.published && !state.ownerUid && !loggedIn && !embed && shop !== "elton";
   /** Soft identity (incl. Facebook名) covers Jimoty/LINE/FB contact; phone still typed. */
   const useStored = method === "phone" ? false
     : method === "line" ? (hardLine || loggedIn) : loggedIn;
@@ -155,22 +150,6 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
     void findOwnedShop().then((id) => { if (!dead) setOwnedId(id); }).catch(() => { if (!dead) setOwnedId(""); });
     return () => { dead = true; };
   }, [loggedIn, lineUid, knownName]);
-
-  async function doClaim() {
-    setClaimBusy(true); setErr(null);
-    try {
-      const r = await claimShop(shop);
-      if (r === "taken") setErr(t("claim.taken", lang));
-      else if (r === "other") setErr(t("claim.other", lang));
-      else {
-        adoptShop(shop);
-        setOwnedId(shop);
-        setClaimOpen(false);
-        setState((prev) => prev && { ...prev, ownerUid: "me" });
-      }
-    } catch (e) { setErr(e instanceof Error ? e.message : "失敗しました"); }
-    finally { setClaimBusy(false); }
-  }
 
   /** After「LINEでログインして並ぶ」OAuth — join once, then clear. */
   useEffect(() => {
@@ -202,17 +181,6 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
       } catch (e) { setErr(e instanceof Error ? e.message : "失敗しました"); }
       finally { setBusy(false); }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shop, knownName, lineUid]);
-
-  /** After claim-banner LINE OAuth — adopt + claim once. */
-  useEffect(() => {
-    let raw = "";
-    try { raw = sessionStorage.getItem(CLAIM_KEY) || ""; } catch { return; }
-    if (raw !== shop) return;
-    if (!knownName && !lineUid) return;
-    try { sessionStorage.removeItem(CLAIM_KEY); } catch { /* ignore */ }
-    void doClaim();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shop, knownName, lineUid]);
   useBodyScrollLock(!!open || checkout);
@@ -402,23 +370,6 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
           {/* 内見動画 temporarily hidden (SS-315); admin youtubeUrl kept. */}
         </p>
       ) : null}
-      {claimable && (
-        <div className="claim-banner">
-          {claimOpen ? (
-            <div className="claim-login">
-              <SoftLoginForm claimShopId={shop} onDone={() => { void doClaim(); }} />
-            </div>
-          ) : (
-            <button type="button" className="cta go" disabled={claimBusy}
-              onClick={() => {
-                if (loggedIn) void doClaim();
-                else setClaimOpen(true);
-              }}>
-              {claimBusy ? t("claim.busy", lang) : t("claim.cta", lang)}
-            </button>
-          )}
-        </div>
-      )}
       {isMine && !embed && (
         <div className="claim-banner">
           <Link className="cta go" href={adminPath(shop)} prefetch>{t("claim.manage", lang)}</Link>
