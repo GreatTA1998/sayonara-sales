@@ -157,7 +157,6 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [slots, setSlots] = useState<string[]>([...PICKUP_SLOTS]);
   const [slotA, setSlotA] = useState("11:00");
   const [slotB, setSlotB] = useState("11:15");
-  const [slotOpen, setSlotOpen] = useState(false);
   const [pickupTo, setPickupTo] = useState("");
   const [leadDays, setLeadDays] = useState(DEF_LEAD);
   const [itemOff, setItemOff] = useState(DEF_OFF);
@@ -1166,21 +1165,19 @@ export default function ShopAdminView({ shop, name }: Props) {
               }}>{s} ×</button>
           ))}
           <span className="slot-add-wrap">
-            <button type="button" className="slot" onClick={() => setSlotOpen((v) => !v)}>時間を追加</button>
-            {slotOpen && (
-              <div className="slot-pop" role="dialog" aria-label="時間を追加">
-                <input type="time" aria-label="開始" value={slotA} onChange={(e) => setSlotA(e.target.value)} />
-                <span aria-hidden="true">〜</span>
-                <input type="time" aria-label="終了" value={slotB} onChange={(e) => setSlotB(e.target.value)} />
-                <button type="button" className="slot" disabled={!slotA || !slotB || slotB <= slotA}
-                  onClick={() => {
-                    const label = fmtSlot(slotA, slotB);
-                    if (slots.includes(label)) { show("すでにあります", "err"); return; }
-                    void saveSlots([...slots, label].sort());
-                    setSlotOpen(false);
-                  }}>追加</button>
-              </div>
-            )}
+            <button type="button" className="slot" popoverTarget="ss-slot-pop">時間を追加</button>
+            <div id="ss-slot-pop" popover="auto" className="slot-pop" role="dialog" aria-label="時間を追加">
+              <input type="time" aria-label="開始" value={slotA} onChange={(e) => setSlotA(e.target.value)} />
+              <span aria-hidden="true">〜</span>
+              <input type="time" aria-label="終了" value={slotB} onChange={(e) => setSlotB(e.target.value)} />
+              <button type="button" className="slot" disabled={!slotA || !slotB || slotB <= slotA}
+                onClick={(e) => {
+                  const label = fmtSlot(slotA, slotB);
+                  if (slots.includes(label)) { show("すでにあります", "err"); return; }
+                  void saveSlots([...slots, label].sort());
+                  (e.currentTarget.closest("[popover]") as HTMLElement | null)?.hidePopover();
+                }}>追加</button>
+            </div>
           </span>
         </div>
       </section>
