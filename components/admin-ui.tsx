@@ -756,13 +756,14 @@ export default function ShopAdminView({ shop, name }: Props) {
     if (d.over !== d.from) void reorderPhotos(d.from, d.over);
   }
 
-  function publish() {
+  async function publish() {
     const val = contactMode === "jimoty" ? jimoty : contactMode === "line" ? lineInvite
       : contactMode === "phone" ? phone : facebook;
     if (!val.trim()) {
       const msg = `${CONTACT_FIELD[contactMode].span}を入力してください`;
       setErr(msg); show(msg, "err"); return;
     }
+    await persistProfile(bio, jimoty, youtube, lineInvite, phone, facebook);
     setPub("on");
     show("公開しました", "ok");
     void act({ action: "publish" }).then((ok) => { if (!ok) setPub("off"); });

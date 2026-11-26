@@ -492,7 +492,7 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       const meta = (await getDoc(shopRef)).data() || {};
       const s = storeFromDocs(meta as Record<string, unknown>, [], []);
       if (!hasBuyerContact(shop, s)) {
-        throw new Error("Jimoty・LINE・電話のいずれかを入力してください");
+        throw new Error("Jimoty・Facebook・LINE・電話のいずれかを入力してください");
       }
       await updateDoc(shopRef, { published: true, updatedAt: new Date().toISOString() });
       return { published: true };
