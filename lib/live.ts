@@ -11,7 +11,8 @@ import { ensureAuth, getDb } from "./fb";
 import { dayLbl, tokyoYmd } from "./days";
 import { DEF_LEAD, DEF_OFF } from "./sale";
 import {
-  getFacebookName, getJimotyName, getLineName, getLineUid, getName,
+  getFacebookName, getJimotyName, getLineName, getLineUid, getName, listBuys,
+  type BuyRow,
 } from "./shop";
 import {
   applyDates, applyItemOff, bookableDays, cartAfter, cartDiscount, claimFields, priceOf,
@@ -631,6 +632,56 @@ export async function leaveWaitLive(shopRaw: string, itemId: string, accounts: s
     tx.update(cref, { waiters: next });
     return { ok: true as const };
   });
+}
+
+/** Soft-name / LINE uid → buys (published+elton claims match contact, else local ss-buys). */
+export async function fetchBuyHistory(): Promise<BuyRow[]> {
+  const names = new Set(
+    [getJimotyName(), getLineName(), getFacebookName(), getName()].map((s) => s.trim()).filter(Boolean),
+  );
+  const lineUid = getLineUid();
+  const local = listBuys();
+  if (!names.size && !lineUid) return local;
+  const db = getDb();
+  const shops = new Set<string>([ELTON_SHOP, ...local.map((b) => b.shop)]);
+  try {
+    for (const d of (await getDocs(query(collection(db, "shops"), where("published", "==", true)))).docs) {
+      shops.add(d.id);
+    }
+  } catch { /* offline */ }
+  const byKey = new Map<string, BuyRow>(local.map((b) => [`${b.shop}|${b.code}|${b.day}|${b.slot}`, b]));
+  for (const shop of shops) {
+    let snap;
+    try { snap = await getDocs(collection(db, "shops", shop, "claims")); }
+    catch { continue; }
+    const mine = snap.docs.filter((d) => {
+      const r = d.data();
+      if (String(r.status || "") === "cancelled") return false;
+      const c = String(r.contact || "").trim();
+      return (c && names.has(c)) || (!!lineUid && String(r.lineUid || "") === lineUid);
+    });
+    if (!mine.length) continue;
+    let label: Record<string, string> = {};
+    try {
+      label = Object.fromEntries(
+        (await getDocs(collection(db, "shops", shop, "items"))).docs
+          .map((d) => [d.id, String(d.data().name || "").trim() || "無題"]),
+      );
+    } catch { /* keep local names */ }
+    for (const d of mine) {
+      const r = d.data();
+      const ids = Array.isArray(r.itemIds) ? r.itemIds.map(String) : [];
+      const items = ids.map((id) => label[id]).filter(Boolean);
+      const key = `${shop}|${r.code || d.id}|${r.day || ""}|${r.slot || ""}`;
+      const prev = byKey.get(key);
+      byKey.set(key, {
+        code: String(r.code || d.id), shop, day: String(r.day || ""), slot: String(r.slot || ""),
+        items: items.length ? items : (prev?.items || []),
+        at: String(r.createdAt || d.id),
+      });
+    }
+  }
+  return [...byKey.values()].sort((a, b) => (b.at || "").localeCompare(a.at || "")).slice(0, 40);
 }
 
 /** Buyer book — creates requested claim; snapshot reconciles. */

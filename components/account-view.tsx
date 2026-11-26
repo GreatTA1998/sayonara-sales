@@ -6,8 +6,9 @@ import { Seg } from "@/components/photo-listing";
 import { SoftLoginForm } from "@/components/soft-login";
 import { dayLbl } from "@/lib/days";
 import { getSavedLang, langLabel, offerLang, setLang, t, useLang } from "@/lib/lang";
+import { fetchBuyHistory } from "@/lib/live";
 import {
-  getFacebookName, getJimotyName, getLineName, getLineUid, getName, listBuys, logout, subscribeAuth,
+  getFacebookName, getJimotyName, getLineName, getLineUid, getName, logout, subscribeAuth,
   type BuyRow,
 } from "@/lib/shop";
 import { slotTime } from "@/lib/store";
@@ -33,10 +34,14 @@ export function AccountView({
   const lang = useLang();
   const [buys, setBuys] = useState<BuyRow[]>([]);
   useEffect(() => {
-    const sync = () => setBuys(listBuys());
+    let dead = false;
+    const sync = () => {
+      void fetchBuyHistory().then((rows) => { if (!dead) setBuys(rows); });
+    };
     sync();
-    return subscribeAuth(sync);
-  }, [name]);
+    const unsub = subscribeAuth(sync);
+    return () => { dead = true; unsub(); };
+  }, [name, hard, jimoty, line, facebook]);
 
   const rawOffer = offerLang();
   const offer = rawOffer === "ja" ? "en" : rawOffer;
