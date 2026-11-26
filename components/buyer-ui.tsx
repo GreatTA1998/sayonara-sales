@@ -14,7 +14,7 @@ import {
 } from "@/lib/shop";
 import {
   bookableDays, cartAfter, cartDiscount, cartRule, itemFlags, shopContact, shopItemOff,
-  shopPublished, shopSlots, takenSlots, type Store,
+  shopPublished, shopSlots, slotTime, takenSlots, type Store,
 } from "@/lib/store";
 import { telHref, ytUrl } from "@/lib/sale";
 
@@ -316,7 +316,7 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
     return (
       <main className="wrap">
         <h1>ありがとう。依頼を受けました</h1>
-        <p className="hint">{dayLbl(receipt.day)} {receipt.slot} · {money(receipt.total ?? 0)}。選んだ連絡方法で、だいたい2日以内に返事します。履歴は下の名前から。</p>
+        <p className="hint">{dayLbl(receipt.day)} {slotTime(receipt.slot) || receipt.slot} · {money(receipt.total ?? 0)}。選んだ連絡方法で、だいたい2日以内に返事します。履歴は下の名前から。</p>
         <button type="button" className="dark" onClick={() => setReceipt(null)}>一覧に戻る</button>
       </main>
     );

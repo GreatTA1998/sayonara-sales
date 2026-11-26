@@ -10,6 +10,7 @@ import {
   getFacebookName, getJimotyName, getLineName, getLineUid, getName, listBuys, logout, subscribeAuth,
   type BuyRow,
 } from "@/lib/shop";
+import { slotTime } from "@/lib/store";
 
 const pts = (names: (string | undefined | null)[]) => {
   const n = names.map((x) => x?.trim() || "無題");
@@ -78,7 +79,7 @@ export function AccountView({
           <ul className="timeline">{buys.map((b) => (
             <li key={b.at}>
               <Link className="tl-card" href={`/s/${b.shop}`} prefetch onClick={onNav}>
-                <b className="tl-when">{dayLbl(b.day)}{b.slot ? ` ${b.slot}` : ""}</b>
+                <b className="tl-when">{[dayLbl(b.day), slotTime(b.slot)].filter(Boolean).join(" ")}</b>
                 <span className="tl-sum">{pts(b.items)}</span>
               </Link>
             </li>

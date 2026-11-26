@@ -1,4 +1,4 @@
-export const PICKUP_SLOTS = ["10:00–10:15", "14:00–14:15", "20:00–20:15"];
+export const PICKUP_SLOTS = ["10:00", "14:00", "20:00"];
 export const DEF_LEAD = 2;
 /** Yen off per cart item (progressive bulk reward). 0 = off. */
 export const DEF_OFF = 100;

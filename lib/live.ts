@@ -16,7 +16,7 @@ import {
 import {
   applyDates, applyItemOff, bookableDays, cartAfter, cartDiscount, claimFields, priceOf,
   ELTON_SHOP, hasBuyerContact, itemFields, normalizeSlots, normalizeSpots, parseShop, shortCode,
-  shopFields, shopItemOff, shopSlots, storeFromDocs, takenSlots, uid, type Claim, type Item, type Store,
+  shopFields, shopItemOff, shopSlots, slotTime, storeFromDocs, takenSlots, uid, type Claim, type Item, type Store,
 } from "./store";
 
 const asClaim = (id: string, data: Record<string, unknown>): Claim =>
@@ -540,7 +540,7 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
     case "reschedule": {
       // day+slot + agreed checkbox; no buyer lead; pending or confirmed.
       if (!body.agreed) throw new Error("チャットで合意が必要です");
-      const id = String(body.id), day = String(body.day || ""), slot = String(body.slot || "").trim();
+      const id = String(body.id), day = String(body.day || ""), slot = slotTime(body.slot);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !slot) throw new Error("日付と時間を選んでください");
       const cref = doc(db, "shops", shop, "claims", id);
       const csnap = await getDoc(cref);
@@ -637,7 +637,8 @@ export async function bookShop(shopRaw: string, body: {
   const shop = parseShop(shopRaw);
   const user = await ensureAuth();
   const db = getDb();
-  const { day, slot, itemIds, contact, contactMethod } = body;
+  const day = body.day, slot = slotTime(body.slot), itemIds = body.itemIds;
+  const contact = body.contact, contactMethod = body.contactMethod;
   const lineUid = (body.lineUid || "").trim();
   if (!day || !slot || !itemIds.length || !contactMethod || !contact.trim()) {
     throw new Error("日付・時間・連絡先・連絡方法・品目を確認してください");

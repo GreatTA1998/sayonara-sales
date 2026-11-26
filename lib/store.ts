@@ -107,7 +107,17 @@ export function asYmd(v: unknown) {
   const s = String(v || "").trim();
   return YMD.test(s) ? s : "";
 }
-export const shopSlots = (s: Store) => (s.slots?.length ? s.slots : [...PICKUP_SLOTS]);
+/** Single HH:mm — strips legacy ranges like 10:00–10:15 → 10:00. */
+export function slotTime(raw: unknown): string {
+  const m = String(raw || "").trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return "";
+  return `${String(Math.min(23, +m[1])).padStart(2, "0")}:${String(Math.min(59, +m[2])).padStart(2, "0")}`;
+}
+
+export const shopSlots = (s: Store) => {
+  const u = s.slots?.length ? [...new Set(s.slots.map(slotTime).filter(Boolean))].sort() : [];
+  return u.length ? u : [...PICKUP_SLOTS];
+};
 
 /** Shop pickup window (no lead) — seller 日程変更. Open ~30d when 退去日 unset. */
 export const pickupDays = (s: Store) => {
@@ -136,16 +146,14 @@ export function cartAfter(items: { availableAfter?: string }[]) {
 
 /** Soonest day+slot first (no past-bucket / not by name). */
 export const byClaimWhen = (a: { day?: unknown; slot?: unknown }, b: { day?: unknown; slot?: unknown }) => {
-  const k = (c: { day?: unknown; slot?: unknown }) => `${c.day || ""}${String(c.slot || "99:99").slice(0, 5)}`;
+  const k = (c: { day?: unknown; slot?: unknown }) => `${c.day || ""}${slotTime(c.slot) || "99:99"}`;
   const ka = k(a), kb = k(b);
   return ka < kb ? -1 : +(ka > kb);
 };
 
 export function normalizeSlots(raw: unknown): string[] {
   if (!Array.isArray(raw)) throw new Error("時間帯が不正です");
-  const out = [...new Set(
-    raw.map((x) => String(x).trim().replace(/\s*[-–—]\s*/g, "–")).filter(Boolean),
-  )];
+  const out = [...new Set(raw.map(slotTime).filter(Boolean))].sort();
   if (!out.length) throw new Error("時間帯を1つ以上指定してください");
   return out;
 }
@@ -250,7 +258,8 @@ export const shopFromUrl = (req: Request) => {
 export function takenSlots(s: Store, day: string): string[] {
   return s.claims
     .filter((c) => c.day === day && c.status !== "cancelled" && c.slot)
-    .map((c) => c.slot);
+    .map((c) => slotTime(c.slot))
+    .filter(Boolean);
 }
 
 export const uid = (p: string) => `${p}${Math.random().toString(36).slice(2, 8)}`;
@@ -289,7 +298,9 @@ export function itemFlags(s: Store, item: Item) {
     reqN: taken ? 0 : s.claims.reduce((n, x) => n + (x.status === "requested" && x.itemIds.includes(item.id) ? 1 : 0), 0),
     waitN: waitAs.length,
     waitAs,
-    ...(c?.status === "booked" && c.day ? { when: `${dayLbl(c.day)}${c.slot ? ` ${c.slot}` : ""}` } : {}),
+    ...(c?.status === "booked" && c.day
+      ? { when: [dayLbl(c.day), slotTime(c.slot)].filter(Boolean).join(" ") }
+      : {}),
   };
 }
 
