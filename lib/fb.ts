@@ -59,3 +59,15 @@ export function ensureAuth(): Promise<User> {
   })();
   return authReady;
 }
+
+/** Stamp soft contact onto Auth displayName → rules see request.auth.token.name. */
+export async function syncBuyerAuthLabel(label: string) {
+  const name = label.trim();
+  if (!name) return ensureAuth();
+  const user = await ensureAuth();
+  if (user.displayName === name) return user;
+  const { updateProfile } = await import("firebase/auth");
+  await updateProfile(user, { displayName: name });
+  await user.getIdToken(true);
+  return user;
+}

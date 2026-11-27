@@ -27,6 +27,45 @@ service cloud.firestore {
         'ownerUid', 'ownerLineUid', 'ownerJimotyName', 'ownerLineName', 'ownerFacebookName'
       ]);
     }
+    function claimOf(shopId, claimId) {
+      return get(/databases/$(database)/documents/shops/$(shopId)/claims/$(claimId)).data;
+    }
+    // Soft Jimoty: contact matches Auth displayName (token.name). Or buyerUid.
+    function ownsClaim() {
+      return signedIn() && (
+        ('buyerUid' in resource.data && resource.data.buyerUid == request.auth.uid)
+        || (resource.data.contact is string
+            && resource.data.contact.size() > 0
+            && request.auth.token.name == resource.data.contact)
+      );
+    }
+    function ownsClaimDoc(shopId, claimId) {
+      let c = claimOf(shopId, claimId);
+      return signedIn() && (
+        ('buyerUid' in c && c.buyerUid == request.auth.uid)
+        || (c.contact is string && c.contact.size() > 0
+            && request.auth.token.name == c.contact)
+      );
+    }
+    function openClaim() {
+      return resource.data.status == 'requested' || resource.data.status == 'booked';
+    }
+    // Buyer cancel: status→cancelled + clear waiters (+ optional declineReason).
+    function buyerCancel() {
+      return ownsClaim() && openClaim()
+        && request.resource.data.status == 'cancelled'
+        && request.resource.data.waiters.size() == 0
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'waiters', 'declineReason']);
+    }
+    // Buyer 日程変更: day+slot only.
+    function buyerResched() {
+      return ownsClaim() && openClaim()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['day', 'slot'])
+        && request.resource.data.day is string
+        && request.resource.data.day.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.slot is string;
+    }
     // One shop per Firebase uid — written in the same claim transaction as ownerUid.
     match /uids/{uid} {
       allow read: if signedIn() && request.auth.uid == uid;
@@ -66,11 +105,18 @@ service cloud.firestore {
         allow read: if true;
         allow create: if canEdit(shopId);
         allow delete: if canEdit(shopId) || (signedIn() && unclaimed(shopId));
+        // Book: set claimId when free. Buyer cancel: clear claimId on own claim.
         allow update: if canEdit(shopId) || (
           signedIn()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['claimId'])
-          && resource.data.claimId == null
-          && request.resource.data.claimId is string
+          && (
+            (resource.data.claimId == null && request.resource.data.claimId is string)
+            || (
+              resource.data.claimId is string
+              && request.resource.data.claimId == null
+              && ownsClaimDoc(shopId, resource.data.claimId)
+            )
+          )
         );
       }
 
@@ -79,10 +125,11 @@ service cloud.firestore {
         allow create: if signedIn()
           && request.resource.data.buyerUid == request.auth.uid
           && request.resource.data.status == 'requested';
-        allow update: if canAdmin(shopId) || (
-          signedIn()
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['waiters'])
-        );
+        allow update: if canAdmin(shopId)
+          || (signedIn()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['waiters']))
+          || buyerCancel()
+          || buyerResched();
         allow delete: if canAdmin(shopId) || (signedIn() && unclaimed(shopId));
       }
     }

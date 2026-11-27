@@ -196,7 +196,10 @@ export async function logout() {
   clearNames(); localStorage.removeItem(UID_KEY); localStorage.removeItem(ID_KEY); notifyAuth();
   try { await fetch("/api/auth/session", { method: "DELETE" }); } catch { /* offline */ }
 }
-export type BuyRow = { code: string; shop: string; day: string; slot: string; items: string[]; at: string };
+export type BuyRow = {
+  code: string; shop: string; day: string; slot: string; items: string[]; at: string;
+  id?: string; status?: "requested" | "booked" | "picked_up" | "cancelled";
+};
 const BUY_KEY = "ss-buys";
 export const listBuys = (): BuyRow[] => {
   if (typeof window === "undefined") return [];
