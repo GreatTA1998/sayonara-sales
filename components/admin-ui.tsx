@@ -218,7 +218,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     setYoutube(body.youtubeUrl || ytUrl(bioVal) || "");
     setContactMode(
       (j.trim() && "jimoty") || (f.trim() && "facebook") || (l.trim() && "line")
-        || (p.trim() && "phone") || (o.trim() && "other") || "jimoty",
+        || (o.trim() && "other") || "jimoty",
     );
     setSlots(shopSlots(body));
     setPickupTo(body.pickupTo || body.moveOut || "");
@@ -925,7 +925,7 @@ export default function ShopAdminView({ shop, name }: Props) {
               onBlur={() => void persistProfile()}
               placeholder="動作確認・値引き・引越し・車・まとめ買い優先など" /></label>
           <Seg label="買い手連絡" value={contactMode} onPick={(v) => setContactMode(v as ContactMode)}
-            opts={CONTACT_OPTS} />
+            opts={CONTACT_OPTS.filter(([k]) => k !== "phone")} />
           <label className="float"><span>{CONTACT_FIELD[contactMode].span}</span>
             <input
               value={contactByMode[contactMode]}

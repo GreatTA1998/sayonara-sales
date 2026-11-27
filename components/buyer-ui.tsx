@@ -115,10 +115,10 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
   const phoneDisp = (state?.phone || "").trim();
   const otherUrl = (state?.otherUrl || "").trim();
   const otherHref = extHref(otherUrl);
-  const canJimoty = !!jimotyUrl, canLine = !!lineUrl, canPhone = !!phoneDisp, canFb = !!facebookUrl;
+  const canJimoty = !!jimotyUrl, canLine = !!lineUrl, canFb = !!facebookUrl;
   const canOther = !!otherUrl;
   const methodOpts = (
-    [["jimoty", canJimoty], ["facebook", canFb], ["line", canLine], ["phone", canPhone], ["other", canOther]] as const
+    [["jimoty", canJimoty], ["facebook", canFb], ["line", canLine], ["other", canOther]] as const
   ).filter(([, ok]) => ok).map(([id]) => [id, CH[id][0]] as [Method, string]);
   const chanHref: Record<Method, string> = {
     jimoty: jimotyUrl, facebook: facebookUrl, line: lineUrl, phone: telHref(phoneDisp), other: otherHref,
@@ -230,7 +230,7 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
   const cartOff = cartDiscount(pickedItems.length, itemOff);
   const cartTotal = Math.max(0, cartSub - cartOff);
   const canSend = !!slot && !!method && !!contactVal && chanOk && pickedItems.length > 0
-    && ({ jimoty: canJimoty, facebook: canFb, line: canLine, phone: canPhone, other: canOther }[method])
+    && ({ jimoty: canJimoty, facebook: canFb, line: canLine, phone: false, other: canOther }[method])
     && (!after || day >= after);
   const rule = state?.rule || null;
 
@@ -357,7 +357,7 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
             if (n) setLineName(n);
             setOpenId(null); setSlot(null);
             setMethod(canJimoty ? "jimoty" : canFb ? "facebook" : canLine ? "line"
-              : canPhone ? "phone" : canOther ? "other" : null);
+              : canOther ? "other" : null);
             setChanOk(false); setErr(null); setCheckout(true);
           }}>
           {pickedItems.length
