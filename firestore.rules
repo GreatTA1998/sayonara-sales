@@ -30,17 +30,29 @@ service cloud.firestore {
     function claimOf(shopId, claimId) {
       return get(/databases/$(database)/documents/shops/$(shopId)/claims/$(claimId)).data;
     }
-    function isBuyerClaim() {
-      return signedIn()
-        && 'buyerUid' in resource.data
-        && resource.data.buyerUid == request.auth.uid;
+    // Soft Jimoty: contact matches Auth displayName (token.name). Or buyerUid.
+    function ownsClaim() {
+      return signedIn() && (
+        ('buyerUid' in resource.data && resource.data.buyerUid == request.auth.uid)
+        || (resource.data.contact is string
+            && resource.data.contact.size() > 0
+            && request.auth.token.name == resource.data.contact)
+      );
+    }
+    function ownsClaimDoc(shopId, claimId) {
+      let c = claimOf(shopId, claimId);
+      return signedIn() && (
+        ('buyerUid' in c && c.buyerUid == request.auth.uid)
+        || (c.contact is string && c.contact.size() > 0
+            && request.auth.token.name == c.contact)
+      );
     }
     function openClaim() {
       return resource.data.status == 'requested' || resource.data.status == 'booked';
     }
     // Buyer cancel: status→cancelled + clear waiters (+ optional declineReason).
     function buyerCancel() {
-      return isBuyerClaim() && openClaim()
+      return ownsClaim() && openClaim()
         && request.resource.data.status == 'cancelled'
         && request.resource.data.waiters.size() == 0
         && request.resource.data.diff(resource.data).affectedKeys()
@@ -48,7 +60,7 @@ service cloud.firestore {
     }
     // Buyer 日程変更: day+slot only.
     function buyerResched() {
-      return isBuyerClaim() && openClaim()
+      return ownsClaim() && openClaim()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['day', 'slot'])
         && request.resource.data.day is string
         && request.resource.data.day.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
@@ -102,7 +114,7 @@ service cloud.firestore {
             || (
               resource.data.claimId is string
               && request.resource.data.claimId == null
-              && claimOf(shopId, resource.data.claimId).buyerUid == request.auth.uid
+              && ownsClaimDoc(shopId, resource.data.claimId)
             )
           )
         );

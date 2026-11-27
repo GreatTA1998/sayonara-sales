@@ -121,6 +121,47 @@ await testEnv.clearFirestore();
   }))) === "ALLOW");
 }
 
+{
+  // Soft みるく: no buyerUid match — Auth token.name == contact.
+  n += 1;
+  const softUid = `soft-milk-${n}`;
+  const soft = testEnv.authenticatedContext(softUid, {
+    firebase: { sign_in_provider: "anonymous" }, name: "みるく",
+  }).firestore();
+  const spoof = testEnv.authenticatedContext(`spoof-${n}`, {
+    firebase: { sign_in_provider: "anonymous" }, name: "別人",
+  }).firestore();
+  // dig5 (not elton): elton is writable by any signed-in anon via canAdmin.
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const fs = ctx.firestore();
+    await setDoc(doc(fs, "shops", "10004"), { address: "目黒区", published: true, ownerUid: "seller-y" });
+    await setDoc(doc(fs, "shops", "10004", "items", "i-milk"), {
+      name: "傘まとめ", price: 500, claimId: "c-milk", pos: 0,
+    });
+    await setDoc(doc(fs, "shops", "10004", "claims", "c-milk"), {
+      code: "MILK", day: "2026-11-27", slot: "10:00", itemIds: ["i-milk"],
+      status: "booked", contact: "みるく", waiters: [],
+      // buyerUid from a different anon session — soft re-login won't match.
+      buyerUid: "other-anon-session",
+    });
+  });
+  const cref = doc(soft, "shops", "10004", "claims", "c-milk");
+  const iref = doc(soft, "shops", "10004", "items", "i-milk");
+  const spoofRef = doc(spoof, "shops", "10004", "claims", "c-milk");
+  check("soft contact can reschedule", (await outcome(updateDoc(cref, {
+    day: "2026-11-28", slot: "14:00",
+  }))) === "ALLOW");
+  check("wrong soft name cannot reschedule", (await outcome(updateDoc(spoofRef, {
+    day: "2026-11-29", slot: "10:00",
+  }))).startsWith("DENY"));
+  check("soft contact can cancel", (await outcome(updateDoc(cref, {
+    status: "cancelled", waiters: [],
+  }))) === "ALLOW");
+  check("soft contact can clear claimId", (await outcome(updateDoc(iref, {
+    claimId: null,
+  }))) === "ALLOW");
+}
+
 await testEnv.cleanup();
 if (fails.length) {
   console.error(`\n${fails.length} failed`);

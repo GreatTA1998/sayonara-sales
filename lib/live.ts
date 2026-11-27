@@ -7,7 +7,7 @@ import {
   arrayRemove, arrayUnion, collection, doc, getDoc, getDocs, limit, onSnapshot, query, runTransaction, setDoc, updateDoc, deleteDoc,
   where, writeBatch, type Unsubscribe,
 } from "firebase/firestore";
-import { ensureAuth, getDb } from "./fb";
+import { ensureAuth, getDb, syncBuyerAuthLabel } from "./fb";
 import { dayLbl, tokyoYmd } from "./days";
 import { DEF_LEAD, DEF_OFF } from "./sale";
 import {
@@ -686,8 +686,11 @@ export async function fetchBuyHistory(): Promise<BuyRow[]> {
 }
 
 const openClaim = (st: string) => st === "requested" || st === "booked";
+const softNames = () => new Set(
+  [getJimotyName(), getLineName(), getFacebookName(), getName()].map((s) => s.trim()).filter(Boolean),
+);
 
-/** Buyer cancel / 日程変更 — own claim only (buyerUid). */
+/** Buyer cancel / 日程変更 — buyerUid or soft contact name (みるく etc.). */
 export async function buyerClaimAct(shopRaw: string, body: {
   action: "cancel" | "reschedule"; id: string; day?: string; slot?: string;
 }) {
@@ -699,8 +702,13 @@ export async function buyerClaimAct(shopRaw: string, body: {
   const csnap = await getDoc(cref);
   if (!csnap.exists()) throw new Error("予約が見つかりません");
   const c = csnap.data();
-  if (String(c.buyerUid || "") !== user.uid) throw new Error("この予約を変更できません");
+  const contact = String(c.contact || "").trim();
+  const uidOk = String(c.buyerUid || "") === user.uid;
+  const softOk = !!contact && softNames().has(contact);
+  if (!uidOk && !softOk) throw new Error("この予約を変更できません");
   if (!openClaim(String(c.status || ""))) throw new Error("変更できない予約です");
+  // Soft path: stamp Auth displayName so rules match contact via token.name.
+  if (softOk) await syncBuyerAuthLabel(contact);
   if (body.action === "reschedule") {
     const day = String(body.day || ""), slot = slotTime(body.slot);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !slot) throw new Error("日付と時間を選んでください");
