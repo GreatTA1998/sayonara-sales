@@ -39,7 +39,7 @@ const S: Record<string, [string, string]> = {
   "login.lineNeed": ["このアカウントはLINEログインが必要です", "This account requires LINE login"],
   "login.hint": ["任意：あとでLINEでアカウントを保護できます", "Optional: secure this account with LINE later"],
   "home.slogan": ["効率的なお引越しセール", "Efficient move-out sales"],
-  "home.prose": ["元のプラットフォームから出品を自動取り込み。どこにでもシェアできるリンク。予約済がすぐ見えるので、まとめ買いの予定も衝突なし。確定したら、いつもの安心できる連絡先でメッセージを。", "Auto-import listings from the original platform. A link you can share anywhere. See what's reserved right away, so bulk pickups stay clash-free. Once confirmed, message on your usual trusted contact."],
+  "home.prose": ["引っ越しセールを、URLひとつでどこにでもシェア。空き状況がひと目でわかり、キャンセル待ちにも登録できます。やりとりと受け渡しは、いつものアプリで。", "Share your moving sale anywhere with a URL. Buyers see what's available upfront and can join a waitlist in case someone cancels. Message and finish back on the apps you already use."],
   "home.tabs": ["ショップ一覧", "Shops"],
   "home.copy": ["URLコピー", "Copy URL"],
   "home.copied": ["コピーしました", "Copied"],
