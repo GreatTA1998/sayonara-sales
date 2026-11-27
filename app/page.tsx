@@ -7,7 +7,7 @@ import { t, useLang } from "@/lib/lang";
 import { ELTON_ID } from "@/lib/shop";
 import { SITE_URL } from "@/lib/site";
 
-type Card = { id: string; ward: string; count: number };
+type Card = { id: string; ward: string };
 
 export default function HomePage() {
   const lang = useLang();
@@ -31,7 +31,8 @@ export default function HomePage() {
 
   const active = cards.find((c) => c.id === selected) || cards[0];
   const shopId = active?.id || ELTON_ID;
-  const panelReady = cards.length > 0 && readyShop !== null;
+  // Sun-ray clears on selected shop ready — tabs may still be loading.
+  const panelReady = readyShop !== null;
   const copyUrl = (e: { stopPropagation(): void }) => {
     e.stopPropagation();
     const url = `${SITE_URL}/s/${shopId}`;
@@ -51,7 +52,7 @@ export default function HomePage() {
                 className={`shop-tab${selected === c.id ? " on" : ""}`}
                 aria-selected={selected === c.id}
                 onClick={() => setSelected(c.id)}>
-                {c.count}点 {c.ward}
+                {c.ward}
                 {c.id === shopId && (
                   <span className="share" onClick={copyUrl}>{t("home.copy", lang)}</span>
                 )}
