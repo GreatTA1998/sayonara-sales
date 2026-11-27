@@ -15,7 +15,7 @@ import {
   type BuyRow,
 } from "./shop";
 import {
-  applyDates, applyItemOff, bookableDays, cartAfter, cartDiscount, claimFields, priceOf,
+  applyDates, applyItemOff, bookableDays, cartAfter, cartDiscount, claimFields, pickupDays, priceOf,
   ELTON_SHOP, hasBuyerContact, itemFields, normalizeSlots, normalizeSpots, parseShop, shortCode,
   shopFields, shopItemOff, shopSlots, slotTime, storeFromDocs, takenSlots, uid, type Claim, type Item, type Store,
 } from "./store";
@@ -672,16 +672,69 @@ export async function fetchBuyHistory(): Promise<BuyRow[]> {
       const r = d.data();
       const ids = Array.isArray(r.itemIds) ? r.itemIds.map(String) : [];
       const items = ids.map((id) => label[id]).filter(Boolean);
+      const st = String(r.status || "") as BuyRow["status"];
       const key = `${shop}|${r.code || d.id}|${r.day || ""}|${r.slot || ""}`;
       const prev = byKey.get(key);
       byKey.set(key, {
-        code: String(r.code || d.id), shop, day: String(r.day || ""), slot: String(r.slot || ""),
+        id: d.id, code: String(r.code || d.id), shop, day: String(r.day || ""), slot: String(r.slot || ""),
         items: items.length ? items : (prev?.items || []),
-        at: String(r.createdAt || d.id),
+        at: String(r.createdAt || d.id), status: st,
       });
     }
   }
   return [...byKey.values()].sort((a, b) => (b.at || "").localeCompare(a.at || "")).slice(0, 40);
+}
+
+const openClaim = (st: string) => st === "requested" || st === "booked";
+
+/** Buyer cancel / 日程変更 — own claim only (buyerUid). */
+export async function buyerClaimAct(shopRaw: string, body: {
+  action: "cancel" | "reschedule"; id: string; day?: string; slot?: string;
+}) {
+  const shop = parseShop(shopRaw);
+  const user = await ensureAuth();
+  const db = getDb();
+  const id = String(body.id);
+  const cref = doc(db, "shops", shop, "claims", id);
+  const csnap = await getDoc(cref);
+  if (!csnap.exists()) throw new Error("予約が見つかりません");
+  const c = csnap.data();
+  if (String(c.buyerUid || "") !== user.uid) throw new Error("この予約を変更できません");
+  if (!openClaim(String(c.status || ""))) throw new Error("変更できない予約です");
+  if (body.action === "reschedule") {
+    const day = String(body.day || ""), slot = slotTime(body.slot);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !slot) throw new Error("日付と時間を選んでください");
+    await updateDoc(cref, { day, slot });
+    return asClaim(id, { ...c, day, slot });
+  }
+  const patch = { status: "cancelled" as const, waiters: [] as [] };
+  await updateDoc(cref, patch);
+  await Promise.all((Array.isArray(c.itemIds) ? c.itemIds.map(String) : []).map(async (iid) => {
+    const iref = doc(db, "shops", shop, "items", iid);
+    const isnap = await getDoc(iref);
+    if (isnap.exists() && isnap.data().claimId === id) await updateDoc(iref, { claimId: null });
+  }));
+  return asClaim(id, { ...c, ...patch });
+}
+
+/** Days/slots for buyer 日程変更 (excludes this claim from taken). */
+export async function loadBuyerPickup(shopRaw: string, claimId: string) {
+  const shop = parseShop(shopRaw);
+  await ensureAuth();
+  const db = getDb();
+  const [meta, claims] = await Promise.all([
+    getDoc(doc(db, "shops", shop)),
+    getDocs(collection(db, "shops", shop, "claims")),
+  ]);
+  const s = storeFromDocs(
+    (meta.data() || {}) as Record<string, unknown>,
+    [],
+    claims.docs.map((d) => ({ id: d.id, data: d.data() as Record<string, unknown> })),
+  );
+  const days = pickupDays(s);
+  const slots = shopSlots(s);
+  const rest = { ...s, claims: s.claims.filter((c) => c.id !== claimId) };
+  return { days, slots, taken: (day: string) => takenSlots(rest, day) };
 }
 
 /** Buyer book — creates requested claim; snapshot reconciles. */

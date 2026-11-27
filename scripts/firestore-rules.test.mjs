@@ -90,6 +90,37 @@ await testEnv.clearFirestore();
   check("elton still editable", (await outcome(updateDoc(shop(db, "elton"), { address: "目黒区2" }))) === "ALLOW");
 }
 
+{
+  const buyer = user("buyer", "anonymous");
+  const other = user("other", "anonymous");
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const fs = ctx.firestore();
+    await setDoc(doc(fs, "shops", "10003"), { address: "目黒区", published: true, ownerUid: "seller-x" });
+    await setDoc(doc(fs, "shops", "10003", "items", "i1"), { name: "傘", price: 100, claimId: "c1", pos: 0 });
+    await setDoc(doc(fs, "shops", "10003", "claims", "c1"), {
+      code: "ABCD", day: "2026-11-27", slot: "10:00", itemIds: ["i1"],
+      status: "booked", buyerUid: buyer.uid, contact: "みるく", waiters: [],
+    });
+  });
+  const cref = doc(buyer.db, "shops", "10003", "claims", "c1");
+  const iref = doc(buyer.db, "shops", "10003", "items", "i1");
+  check("buyer can reschedule own claim", (await outcome(updateDoc(cref, {
+    day: "2026-11-28", slot: "14:00",
+  }))) === "ALLOW");
+  check("other cannot reschedule", (await outcome(updateDoc(doc(other.db, "shops", "10003", "claims", "c1"), {
+    day: "2026-11-29", slot: "10:00",
+  }))).startsWith("DENY"));
+  check("other cannot clear claimId", (await outcome(updateDoc(doc(other.db, "shops", "10003", "items", "i1"), {
+    claimId: null,
+  }))).startsWith("DENY"));
+  check("buyer can cancel own claim", (await outcome(updateDoc(cref, {
+    status: "cancelled", waiters: [],
+  }))) === "ALLOW");
+  check("buyer can clear item claimId after cancel", (await outcome(updateDoc(iref, {
+    claimId: null,
+  }))) === "ALLOW");
+}
+
 await testEnv.cleanup();
 if (fails.length) {
   console.error(`\n${fails.length} failed`);
