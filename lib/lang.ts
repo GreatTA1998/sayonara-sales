@@ -69,6 +69,8 @@ const S: Record<string, [string, string]> = {
   "sort.spacious": ["通常", "Spacious"],
   "sort.dense": ["密集", "Dense"],
   "filter.sold": ["引取済", "Picked up"],
+  "foot.privacy": ["プライバシー", "Privacy"],
+  "foot.terms": ["利用規約", "Terms"],
 };
 
 export function detectBrowserLang(): string {

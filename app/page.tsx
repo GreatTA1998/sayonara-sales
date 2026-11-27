@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import ShopBuyerView from "@/components/buyer-ui";
 import { Snack, useSnack } from "@/components/snack";
@@ -63,7 +64,13 @@ export default function HomePage() {
             <ShopBuyerView shop={shopId} embed onReady={() => setReadyShop(shopId)} />
           </div>
         </div>
-        <footer className="soft-promo hint">Made by エルトン</footer>
+        <footer className="soft-promo hint">
+          Made by エルトン
+          {" · "}
+          <Link href="/privacy">{t("foot.privacy", lang)}</Link>
+          {" · "}
+          <Link href="/terms">{t("foot.terms", lang)}</Link>
+        </footer>
       </div>
       <Snack snack={snack} />
     </main>
