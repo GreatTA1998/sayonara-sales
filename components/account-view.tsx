@@ -32,9 +32,10 @@ export function AccountView({
   const line = useSyncExternalStore(subscribeAuth, getLineName, () => "");
   const facebook = useSyncExternalStore(subscribeAuth, getFacebookName, () => "");
   const lang = useLang();
-  const [buys, setBuys] = useState<BuyRow[]>([]);
+  const [buys, setBuys] = useState<BuyRow[] | null>(null);
   useEffect(() => {
     let dead = false;
+    setBuys(null);
     const sync = () => {
       void fetchBuyHistory().then((rows) => { if (!dead) setBuys(rows); });
     };
@@ -48,8 +49,16 @@ export function AccountView({
   const cur = getSavedLang() || "ja";
   const langVal = cur === "ja" ? "ja" : offer;
 
+  if (buys === null) {
+    return (
+      <div className="account-view" aria-busy="true">
+        <p className="av-load">{t("home.loading", lang)}</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="account-view">
+    <div className="account-view ready">
       <h1>{name || t("me.title", lang)}</h1>
       {!name && !hard ? (
         <SoftLoginForm onDone={(id) => onLoginDone?.(id)} />
