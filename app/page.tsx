@@ -31,8 +31,8 @@ export default function HomePage() {
 
   const active = cards.find((c) => c.id === selected) || cards[0];
   const shopId = active?.id || ELTON_ID;
-  // Sun-ray clears on selected shop ready — tabs may still be loading.
-  const panelReady = readyShop !== null;
+  // Sun-ray until both shop-tab nav and selected shop are ready.
+  const panelReady = cards.length > 0 && readyShop !== null;
   const copyUrl = (e: { stopPropagation(): void }) => {
     e.stopPropagation();
     const url = `${SITE_URL}/s/${shopId}`;
