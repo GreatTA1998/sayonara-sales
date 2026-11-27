@@ -495,12 +495,6 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
                     ) : method === "line" ? (
                       <p className="hint">ジモティーのアカウントをお持ちでない方向けです。</p>
                     ) : null}
-                    {method === "jimoty" && !hardLine && (
-                      <>
-                        <p className="hint">依頼・ステータス・キャンセル待ちの通知はLINEログインで受け取れます。</p>
-                        <a className="cta line" href={lineLoginHref()}>LINEでログイン</a>
-                      </>
-                    )}
                     <label className="float"><span>{CH[method][2]}</span>
                       <input value={lineName} onChange={(e) => {
                         const v = e.target.value;
@@ -521,6 +515,12 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
             {err && <div className="err">{err}</div>}
             <button type="button" className={`cta${canSend ? " go" : ""}`} disabled={busy || !canSend}
               onClick={book}>{busy ? "送信中…" : "依頼を送信"}</button>
+            {method === "jimoty" && !hardLine && (
+              <>
+                <p className="hint">{t("buy.lineOpt", lang)}</p>
+                <a className="cta line" href={lineLoginHref()}>{t("buy.lineLogin", lang)}</a>
+              </>
+            )}
           </div>
         </div>
       )}
