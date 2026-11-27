@@ -56,6 +56,8 @@ const S: Record<string, [string, string]> = {
   "lang.en": ["英語", "English"],
   "buy.cta": ["引き取りを依頼", "Request pickup"],
   "buy.ctaN": ["引き取りを依頼 ({n})", "Request pickup ({n})"],
+  "buy.lineHint": ["任意：依頼・ステータス通知はLINEで", "Optional: LINE alerts for requests & status"],
+  "buy.lineLogin": ["LINEでログイン", "Log in with LINE"],
   "badge.req": ["依頼中", "Requested"],
   "badge.booked": ["予約済", "Reserved"],
   "badge.sold": ["引取済", "Picked up"],
