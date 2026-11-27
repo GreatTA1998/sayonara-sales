@@ -133,7 +133,7 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
   /** Own shop (ownerUid / soft pointer / LINE uid) → 出品を管理. */
   const isMine = ownedId === shop || myShop === shop
     || (!!lineUid && state?.ownerLineUid === lineUid);
-  /** Name field always shown — typing soft-logs (openShop); phone is typed as-is. */
+  /** Name field always shown — soft-login only on successful「依頼を送信」. */
   const contactVal = lineName.trim();
 
   useEffect(() => {
@@ -496,15 +496,7 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
                       <p className="hint">ジモティーのアカウントをお持ちでない方向けです。</p>
                     ) : null}
                     <label className="float"><span>{CH[method][2]}</span>
-                      <input value={lineName} onChange={(e) => {
-                        const v = e.target.value;
-                        setLineName(v);
-                        const n = v.trim();
-                        if (n && method !== "phone" && method !== "other"
-                          && !(method === "line" && hardLine)) {
-                          openShop(n, method);
-                        }
-                      }}
+                      <input value={lineName} onChange={(e) => setLineName(e.target.value)}
                         placeholder={method === "phone" ? "080-0000-0000" : "表示名"}
                         inputMode={method === "phone" ? "tel" : "text"} autoComplete="nickname"
                         enterKeyHint="done" /></label>
