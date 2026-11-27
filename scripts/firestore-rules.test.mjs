@@ -162,38 +162,6 @@ await testEnv.clearFirestore();
   }))) === "ALLOW");
 }
 
-{
-  const buyer = user("chat-buyer", "anonymous");
-  const seller = user("chat-seller", "anonymous");
-  const other = user("chat-other", "anonymous");
-  await testEnv.withSecurityRulesDisabled(async (ctx) => {
-    const fs = ctx.firestore();
-    await setDoc(doc(fs, "shops", "10005"), {
-      address: "目黒区", published: true, ownerUid: seller.uid,
-    });
-  });
-  const tid = "10005_c-chat";
-  const tref = doc(buyer.db, "threads", tid);
-  check("buyer creates app thread", (await outcome(setDoc(tref, {
-    shopId: "10005", claimId: "c-chat", label: "目黒・ソファ",
-    buyerUid: buyer.uid, sellerUid: seller.uid, contact: "たろう",
-    lastText: "アプリ内でやり取り希望です。", lastAt: "t0", lastBy: buyer.uid,
-    lastRole: "buyer", unreadBuyer: 0, unreadSeller: 1,
-  }))) === "ALLOW");
-  check("buyer writes first message", (await outcome(setDoc(doc(buyer.db, "threads", tid, "messages", "m1"), {
-    text: "アプリ内でやり取り希望です。", by: buyer.uid, at: "t0", role: "buyer",
-  }))) === "ALLOW");
-  check("seller reads thread", (await outcome(getDoc(doc(seller.db, "threads", tid)))) === "ALLOW");
-  check("other cannot read thread", (await outcome(getDoc(doc(other.db, "threads", tid)))).startsWith("DENY"));
-  check("seller can reply", (await outcome(setDoc(doc(seller.db, "threads", tid, "messages", "m2"), {
-    text: "了解です", by: seller.uid, at: "t1", role: "seller",
-  }))) === "ALLOW");
-  check("seller clears unread", (await outcome(updateDoc(doc(seller.db, "threads", tid), {
-    unreadSeller: 0, lastText: "了解です", lastAt: "t1", lastBy: seller.uid, lastRole: "seller",
-    unreadBuyer: 1,
-  }))) === "ALLOW");
-}
-
 await testEnv.cleanup();
 if (fails.length) {
   console.error(`\n${fails.length} failed`);

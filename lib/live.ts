@@ -460,13 +460,12 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       if ("lineInviteUrl" in body) patch.lineInviteUrl = String(body.lineInviteUrl || "").trim();
       if ("phone" in body) patch.phone = String(body.phone || "").trim();
       if ("otherUrl" in body) patch.otherUrl = String(body.otherUrl || "").trim();
-      if ("inAppChat" in body) patch.inAppChat = !!body.inAppChat;
       await updateDoc(shopRef, patch);
       return {
         bio: String(patch.bio ?? ""), jimotyUrl: String(patch.jimotyUrl ?? ""),
         youtubeUrl: String(patch.youtubeUrl ?? ""), facebookUrl: String(patch.facebookUrl ?? ""),
         lineInviteUrl: String(patch.lineInviteUrl ?? ""), phone: String(patch.phone ?? ""),
-        otherUrl: String(patch.otherUrl ?? ""), inAppChat: !!patch.inAppChat,
+        otherUrl: String(patch.otherUrl ?? ""),
       };
     }
     case "dates": {
@@ -741,12 +740,11 @@ export async function loadBuyerPickup(shopRaw: string, claimId: string) {
   return { days, slots, taken: (day: string) => takenSlots(rest, day) };
 }
 
-/** Buyer book — creates requested claim; snapshot reconciles. アプリ内 also opens a thread. */
+/** Buyer book — creates requested claim; snapshot reconciles. */
 export async function bookShop(shopRaw: string, body: {
-  day: string; slot: string; itemIds: string[]; contact: string;
-  contactMethod: "jimoty" | "line" | "phone" | "facebook" | "other" | "app";
+  day: string; slot: string; itemIds: string[]; contact: string; contactMethod: "jimoty" | "line" | "phone" | "facebook" | "other";
   lineUid?: string;
-}): Promise<{ code: string; day: string; slot: string; address: string; contact: string; contactMethod: string; total: number; items: string[]; claimId?: string }> {
+}): Promise<{ code: string; day: string; slot: string; address: string; contact: string; contactMethod: string; total: number; items: string[] }> {
   const shop = parseShop(shopRaw);
   const user = await ensureAuth();
   const db = getDb();
@@ -771,7 +769,7 @@ export async function bookShop(shopRaw: string, body: {
   if (!shopSlots(pre).includes(slot)) throw new Error("その時間帯は選べません");
   if (takenSlots(pre, day).includes(slot)) throw new Error("その時間帯は埋まっています");
 
-  const booked = await runTransaction(db, async (tx) => {
+  return runTransaction(db, async (tx) => {
     const itemSnaps = await Promise.all(itemIds.map((id) => tx.get(doc(db, "shops", shop, "items", id))));
     const items: Item[] = itemSnaps.map((s, i) => {
       if (!s.exists()) throw new Error("品目が見つかりません");
@@ -816,24 +814,7 @@ export async function bookShop(shopRaw: string, body: {
     }
     return {
       code, day, slot, address: String(meta.address || ""), contact: claim.contact!, contactMethod,
-      total, items: items.map((it) => it.name), claimId,
-      ward: String(meta.address || "").trim(),
-      sellerUid: String(meta.ownerUid || ""),
+      total, items: items.map((it) => it.name),
     };
   });
-
-  if (contactMethod === "app") {
-    try {
-      const { openAppThread } = await import("./chat");
-      const first = booked.items[0]?.trim() || "出品";
-      const ward = booked.ward.replace(/区$/, "") || booked.ward || "ショップ";
-      await openAppThread({
-        shopId: shop, claimId: booked.claimId, contact: booked.contact,
-        label: `${ward}・${first}`.slice(0, 40),
-        sellerUid: booked.sellerUid || undefined,
-      });
-    } catch { /* claim still stands; inbox may lag */ }
-  }
-  const { ward: _w, sellerUid: _s, ...out } = booked;
-  return out;
 }

@@ -153,54 +153,5 @@ service cloud.firestore {
         && !exists(/databases/$(database)/documents/shops/$(resource.data.shopId));
       allow delete: if false;
     }
-
-    // In-app chat (アプリ内). Buyer = buyerUid; seller = shop admin (owner / elton).
-    function threadShop() {
-      return resource.data.shopId;
-    }
-    function threadParty() {
-      return signedIn() && (
-        resource.data.buyerUid == request.auth.uid
-        || canAdmin(threadShop())
-      );
-    }
-    function newThreadParty() {
-      return signedIn() && (
-        request.resource.data.buyerUid == request.auth.uid
-        || canAdmin(request.resource.data.shopId)
-      );
-    }
-    match /threads/{threadId} {
-      allow read: if threadParty();
-      allow create: if newThreadParty()
-        && request.resource.data.buyerUid == request.auth.uid
-        && request.resource.data.shopId is string
-        && request.resource.data.claimId is string
-        && request.resource.data.lastText is string
-        && request.resource.data.lastAt is string;
-      allow update: if threadParty()
-        && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['lastText', 'lastAt', 'lastBy', 'lastRole', 'unreadBuyer', 'unreadSeller', 'sellerUid', 'label']);
-      allow delete: if false;
-
-      match /messages/{msgId} {
-        allow read: if signedIn() && (
-          get(/databases/$(database)/documents/threads/$(threadId)).data.buyerUid == request.auth.uid
-          || canAdmin(get(/databases/$(database)/documents/threads/$(threadId)).data.shopId)
-        );
-        allow create: if signedIn()
-          && request.resource.data.by == request.auth.uid
-          && request.resource.data.text is string
-          && request.resource.data.text.size() > 0
-          && request.resource.data.text.size() <= 2000
-          && request.resource.data.at is string
-          && (request.resource.data.role == 'buyer' || request.resource.data.role == 'seller')
-          && (
-            get(/databases/$(database)/documents/threads/$(threadId)).data.buyerUid == request.auth.uid
-            || canAdmin(get(/databases/$(database)/documents/threads/$(threadId)).data.shopId)
-          );
-        allow update, delete: if false;
-      }
-    }
   }
 }

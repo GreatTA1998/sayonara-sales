@@ -34,7 +34,7 @@ type Claim = {
 };
 type AdminState = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string; facebookUrl?: string;
-  lineInviteUrl?: string; phone?: string; otherUrl?: string; inAppChat?: boolean; slots?: string[];
+  lineInviteUrl?: string; phone?: string; otherUrl?: string; slots?: string[];
   pickupFrom?: string; pickupTo?: string; moveOut?: string; leadDays?: number;
   itemOff?: number; published?: boolean; ownerUid?: string; ownerLineUid?: string;
   items: Item[]; claims: Claim[];
@@ -44,8 +44,7 @@ type ContactMode = "jimoty" | "facebook" | "line" | "phone" | "other";
 const CONTACT_OPTS: [ContactMode, string][] = [
   ["jimoty", "ジモティー"], ["facebook", "Facebook"], ["line", "LINE"], ["phone", "電話"], ["other", "その他"],
 ];
-const methodJa = (m?: string) =>
-  (m === "app" ? "アプリ内" : CONTACT_OPTS.find(([k]) => k === m)?.[1]) || m || "";
+const methodJa = (m?: string) => CONTACT_OPTS.find(([k]) => k === m)?.[1] || m || "";
 const CONTACT_FIELD: Record<ContactMode, { span: string; ph: string; mode: "url" | "tel"; ac: string }> = {
   jimoty: { span: "ジモティープロフィール", ph: "https://jmty.jp/…", mode: "url", ac: "url" },
   line: { span: "LINE招待リンク", ph: "https://line.me/ti/p/…", mode: "url", ac: "off" },
@@ -155,7 +154,6 @@ export default function ShopAdminView({ shop, name }: Props) {
   const [lineInvite, setLineInvite] = useState("");
   const [phone, setPhone] = useState("");
   const [other, setOther] = useState("");
-  const [inAppChat, setInAppChat] = useState(false);
   const [contactMode, setContactMode] = useState<ContactMode>("jimoty");
   const contactByMode = { jimoty, facebook, line: lineInvite, phone, other };
   const setContactByMode = {
@@ -217,7 +215,6 @@ export default function ShopAdminView({ shop, name }: Props) {
     const l = body.lineInviteUrl || "", p = body.phone || "";
     const f = body.facebookUrl || "", o = body.otherUrl || "";
     setJimoty(j); setLineInvite(l); setPhone(p); setFacebook(f); setOther(o);
-    setInAppChat(!!body.inAppChat);
     setYoutube(body.youtubeUrl || ytUrl(bioVal) || "");
     setContactMode(
       (j.trim() && "jimoty") || (f.trim() && "facebook") || (l.trim() && "line")
@@ -345,12 +342,11 @@ export default function ShopAdminView({ shop, name }: Props) {
     addrTimer.current = setTimeout(() => { void saveAddress(stem); }, 450);
   }
 
-  async function persistProfile(nextBio = bio, nextYt = youtube, nextApp = inAppChat) {
+  async function persistProfile(nextBio = bio, nextYt = youtube) {
     const yt = nextYt.trim() || ytUrl(nextBio);
     await act({
       action: "profile", bio: nextBio, jimotyUrl: jimoty, youtubeUrl: yt,
       facebookUrl: facebook, lineInviteUrl: lineInvite, phone, otherUrl: other,
-      inAppChat: nextApp,
     });
     if (yt !== nextYt) setYoutube(yt);
   }
@@ -938,12 +934,6 @@ export default function ShopAdminView({ shop, name }: Props) {
               placeholder={CONTACT_FIELD[contactMode].ph}
               inputMode={CONTACT_FIELD[contactMode].mode}
               autoComplete={CONTACT_FIELD[contactMode].ac} /></label>
-          <label className="late-check"><input type="checkbox" checked={inAppChat}
-            onChange={(e) => {
-              const on = e.target.checked;
-              setInAppChat(on);
-              void persistProfile(bio, youtube, on);
-            }} />アプリ内チャットを連絡方法にする</label>
         </section>
       )}
 
