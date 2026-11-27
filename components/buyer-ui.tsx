@@ -35,7 +35,7 @@ type State = {
   published?: boolean; ownerUid?: string; ownerLineUid?: string;
 };
 type Receipt = { day: string; slot: string; total?: number };
-type Method = "jimoty" | "line" | "phone" | "facebook" | "other";
+type Method = "jimoty" | "line" | "phone" | "facebook" | "other" | "app";
 type Props = {
   shop: string; /** Flatten padding when embedded on home. */ embed?: boolean;
   onReady?: () => void;
@@ -46,6 +46,7 @@ const CH = {
   phone: ["電話", "メッセージ済み", "電話番号"],
   facebook: ["Facebook", "メッセージ済み", "Facebook名"],
   other: ["その他", "メッセージ済み", "お名前"],
+  app: ["アプリ内", "", "お名前（依頼の識別）"],
 } as const;
 
 /** Confirmed only — pending is disclaimer + still 依頼可. */
@@ -119,11 +120,12 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
   const canOther = !!otherUrl;
   const methodOpts = (
     [["jimoty", canJimoty], ["facebook", canFb], ["line", canLine], ["phone", canPhone], ["other", canOther]] as const
-  ).filter(([, ok]) => ok).map(([id]) => [id, CH[id][0]] as [Method, string]);
-  const chanHref: Record<Method, string> = {
+  ).filter(([, ok]) => ok).map(([id]) => [id, CH[id][0]] as [Method, string])
+    .concat([["app", CH.app[0]]]);
+  const chanHref: Record<Exclude<Method, "app">, string> = {
     jimoty: jimotyUrl, facebook: facebookUrl, line: lineUrl, phone: telHref(phoneDisp), other: otherHref,
   };
-  const chanLbl: Record<Method, string> = {
+  const chanLbl: Record<Exclude<Method, "app">, string> = {
     jimoty: "出品者のジモティー", facebook: "Facebook Marketplace", line: "LINE招待リンク",
     phone: phoneDisp, other: otherHref ? "その他の連絡先" : otherUrl,
   };
@@ -229,8 +231,8 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
   const itemOff = Number(state?.itemOff) || 0;
   const cartOff = cartDiscount(pickedItems.length, itemOff);
   const cartTotal = Math.max(0, cartSub - cartOff);
-  const canSend = !!slot && !!method && !!contactVal && chanOk && pickedItems.length > 0
-    && ({ jimoty: canJimoty, facebook: canFb, line: canLine, phone: canPhone, other: canOther }[method])
+  const canSend = !!slot && !!method && !!contactVal && pickedItems.length > 0
+    && (method === "app" ? true : chanOk && ({ jimoty: canJimoty, facebook: canFb, line: canLine, phone: canPhone, other: canOther }[method]))
     && (!after || day >= after);
   const rule = state?.rule || null;
 
@@ -306,9 +308,9 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
         day, slot, itemIds, contactMethod: method, contact: contactVal,
         lineUid: lineUid || undefined,
       });
-      if (method === "jimoty" || method === "facebook"
+      if (method === "app" || method === "jimoty" || method === "facebook"
         || (method === "line" && !hardLine)) {
-        openShop(contactVal, method);
+        openShop(contactVal, method === "app" ? "jimoty" : method);
       }
       pushBuy({
         code: String(data.code || ""), shop, day, slot,
@@ -357,7 +359,7 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
             if (n) setLineName(n);
             setOpenId(null); setSlot(null);
             setMethod(canJimoty ? "jimoty" : canFb ? "facebook" : canLine ? "line"
-              : canPhone ? "phone" : canOther ? "other" : null);
+              : canPhone ? "phone" : canOther ? "other" : "app");
             setChanOk(false); setErr(null); setCheckout(true);
           }}>
           {pickedItems.length
@@ -475,48 +477,65 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
               <li key={i.id}><span>{i.name?.trim() || "無題"} · キャンセル待ち</span><span>{money(i.price)}</span></li>
             )))}</ul>
             <div className="field contact"><span>連絡方法</span>
-              {!methodOpts.length ? (
-                <p className="sw">出品者の連絡先が未設定です。しばらくしてから再度お試しください。</p>
-              ) : (
+              <Seg label="連絡方法" value={method || ""} onPick={(v) => { setMethod(v as Method); setChanOk(false); }}
+                opts={methodOpts} />
+              {method === "app" ? (
                 <>
-                  <Seg label="連絡方法" value={method || ""} onPick={(v) => { setMethod(v as Method); setChanOk(false); }}
-                    opts={methodOpts} />
-                  {method && <>
-                    <div className="linebox">
-                      {chanHref[method] ? (
-                        <a className={`linelink${method === "facebook" ? " fb" : ""}`} target="_blank" rel="noopener noreferrer"
-                          href={chanHref[method]}>{chanLbl[method]}</a>
-                      ) : <span className="linelink">{chanLbl[method]}</span>}
-                      <label className="late-check"><input type="checkbox" checked={chanOk}
-                        onChange={(e) => setChanOk(e.target.checked)} />{CH[method][1]}</label>
-                    </div>
-                    {method === "jimoty" ? (
-                      <p className="hint">ジモティーから来た方は、できればジモティー上で取引を完了してください。</p>
-                    ) : method === "line" ? (
-                      <p className="hint">ジモティーのアカウントをお持ちでない方向けです。</p>
-                    ) : null}
-                    {method === "jimoty" && !hardLine && (
-                      <>
-                        <p className="hint">依頼・ステータス・キャンセル待ちの通知はLINEログインで受け取れます。</p>
-                        <a className="cta line" href={lineLoginHref()}>LINEでログイン</a>
-                      </>
+                  <div className="app-notify">
+                    <b>通知を受け取る（任意）</b>
+                    <p>やり取りはアプリ内チャットで行います。確定・返信の通知だけ LINE で受け取ります。</p>
+                    {!hardLine ? (
+                      <a className="cta line" href={lineLoginHref()}>LINEでログインして通知ON</a>
+                    ) : (
+                      <p className="hint">LINE連携済み · 通知ON</p>
                     )}
-                    <label className="float"><span>{CH[method][2]}</span>
-                      <input value={lineName} onChange={(e) => {
-                        const v = e.target.value;
-                        setLineName(v);
-                        const n = v.trim();
-                        if (n && method !== "phone" && method !== "other"
-                          && !(method === "line" && hardLine)) {
-                          openShop(n, method);
-                        }
-                      }}
-                        placeholder={method === "phone" ? "080-0000-0000" : "表示名"}
-                        inputMode={method === "phone" ? "tel" : "text"} autoComplete="nickname"
-                        enterKeyHint="done" /></label>
-                  </>}
+                    <p className="hint">※ LINEはチャット本体ではなく、通知チャネルです。スキップしても依頼できます。</p>
+                  </div>
+                  <label className="float"><span>{CH.app[2]}</span>
+                    <input value={lineName} onChange={(e) => {
+                      const v = e.target.value;
+                      setLineName(v);
+                      const n = v.trim();
+                      if (n) openShop(n, "jimoty");
+                    }}
+                      placeholder="表示名" autoComplete="nickname" enterKeyHint="done" /></label>
                 </>
-              )}
+              ) : method ? (
+                <>
+                  <div className="linebox">
+                    {chanHref[method] ? (
+                      <a className={`linelink${method === "facebook" ? " fb" : ""}`} target="_blank" rel="noopener noreferrer"
+                        href={chanHref[method]}>{chanLbl[method]}</a>
+                    ) : <span className="linelink">{chanLbl[method]}</span>}
+                    <label className="late-check"><input type="checkbox" checked={chanOk}
+                      onChange={(e) => setChanOk(e.target.checked)} />{CH[method][1]}</label>
+                  </div>
+                  {method === "jimoty" ? (
+                    <p className="hint">ジモティーから来た方は、できればジモティー上で取引を完了してください。</p>
+                  ) : method === "line" ? (
+                    <p className="hint">ジモティーのアカウントをお持ちでない方向けです。</p>
+                  ) : null}
+                  {method === "jimoty" && !hardLine && (
+                    <>
+                      <p className="hint">依頼・ステータス・キャンセル待ちの通知はLINEログインで受け取れます。</p>
+                      <a className="cta line" href={lineLoginHref()}>LINEでログイン</a>
+                    </>
+                  )}
+                  <label className="float"><span>{CH[method][2]}</span>
+                    <input value={lineName} onChange={(e) => {
+                      const v = e.target.value;
+                      setLineName(v);
+                      const n = v.trim();
+                      if (n && method !== "phone" && method !== "other"
+                        && !(method === "line" && hardLine)) {
+                        openShop(n, method);
+                      }
+                    }}
+                      placeholder={method === "phone" ? "080-0000-0000" : "表示名"}
+                      inputMode={method === "phone" ? "tel" : "text"} autoComplete="nickname"
+                      enterKeyHint="done" /></label>
+                </>
+              ) : null}
             </div>
             {err && <div className="err">{err}</div>}
             <button type="button" className={`cta${canSend ? " go" : ""}`} disabled={busy || !canSend}

@@ -6,7 +6,8 @@ import { AccountView } from "@/components/account-view";
 import { Icon } from "@/components/icons";
 import { useLineOAuthReturn } from "@/components/line-oauth";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
-import { listenPendingRequests } from "@/lib/live";
+import { listenUnread } from "@/lib/chat";
+import { findOwnedShop, listenPendingRequests } from "@/lib/live";
 import { t, useLang } from "@/lib/lang";
 import { adminPath, ensureShopId, getId, getLineUid, getName, subscribeAuth } from "@/lib/shop";
 
@@ -29,6 +30,8 @@ export default function AppNav() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(""); // "" | ok | "!err"
   const [reqN, setReqN] = useState(0);
+  const [chatN, setChatN] = useState(0);
+  const [ownedShop, setOwnedShop] = useState("");
   const shotRef = useRef<Shot | null>(null);
   shotRef.current = shot;
 
@@ -39,6 +42,18 @@ export default function AppNav() {
     if (!shopId) { setReqN(0); return; }
     return listenPendingRequests(shopId, setReqN);
   }, [shopId]);
+  useEffect(() => {
+    if (!signedIn) { setOwnedShop(""); return; }
+    let dead = false;
+    void findOwnedShop().then((id) => { if (!dead) setOwnedShop(id); }).catch(() => {
+      if (!dead) setOwnedShop("");
+    });
+    return () => { dead = true; };
+  }, [signedIn, name, lineUid, shopId]);
+  useEffect(() => {
+    if (!signedIn) { setChatN(0); return; }
+    return listenUnread(ownedShop || shopId, setChatN);
+  }, [signedIn, ownedShop, shopId]);
   useLineOAuthReturn();
   useEffect(() => { setOpen(""); }, [path]);
   useEffect(() => {
@@ -178,6 +193,7 @@ export default function AppNav() {
               aria-expanded={open === "me"} aria-haspopup="dialog"
               onClick={() => setOpen(open === "me" ? "" : "me")}>
               {name || (signedIn ? t("me.title", lang) : t("nav.login", lang))}
+              {chatN > 0 ? <span className="nav-badge" aria-label={`未読${chatN}`}>{chatN}</span> : null}
             </button>
             {open === "me" && (
               <div className="menu-pop up pane help-pane me-pane" role="dialog" aria-label={t("me.title", lang)}>
