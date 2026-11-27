@@ -4,13 +4,9 @@ import { LineLoginLink } from "@/components/line-oauth";
 import { Seg } from "@/components/photo-listing";
 import { SoftLoginForm } from "@/components/soft-login";
 import { Snack, useSnack } from "@/components/snack";
-import {
-  chatWhen, listenInbox, listenThread, markThreadRead, sendChat,
-  type ChatMsg, type ChatThread,
-} from "@/lib/chat";
 import { dayLbl } from "@/lib/days";
 import { getSavedLang, langLabel, offerLang, setLang, t, useLang } from "@/lib/lang";
-import { buyerClaimAct, fetchBuyHistory, findOwnedShop, loadBuyerPickup } from "@/lib/live";
+import { buyerClaimAct, fetchBuyHistory, loadBuyerPickup } from "@/lib/live";
 import {
   getFacebookName, getJimotyName, getLineName, getLineUid, getName, logout, subscribeAuth,
   type BuyRow,
@@ -47,15 +43,7 @@ export function AccountView({
   const [slots, setSlots] = useState<string[]>([]);
   const [taken, setTaken] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
-  const [ownedShop, setOwnedShop] = useState("");
-  const [inbox, setInbox] = useState<ChatThread[]>([]);
-  const [threadId, setThreadId] = useState("");
-  const [thread, setThread] = useState<ChatThread | null>(null);
-  const [msgs, setMsgs] = useState<ChatMsg[]>([]);
-  const [draft, setDraft] = useState("");
-  const [chatBusy, setChatBusy] = useState(false);
   const { snack, show } = useSnack();
-
   useEffect(() => {
     let dead = false;
     setBuys(null);
@@ -66,31 +54,6 @@ export function AccountView({
     const unsub = subscribeAuth(sync);
     return () => { dead = true; unsub(); };
   }, [name, hard, jimoty, line, facebook]);
-
-  useEffect(() => {
-    let dead = false;
-    if (!(name || hard)) { setOwnedShop(""); return; }
-    void findOwnedShop().then((id) => { if (!dead) setOwnedShop(id); }).catch(() => {
-      if (!dead) setOwnedShop("");
-    });
-    return () => { dead = true; };
-  }, [name, hard]);
-
-  useEffect(() => {
-    if (!(name || hard)) { setInbox([]); return; }
-    return listenInbox(ownedShop, setInbox);
-  }, [name, hard, ownedShop]);
-
-  useEffect(() => {
-    if (!threadId) { setThread(null); setMsgs([]); return; }
-    return listenThread(threadId, setThread, setMsgs);
-  }, [threadId]);
-
-  useEffect(() => {
-    if (!threadId || !thread) return;
-    const as = ownedShop && thread.shopId === ownedShop ? "seller" : "buyer";
-    void markThreadRead(threadId, as);
-  }, [threadId, thread, ownedShop, msgs.length]);
 
   const open = (buys || []).find((b) => rowKey(b) === openKey) || null;
 
@@ -125,17 +88,6 @@ export function AccountView({
     }
   }
 
-  async function send() {
-    if (!threadId || !draft.trim() || chatBusy) return;
-    setChatBusy(true);
-    try {
-      await sendChat(threadId, draft, ownedShop);
-      setDraft("");
-    } catch (e) {
-      show(e instanceof Error ? e.message : "送信失敗", "err");
-    } finally { setChatBusy(false); }
-  }
-
   const rawOffer = offerLang();
   const offer = rawOffer === "ja" ? "en" : rawOffer;
   const cur = getSavedLang() || "ja";
@@ -151,9 +103,6 @@ export function AccountView({
     );
   }
 
-  const unreadOf = (trow: ChatThread) =>
-    (ownedShop && trow.shopId === ownedShop ? trow.unreadSeller : trow.unreadBuyer) > 0;
-
   return (
     <div className="account-view ready">
       <h1>{name || t("me.title", lang)}</h1>
@@ -163,7 +112,7 @@ export function AccountView({
         <>
           {hard ? (
             <>
-              <p className="hint">LINE連携済み・通知ON</p>
+              <p className="hint">{t("me.lineSecure", lang)}</p>
               <dl className="id-view">
                 <div><dt>{t("me.lineName", lang)}</dt><dd>{line || name || "—"}</dd></div>
                 <div><dt>{t("me.jimotyName", lang)}</dt><dd>{jimoty || "—"}</dd></div>
@@ -176,65 +125,6 @@ export function AccountView({
               <LineLoginLink />
             </>
           )}
-
-          <section className="chat-box" aria-label="チャット">
-            {threadId ? (
-              <>
-                <div className="chat-th">
-                  <button type="button" className="chat-back" onClick={() => { setThreadId(""); setDraft(""); }}>
-                    ← チャット
-                  </button>
-                  <span className="chat-label">{thread?.label || "チャット"}</span>
-                </div>
-                <div className="chat-stream">
-                  {msgs.map((m) => {
-                    const mine = ownedShop && thread?.shopId === ownedShop
-                      ? m.role === "seller" : m.role === "buyer";
-                    return (
-                      <div key={m.id} className={`chat-row${mine ? " me" : ""}`}>
-                        <div className={`chat-bubble${mine ? " me" : ""}`}>{m.text}</div>
-                        <span className="chat-meta">{chatWhen(m.at)}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-                <form className="chat-compose" onSubmit={(e) => { e.preventDefault(); void send(); }}>
-                  <input value={draft} onChange={(e) => setDraft(e.target.value)}
-                    placeholder="メッセージを入力..." enterKeyHint="send" aria-label="メッセージ" />
-                  <button type="submit" className="chat-send" disabled={chatBusy || !draft.trim()}
-                    aria-label="送信">↑</button>
-                </form>
-              </>
-            ) : (
-              <>
-                <div className="claims-h">チャット</div>
-                {inbox.length ? (
-                  <div className="chat-inbox">
-                    {inbox.map((row) => {
-                      const mine = ownedShop && row.shopId === ownedShop
-                        ? row.lastRole === "seller" : row.lastRole === "buyer";
-                      const unread = unreadOf(row);
-                      return (
-                        <div key={row.id} className={`chat-row${mine ? " me" : ""}`}>
-                          <span className="chat-chip">{row.label || "チャット"}</span>
-                          <div className={`chat-bubble${mine ? " me" : ""}`}>{row.lastText}</div>
-                          <div className="chat-meta">
-                            <span>{chatWhen(row.lastAt)}</span>
-                            {unread ? <span className="chat-dot" aria-label="未読" /> : null}
-                            <button type="button" className="chat-reply"
-                              onClick={() => setThreadId(row.id)}>返信</button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="hint chat-empty">まだメッセージはありません</p>
-                )}
-              </>
-            )}
-          </section>
-
           <button type="button" className="cta soft" onClick={() => { void logout(); onAfterLogout?.(); }}>{t("me.logout", lang)}</button>
         </>
       )}

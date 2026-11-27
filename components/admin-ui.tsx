@@ -44,8 +44,7 @@ type ContactMode = "jimoty" | "facebook" | "line" | "phone" | "other";
 const CONTACT_OPTS: [ContactMode, string][] = [
   ["jimoty", "ジモティー"], ["facebook", "Facebook"], ["line", "LINE"], ["phone", "電話"], ["other", "その他"],
 ];
-const methodJa = (m?: string) =>
-  (m === "app" ? "アプリ内" : CONTACT_OPTS.find(([k]) => k === m)?.[1]) || m || "";
+const methodJa = (m?: string) => CONTACT_OPTS.find(([k]) => k === m)?.[1] || m || "";
 const CONTACT_FIELD: Record<ContactMode, { span: string; ph: string; mode: "url" | "tel"; ac: string }> = {
   jimoty: { span: "ジモティープロフィール", ph: "https://jmty.jp/…", mode: "url", ac: "url" },
   line: { span: "LINE招待リンク", ph: "https://line.me/ti/p/…", mode: "url", ac: "off" },

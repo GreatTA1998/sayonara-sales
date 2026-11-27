@@ -14,7 +14,7 @@ export type Item = {
 export type PickupSpot = { id: string; name: string; mapsUrl: string };
 export type Claim = {
   id: string; code: string; day: string; slot: string; itemIds: string[];
-  contact?: string; contactMethod?: "jimoty" | "line" | "phone" | "facebook" | "other" | "app";
+  contact?: string; contactMethod?: "jimoty" | "line" | "phone" | "facebook" | "other";
   /** Snapshot at book — survives admin spot edits/deletes. */
   spotId?: string; spotName?: string; spotMapsUrl?: string;
   /** requested = pending; booked = 予約済; picked_up = 引取済 (sold). */
