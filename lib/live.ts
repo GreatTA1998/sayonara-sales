@@ -215,24 +215,19 @@ export function listenPendingRequests(shopRaw: string, onN: (n: number) => void)
   return () => { dead = true; stop?.(); };
 }
 
-/** Public home tabs — Firestore `published==true` (not soft-login local map). */
-export async function listPublishedShops(): Promise<{ id: string; ward: string; count: number }[]> {
-  const db = getDb();
-  const snap = await getDocs(query(collection(db, "shops"), where("published", "==", true)));
-  const rows = await Promise.all(snap.docs.map(async (d) => {
-    const items = await getDocs(collection(db, "shops", d.id, "items"));
-    return {
-      id: d.id,
-      ward: String(d.data()?.address || "").trim(),
-      count: items.docs.filter((x) => !x.data().paused).length,
-      at: String(d.data()?.updatedAt || ""),
-    };
+/** Public home tabs — Firestore `published==true` (shop docs only; no item counts). */
+export async function listPublishedShops(): Promise<{ id: string; ward: string }[]> {
+  const snap = await getDocs(query(collection(getDb(), "shops"), where("published", "==", true)));
+  const rows = snap.docs.map((d) => ({
+    id: d.id,
+    ward: String(d.data()?.address || "").trim(),
+    at: String(d.data()?.updatedAt || ""),
   }));
   rows.sort((a, b) =>
     (a.id === ELTON_SHOP ? 0 : 1) - (b.id === ELTON_SHOP ? 0 : 1)
     || (b.at || "").localeCompare(a.at || "")
     || a.id.localeCompare(b.id));
-  return rows.map(({ id, ward, count }) => ({ id, ward, count }));
+  return rows.map(({ id, ward }) => ({ id, ward }));
 }
 
 export type UnclaimedShop = {
