@@ -28,8 +28,6 @@ export type Claim = {
 export type Store = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string; facebookUrl?: string;
   lineInviteUrl?: string; phone?: string; otherUrl?: string;
-  /** Seller opt-in: show アプリ内 on checkout. Missing/false = off. */
-  inAppChat?: boolean;
   slots?: string[];
   pickupSpots?: PickupSpot[];
   pickupFrom?: string; pickupTo?: string; moveOut?: string;
@@ -414,7 +412,6 @@ export function storeFromDocs(
   if (shop.lineInviteUrl) s.lineInviteUrl = String(shop.lineInviteUrl);
   if (shop.phone) s.phone = String(shop.phone);
   if (shop.otherUrl) s.otherUrl = String(shop.otherUrl);
-  if (shop.inAppChat) s.inAppChat = true;
   if (Array.isArray(shop.slots) && shop.slots.length) s.slots = shop.slots.map(String);
   if (Array.isArray(shop.pickupSpots) && shop.pickupSpots.length) {
     try { s.pickupSpots = normalizeSpots(shop.pickupSpots); } catch { /* ignore bad snap */ }

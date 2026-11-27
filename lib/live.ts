@@ -460,13 +460,12 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       if ("lineInviteUrl" in body) patch.lineInviteUrl = String(body.lineInviteUrl || "").trim();
       if ("phone" in body) patch.phone = String(body.phone || "").trim();
       if ("otherUrl" in body) patch.otherUrl = String(body.otherUrl || "").trim();
-      if ("inAppChat" in body) patch.inAppChat = !!body.inAppChat;
       await updateDoc(shopRef, patch);
       return {
         bio: String(patch.bio ?? ""), jimotyUrl: String(patch.jimotyUrl ?? ""),
         youtubeUrl: String(patch.youtubeUrl ?? ""), facebookUrl: String(patch.facebookUrl ?? ""),
         lineInviteUrl: String(patch.lineInviteUrl ?? ""), phone: String(patch.phone ?? ""),
-        otherUrl: String(patch.otherUrl ?? ""), inAppChat: !!patch.inAppChat,
+        otherUrl: String(patch.otherUrl ?? ""),
       };
     }
     case "dates": {

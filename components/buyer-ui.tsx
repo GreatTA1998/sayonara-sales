@@ -30,7 +30,6 @@ type State = {
   days: string[]; slots: string[]; taken: Record<string, string[]>;
   moveOut?: string;
   lineInviteUrl?: string | null; phone?: string | null; otherUrl?: string;
-  inAppChat?: boolean;
   items: Item[];
   itemOff?: number; rule?: string | null;
   published?: boolean; ownerUid?: string; ownerLineUid?: string;
@@ -66,7 +65,6 @@ function toBuyerState(shop: string, s: Store): State {
   return {
     address: s.address, bio: s.bio || "", jimotyUrl: s.jimotyUrl || "", youtubeUrl: s.youtubeUrl || "",
     facebookUrl: s.facebookUrl || "", otherUrl: s.otherUrl || "",
-    inAppChat: !!s.inAppChat,
     days, slots, taken,
     moveOut: s.moveOut || s.pickupTo || "",
     lineInviteUrl: contact.lineInviteUrl || null, phone: contact.phone || null,
@@ -119,11 +117,11 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
   const otherUrl = (state?.otherUrl || "").trim();
   const otherHref = extHref(otherUrl);
   const canJimoty = !!jimotyUrl, canLine = !!lineUrl, canPhone = !!phoneDisp, canFb = !!facebookUrl;
-  const canOther = !!otherUrl, canApp = !!state?.inAppChat;
+  const canOther = !!otherUrl;
   const methodOpts = (
-    [["jimoty", canJimoty], ["facebook", canFb], ["line", canLine], ["phone", canPhone],
-      ["other", canOther], ["app", canApp]] as const
-  ).filter(([, ok]) => ok).map(([id]) => [id, CH[id][0]] as [Method, string]);
+    [["jimoty", canJimoty], ["facebook", canFb], ["line", canLine], ["phone", canPhone], ["other", canOther]] as const
+  ).filter(([, ok]) => ok).map(([id]) => [id, CH[id][0]] as [Method, string])
+    .concat([["app", CH.app[0]]]);
   const chanHref: Record<Exclude<Method, "app">, string> = {
     jimoty: jimotyUrl, facebook: facebookUrl, line: lineUrl, phone: telHref(phoneDisp), other: otherHref,
   };
@@ -361,7 +359,7 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
             if (n) setLineName(n);
             setOpenId(null); setSlot(null);
             setMethod(canJimoty ? "jimoty" : canFb ? "facebook" : canLine ? "line"
-              : canPhone ? "phone" : canOther ? "other" : canApp ? "app" : null);
+              : canPhone ? "phone" : canOther ? "other" : "app");
             setChanOk(false); setErr(null); setCheckout(true);
           }}>
           {pickedItems.length
