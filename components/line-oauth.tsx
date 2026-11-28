@@ -1,5 +1,5 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { applyLineSession, getId } from "@/lib/shop";
 
 function cleanUrl() {
@@ -11,11 +11,30 @@ function cleanUrl() {
   if (dirty) window.history.replaceState({}, "", u.pathname + u.search + u.hash);
 }
 
-/** Soft+hard hydrate from LINE cookie; clean ?line_ok/?line_err. AppNav mounts app-wide. */
+const ERR_JA: Record<string, string> = {
+  state: "LINEログインを完了できませんでした。ログインを始めたブラウザ（Safari）でもう一度お試しください。",
+  token: "LINEログインに失敗しました。もう一度お試しください。",
+  denied: "LINEログインがキャンセルされました。",
+  config: "LINEログインは現在利用できません。",
+};
+const ERR_EN: Record<string, string> = {
+  state: "LINE login could not finish. Please try again in the same browser (Safari) where you started it.",
+  token: "LINE login failed. Please try again.",
+  denied: "LINE login was cancelled.",
+  config: "LINE login is not available right now.",
+};
+/** Visible message for ?line_err=… (was silently dropped, so failed iOS logins looked like a no-op). */
+export const lineErrText = (code: string, lang: string) => (lang === "ja" ? ERR_JA : ERR_EN)[code] || "";
+
+/** Soft+hard hydrate from LINE cookie; clean ?line_ok/?line_err. AppNav mounts app-wide.
+ *  Returns the ?line_err code (if any) so the shell can show it. */
 export function useLineOAuthReturn(onDone?: () => void) {
+  const [err, setErr] = useState("");
   useEffect(() => {
     const u = new URL(window.location.href);
     const dirty = u.searchParams.has("line_ok") || u.searchParams.has("line_err");
+    const code = u.searchParams.get("line_err");
+    if (code) setErr(code);
     void applyLineSession().then((s) => {
       if (dirty) cleanUrl();
       // Only remap on LINE OAuth return — never yank open unclaimed /admin (claim URL).
@@ -29,6 +48,7 @@ export function useLineOAuthReturn(onDone?: () => void) {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  return { err, clearErr: () => setErr("") };
 }
 
 export const lineLoginHref = (ret?: string) => {

@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AccountView } from "@/components/account-view";
 import { Icon } from "@/components/icons";
-import { useLineOAuthReturn } from "@/components/line-oauth";
+import { lineErrText, useLineOAuthReturn } from "@/components/line-oauth";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { listenPendingRequests } from "@/lib/live";
 import { t, useLang } from "@/lib/lang";
@@ -39,7 +39,7 @@ export default function AppNav() {
     if (!shopId) { setReqN(0); return; }
     return listenPendingRequests(shopId, setReqN);
   }, [shopId]);
-  useLineOAuthReturn();
+  const lineRet = useLineOAuthReturn();
   useEffect(() => { setOpen(""); }, [path]);
   useEffect(() => {
     if (!open) return;
@@ -112,6 +112,12 @@ export default function AppNav() {
 
   return (
     <nav className="app-nav bot" aria-label="アプリ">
+      {lineRet.err && lineErrText(lineRet.err, lang) ? (
+        <p className="sw" role="alert" onClick={lineRet.clearErr}
+          style={{ position: "fixed", left: 8, right: 8, bottom: 64, zIndex: 50, margin: 0, padding: "10px 12px", borderRadius: 8, background: "#fff", boxShadow: "0 2px 12px rgba(0,0,0,.2)" }}>
+          {lineErrText(lineRet.err, lang)}
+        </p>
+      ) : null}
       <div className="app-nav-inner">
         <div className="nav-start">
           <Link href="/" className="brand" prefetch aria-label={t("nav.home", lang)}>
