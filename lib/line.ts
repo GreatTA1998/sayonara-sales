@@ -10,6 +10,11 @@ export const SHOP_COOKIE = "ss-line-oauth-shop";
 
 export type LineSess = { uid: string; name: string; exp: number; shop?: string };
 
+/** Signed OAuth `state`: carries return path + shop hint so the callback works even when
+ *  the browser that finishes login is not the one that started it (iOS LINE app / in-app
+ *  browser / SFSafariViewController hand-off drops first-party cookies). */
+export type LineState = { n: string; ret: string; shop?: string; exp: number };
+
 /** dig5 or reserved elton — keep in sync with lib/shop isShop. */
 export const safeShop = (raw: string | null | undefined) => {
   const s = (raw || "").trim();
@@ -41,6 +46,71 @@ const secret = () => process.env.LINE_CHANNEL_SECRET || "dev";
 
 export const newState = () => randomBytes(16).toString("hex");
 
+const sign = (body: string) => createHmac("sha256", secret()).update(body).digest("base64url");
+
+export const signState = (s: LineState) => {
+  const body = Buffer.from(JSON.stringify(s)).toString("base64url");
+  return `${body}.${sign(body)}`;
+};
+
+/** Verify HMAC + expiry. Cookie-independent. */
+export const readState = (raw: string | undefined | null): LineState | null => {
+  if (!raw) return null;
+  const [body, sig] = raw.split(".");
+  if (!body || !sig) return null;
+  try {
+    const a = Buffer.from(sig);
+    const b = Buffer.from(sign(body));
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+    const s = JSON.parse(Buffer.from(body, "base64url").toString()) as LineState;
+    if (!s?.n || !s.exp || Date.now() > s.exp) return null;
+    return s;
+  } catch { return null; }
+};
+
+export type OwnedShop = { status: "found" | "none" | "error"; shop: string; all: string[] };
+
+/**
+ * Server-side lookup of the shop stamped with this LINE userId (shops.ownerLineUid), via
+ * Firestore REST (shops are publicly readable). Independent of the browser's Firestore
+ * SDK/IndexedDB, which is flaky on iOS WebKit. "error" ≠ "none": callers must never
+ * mint a new shop on "error".
+ */
+export async function lookupOwnedShop(uid: string): Promise<OwnedShop> {
+  const err: OwnedShop = { status: "error", shop: "", all: [] };
+  if (!uid) return err;
+  const pid = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim() || "sayonara-sales";
+  const key = process.env.NEXT_PUBLIC_FIREBASE_API_KEY?.trim();
+  try {
+    const res = await fetch(
+      `https://firestore.googleapis.com/v1/projects/${pid}/databases/(default)/documents:runQuery${key ? `?key=${encodeURIComponent(key)}` : ""}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        signal: AbortSignal.timeout(3500),
+        body: JSON.stringify({
+          structuredQuery: {
+            from: [{ collectionId: "shops" }],
+            where: { fieldFilter: { field: { fieldPath: "ownerLineUid" }, op: "EQUAL", value: { stringValue: uid } } },
+            limit: 5,
+          },
+        }),
+      },
+    );
+    if (!res.ok) return err;
+    const rows = (await res.json()) as { document?: { name?: string } }[];
+    if (!Array.isArray(rows)) return err;
+    const all = rows
+      .map((r) => safeShop(r.document?.name?.split("/").pop()))
+      .filter(Boolean);
+    if (!all.length) return { status: "none", shop: "", all: [] };
+    // Several stamped shops (should not happen): reserved elton wins, else lowest id.
+    const shop = all.includes("elton") ? "elton" : [...all].sort()[0];
+    return { status: "found", shop, all };
+  } catch { return err; }
+}
+
 export const signSess = (s: LineSess) => {
   const body = Buffer.from(JSON.stringify(s)).toString("base64url");
   const sig = createHmac("sha256", secret()).update(body).digest("base64url");
@@ -51,7 +121,7 @@ export const readSess = (raw: string | undefined | null): LineSess | null => {
   if (!raw) return null;
   const [body, sig] = raw.split(".");
   if (!body || !sig) return null;
-  const expect = createHmac("sha256", secret()).update(body).digest("base64url");
+  const expect = sign(body);
   try {
     const a = Buffer.from(sig);
     const b = Buffer.from(expect);
