@@ -5,7 +5,9 @@
  */
 import { readFileSync } from "fs";
 import { initializeTestEnvironment } from "@firebase/rules-unit-testing";
-import { doc, getDoc, setDoc, updateDoc, runTransaction } from "firebase/firestore";
+import {
+  doc, getDoc, setDoc, updateDoc, runTransaction, deleteDoc, writeBatch, serverTimestamp, Timestamp,
+} from "firebase/firestore";
 
 const hostEnv = process.env.FIRESTORE_EMULATOR_HOST || "127.0.0.1:8080";
 const [host, portStr] = hostEnv.split(":");
@@ -160,6 +162,63 @@ await testEnv.clearFirestore();
   check("soft contact can clear claimId", (await outcome(updateDoc(iref, {
     claimId: null,
   }))) === "ALLOW");
+}
+
+// Public item comments (shops/{shop}/items/{item}/comments) + per-uid cooldown (commentMeta).
+{
+  const owner = user("cowner", "password");
+  const buyer = user("cbuyer", "anonymous");
+  const buyer2 = user("cbuyer2", "anonymous");
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const fs = ctx.firestore();
+    await setDoc(doc(fs, "shops", "10007"), { address: "目黒区", published: true, ownerUid: owner.uid });
+    await setDoc(doc(fs, "shops", "10007", "items", "i1"), { name: "chair", price: 100 });
+    await setDoc(doc(fs, "shops", "10008"), { address: "目黒区", published: true });
+    await setDoc(doc(fs, "shops", "10008", "items", "i1"), { name: "desk", price: 100 });
+  });
+  const cref = (db, id = undefined, shopId = "10007") =>
+    doc(db, "shops", shopId, "items", "i1", "comments", id || `c${Math.random().toString(36).slice(2, 8)}`);
+  const meta = (db, uid, shopId = "10007") => doc(db, "shops", shopId, "commentMeta", uid);
+  const post = (u, over = {}, id = undefined, shopId = "10007") => {
+    const b = writeBatch(u.db);
+    b.set(meta(u.db, u.uid, shopId), { at: serverTimestamp() });
+    b.set(cref(u.db, id, shopId), {
+      authorUid: u.uid, name: "Taro", text: "Is it still available?", seller: false, at: serverTimestamp(), ...over,
+    });
+    return outcome(b.commit());
+  };
+  const reader = testEnv.unauthenticatedContext().firestore();
+
+  check("anon buyer posts comment", (await post(buyer, {}, "cb1")) === "ALLOW");
+  check("anyone reads comments", (await outcome(getDoc(cref(reader, "cb1")))) === "ALLOW");
+  check("second comment inside cooldown denied", (await post(buyer)).startsWith("DENY"));
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(meta(ctx.firestore(), buyer.uid), { at: Timestamp.fromMillis(Date.now() - 60000) });
+  });
+  check("comment after cooldown allowed", (await post(buyer, {}, "cb2")) === "ALLOW");
+  check("buyer cannot post as seller", (await post(buyer2, { seller: true })).startsWith("DENY"));
+  check("buyer cannot spoof authorUid", (await post(buyer2, { authorUid: "someone-else" })).startsWith("DENY"));
+  check("empty text denied", (await post(buyer2, { text: "" })).startsWith("DENY"));
+  check("too-long text denied", (await post(buyer2, { text: "x".repeat(501) })).startsWith("DENY"));
+  check("empty name denied", (await post(buyer2, { name: "" })).startsWith("DENY"));
+  check("extra field denied", (await post(buyer2, { admin: true })).startsWith("DENY"));
+  check("client-supplied time denied", (await post(buyer2, { at: Timestamp.fromMillis(Date.now() - 999999) })).startsWith("DENY"));
+  check("comment without cooldown stamp denied", (await outcome(setDoc(cref(buyer2.db), {
+    authorUid: buyer2.uid, name: "Taro", text: "hi", seller: false, at: serverTimestamp(),
+  }))).startsWith("DENY"));
+  check("unauthenticated cannot post", (await outcome(setDoc(cref(reader), {
+    authorUid: "x", name: "Taro", text: "hi", seller: false, at: serverTimestamp(),
+  }))).startsWith("DENY"));
+  check("missing item denied", (await outcome(setDoc(doc(buyer2.db, "shops", "10007", "items", "nope", "comments", "z"), {
+    authorUid: buyer2.uid, name: "T", text: "hi", seller: false, at: serverTimestamp(),
+  }))).startsWith("DENY"));
+  check("owner posts seller reply", (await post(owner, { seller: true, name: "Elton", text: "Yes!" }, "cs1")) === "ALLOW");
+  check("unclaimed shop: nobody is seller", (await post(buyer2, { seller: true }, undefined, "10008")).startsWith("DENY"));
+  check("comments cannot be edited", (await outcome(updateDoc(cref(buyer.db, "cb1"), { text: "edit" }))).startsWith("DENY"));
+  check("other buyer cannot delete", (await outcome(deleteDoc(cref(buyer2.db, "cb1")))).startsWith("DENY"));
+  check("author deletes own comment", (await outcome(deleteDoc(cref(buyer.db, "cb2")))) === "ALLOW");
+  check("owner deletes spam", (await outcome(deleteDoc(cref(owner.db, "cb1")))) === "ALLOW");
+  check("cooldown stamp unreadable by others", (await outcome(getDoc(meta(buyer2.db, buyer.uid)))).startsWith("DENY"));
 }
 
 await testEnv.cleanup();

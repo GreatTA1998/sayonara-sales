@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { byPrice, Listings, ListingTools, money, Seg, useDense, usePriceDir, useShowSold } from "@/components/photo-listing";
+import { ItemComments } from "@/components/item-comments";
 import { PhotoLightbox } from "@/components/photo-lightbox";
 import { useBodyScrollLock, useMaskDismiss } from "@/components/snack";
 import { afterLbl, dayLbl, moveOutLeft, tokyoYmd } from "@/lib/days";
@@ -436,6 +437,7 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
                   </button>
                 </>
               )}
+              <ItemComments shop={shop} itemId={open.id} isOwner={isMine} />
             </div>
           </div>
         </div>
