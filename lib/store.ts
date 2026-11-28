@@ -1,5 +1,6 @@
 import { addDays, dayLbl, daysBetween, tokyoYmd } from "./days";
-import { CANON_LINE, CANON_PHONE, DEF_LEAD, DEF_OFF, PICKUP_SLOTS, ytUrl } from "./sale";
+import { waitersFor, type Waiter } from "./waitlist";
+import { CANON_LINE, CANON_PHONE, DEF_LEAD, DEF_OFF, PICKUP_SLOTS, SLOT_MIN, ytUrl } from "./sale";
 
 export type Item = {
   id: string; name: string; price: number | null; note?: string; claimId?: string | null;
@@ -19,7 +20,8 @@ export type Claim = {
   spotId?: string; spotName?: string; spotMapsUrl?: string;
   /** requested = pending; booked = 予約済; picked_up = 引取済 (sold). */
   status: "requested" | "booked" | "picked_up" | "cancelled"; createdAt: string;
-  waiters?: { account: string; at: string; lineUid?: string }[];
+  /** Back-up buyers (キャンセル待ち), join order. Kept on a cancelled claim so the owner can promote. */
+  waiters?: Waiter[];
   buyerUid?: string;
   /** LINE Login userId (OA push). Soft Jimoty-only = absent → no push. */
   lineUid?: string;
@@ -117,6 +119,18 @@ export function slotTime(raw: unknown): string {
   if (!m) return "";
   return `${String(Math.min(23, +m[1])).padStart(2, "0")}:${String(Math.min(59, +m[2])).padStart(2, "0")}`;
 }
+
+const slotMins = (raw: unknown) => {
+  const t = slotTime(raw);
+  return t ? +t.slice(0, 2) * 60 + +t.slice(3) : -1;
+};
+/** Two pickup times clash when their SLOT_MIN-minute windows overlap (custom times like 10:10 vs 10:00). */
+export const slotsOverlap = (a: unknown, b: unknown) => {
+  const x = slotMins(a), y = slotMins(b);
+  return x >= 0 && y >= 0 && Math.abs(x - y) < SLOT_MIN;
+};
+/** True when `slot` overlaps any already-taken time (exact match is the 0-minute case). */
+export const slotTaken = (taken: string[], slot: unknown) => taken.some((t) => slotsOverlap(t, slot));
 
 export const shopSlots = (s: Store) => {
   const u = s.slots?.length ? [...new Set(s.slots.map(slotTime).filter(Boolean))].sort() : [];
@@ -296,7 +310,7 @@ export function itemFlags(s: Store, item: Item) {
   const c = claimOf(s, item);
   const sold = c?.status === "picked_up";
   const taken = c?.status === "booked" || sold;
-  const waitAs = c?.status === "booked" ? (c.waiters || []).map((w) => w.account).filter(Boolean) : [];
+  const waitAs = c?.status === "booked" ? waitersFor(c.waiters, item.id).map((w) => w.account) : [];
   return {
     taken, sold,
     reqN: taken ? 0 : s.claims.reduce((n, x) => n + (x.status === "requested" && x.itemIds.includes(item.id) ? 1 : 0), 0),
@@ -306,6 +320,56 @@ export function itemFlags(s: Store, item: Item) {
       ? { when: [dayLbl(c.day), slotTime(c.slot)].filter(Boolean).join(" ") }
       : {}),
   };
+}
+
+/** Claim statuses that hold an item (cancelled / missing claims do not). */
+const HOLDING = ["requested", "booked", "picked_up"];
+
+/**
+ * Why `item` can't be added to `claim` (null = addable). `holder` = status of the
+ * claim `item.claimId` points to ("" when unset / missing / cancelled).
+ */
+export function claimAddBlock(
+  item: Pick<Item, "id" | "claimId" | "paused" | "availableAfter">,
+  claim: Pick<Claim, "id" | "day" | "itemIds">,
+  holder: string,
+): string | null {
+  if (claim.itemIds.includes(item.id)) return "追加済み";
+  if (item.paused) return "一時停止中";
+  if (item.claimId && item.claimId !== claim.id && HOLDING.includes(holder)) return "取引中";
+  const after = asYmd(item.availableAfter);
+  if (after && claim.day && claim.day < after) return `${dayLbl(after)}以降`;
+  return null;
+}
+
+/**
+ * Never addable, even with the owner's confirm: already on this request, or sold (引取済).
+ * Everything else claimAddBlock reports (取引中 / paused / not yet available) is a soft block
+ * the owner can override after a confirm.
+ */
+export function claimAddHard(
+  item: Pick<Item, "id" | "claimId">,
+  claim: Pick<Claim, "id" | "itemIds">,
+  holder: string,
+): string | null {
+  if (claim.itemIds.includes(item.id)) return "追加済み";
+  if (item.claimId && item.claimId !== claim.id && holder === "picked_up") return "受付終了";
+  return null;
+}
+
+/** Status of the claim holding `item` ("" if none). */
+export const holderStatus = (s: Pick<Store, "claims">, item: Pick<Item, "claimId">) =>
+  (item.claimId && s.claims.find((c) => c.id === item.claimId)?.status) || "";
+
+const fold = (v: string) => v.normalize("NFKC").toLowerCase();
+/** Admin 品目検索: every space-separated token must appear in name or note. */
+export function searchItems<T extends { name: string; note?: string }>(items: T[], q: string): T[] {
+  const toks = fold(q).split(/\s+/).filter(Boolean);
+  if (!toks.length) return [];
+  return items.filter((it) => {
+    const hay = fold(`${it.name} ${it.note || ""}`);
+    return toks.every((t) => hay.includes(t));
+  });
 }
 
 export function shopFields(s: Store): Record<string, unknown> {
@@ -394,11 +458,12 @@ export function storeFromDocs(
         if (r.declineReason) c.declineReason = String(r.declineReason);
         if (Array.isArray(r.waiters)) {
           c.waiters = r.waiters.map((w) => {
-            const row = w as { account?: string; at?: string; lineUid?: string };
-            const out: { account: string; at: string; lineUid?: string } = {
+            const row = w as { account?: string; at?: string; lineUid?: string; itemIds?: unknown };
+            const out: Waiter = {
               account: String(row.account || ""), at: String(row.at || ""),
             };
             if (row.lineUid) out.lineUid = String(row.lineUid);
+            if (Array.isArray(row.itemIds) && row.itemIds.length) out.itemIds = row.itemIds.map(String);
             return out;
           }).filter((w) => w.account);
         }

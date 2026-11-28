@@ -2,10 +2,11 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { byPrice, Listings, ListingTools, money, Seg, useDense, usePriceDir, useShowSold } from "@/components/photo-listing";
+import { ItemComments } from "@/components/item-comments";
 import { PhotoLightbox } from "@/components/photo-lightbox";
 import { useBodyScrollLock, useMaskDismiss } from "@/components/snack";
 import { afterLbl, dayLbl, moveOutLeft, tokyoYmd } from "@/lib/days";
-import { lineLoginHref, WL_KEY } from "@/components/line-oauth";
+import { LineLoginAnchor, WL_KEY } from "@/components/line-oauth";
 import { bookShop, findOwnedShop, joinWaitLive, leaveWaitLive, listenShop } from "@/lib/live";
 import { t, useLang } from "@/lib/lang";
 import { notifyLine } from "@/lib/notify";
@@ -14,7 +15,7 @@ import {
 } from "@/lib/shop";
 import {
   bookableDays, cartAfter, cartDiscount, cartRule, itemFlags, shopContact, shopItemOff,
-  shopPublished, shopSlots, slotTime, takenSlots, type Store,
+  shopPublished, shopSlots, slotTaken, slotTime, takenSlots, type Store,
 } from "@/lib/store";
 import { extHref, telHref, ytUrl } from "@/lib/sale";
 
@@ -221,9 +222,9 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
     if (!next.length) { if (day) setDay(""); return; }
     if (!next.includes(day)) { setDay(next[0]); setSlot(null); }
   }, [state?.days, after, day]);
-  const freeSlots = (state?.slots || []).filter((s) => !(state?.taken?.[day] || []).includes(s));
+  const freeSlots = (state?.slots || []).filter((s) => !slotTaken(state?.taken?.[day] || [], s));
   useEffect(() => {
-    if (slot && (!(state?.slots || []).includes(slot) || (state?.taken?.[day] || []).includes(slot))) setSlot(null);
+    if (slot && (!(state?.slots || []).includes(slot) || slotTaken(state?.taken?.[day] || [], slot))) setSlot(null);
   }, [state, day, slot]);
   const cartSub = pickedItems.reduce((n, i) => n + (i.price ?? 0), 0);
   const itemOff = Number(state?.itemOff) || 0;
@@ -333,7 +334,13 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
     );
   }
 
-  if (!state) return <main className={`buy${embed ? " embed" : ""}`} aria-busy="true" />;
+  if (!state) {
+    return (
+      <main className={`buy${embed ? " embed" : ""}`} aria-busy={!err || undefined}>
+        {err ? <div className="err">{err}</div> : null}
+      </main>
+    );
+  }
 
   const soldOpen = !!open?.sold;
   const takenOpen = !!open?.taken && !soldOpen;
@@ -412,19 +419,22 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
               ) : takenOpen ? (
                 <>
                   <p className="sw sold">{t("badge.booked", lang)}{open.when ? ` — ${open.when}` : ""}</p>
-                  {open.waitN ? <p className="sw">{open.waitN}人待ち</p> : null}
+                  <p className="sn">{t("wait.wanted", lang)}</p>
+                  {waiting ? (
+                    <p className="hint">{t("wait.you", lang, { n: (open.waitAs || []).findIndex((a) => myKeys.includes(a)) + 1 })}</p>
+                  ) : open.waitN ? <p className="hint">{t("wait.n", lang, { n: open.waitN })}</p> : null}
                   {err && <div className="err">{err}</div>}
                   {waiting ? (
                     <button type="button" className="cta soft" disabled={busy}
-                      onClick={() => void leaveWait(open.id)}>順番をやめる</button>
+                      onClick={() => void leaveWait(open.id)}>{t("wait.leave", lang)}</button>
                   ) : canWaitSoft ? (
                     <button type="button" className="cta go" disabled={busy}
-                      onClick={() => void joinWait(open.id)}>キャンセル待ち</button>
+                      onClick={() => void joinWait(open.id)}>{t("wait.join", lang)}</button>
                   ) : (
-                    <a className="cta line" href={lineLoginHref()}
+                    <LineLoginAnchor
                       onClick={() => { try { sessionStorage.setItem(WL_KEY, `${shop}|${open.id}`); } catch { /* */ } }}>
-                      LINEでログインして並ぶ
-                    </a>
+                      {t("wait.line", lang)}
+                    </LineLoginAnchor>
                   )}
                 </>
               ) : (
@@ -436,6 +446,7 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
                   </button>
                 </>
               )}
+              <ItemComments shop={shop} itemId={open.id} isOwner={isMine} />
             </div>
           </div>
         </div>
@@ -510,7 +521,7 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
             {method === "jimoty" && !hardLine && (
               <>
                 <p className="hint">{t("buy.lineOpt", lang)}</p>
-                <a className="cta line" href={lineLoginHref()}>{t("buy.lineLogin", lang)}</a>
+                <LineLoginAnchor>{t("buy.lineLogin", lang)}</LineLoginAnchor>
               </>
             )}
           </div>

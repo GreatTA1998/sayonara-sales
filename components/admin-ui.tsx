@@ -10,6 +10,7 @@ import { TimePicker } from "@/components/time-picker";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { dayLbl, daysBetween, tokyoYmd } from "@/lib/days";
 import { DECLINE_PRESETS, DEF_LEAD, DEF_OFF, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
+import { ClaimAddItems } from "@/components/claim-add-items";
 import { SoftLoginForm } from "@/components/soft-login";
 import { CLAIM_KEY } from "@/components/line-oauth";
 import { adminAct, claimShop, listenShop } from "@/lib/live";
@@ -19,18 +20,19 @@ import {
   adoptShop, forgetShop, getLineUid, getName, openShop, subscribeAuth,
 } from "@/lib/shop";
 import {
-  ELTON_SHOP, itemFlags, pickupDays, shopItemOff, shopPublished, shopSlots, slotTime, uid,
+  ELTON_SHOP, itemFlags, pickupDays, shopItemOff, shopPublished, shopSlots, slotTime, slotsOverlap, uid,
   wardAddress as kuFull, wardStem as kuStem,
   type Store,
 } from "@/lib/store";
 import { SITE_URL } from "@/lib/site";
+import { planPromotion, type Waiter } from "@/lib/waitlist";
 
 type Item = PhotoItem & { claimId?: string | null; note?: string; paused?: boolean; availableAfter?: string; jimoty?: boolean };
 type Claim = {
   id: string; code: string; day: string; slot?: string; contact?: string; contactMethod?: string;
   itemIds: string[]; status: string; spotName?: string; spotMapsUrl?: string;
   lineUid?: string;
-  waiters?: { account: string; at: string; lineUid?: string }[];
+  waiters?: Waiter[];
 };
 type AdminState = {
   address: string; bio?: string; jimotyUrl?: string; youtubeUrl?: string; facebookUrl?: string;
@@ -142,7 +144,6 @@ export default function ShopAdminView({ shop, name }: Props) {
   const lineUid = useSyncExternalStore(subscribeAuth, getLineUid, () => "");
   const logged = !!(softName || lineUid);
   const lang = useLang();
-  const label = softName || (/^\d{5}$/.test(name) ? "" : name);
   const [ownOpen, setOwnOpen] = useState(false);
   const [ownBusy, setOwnBusy] = useState(false);
   const [camOpen, setCamOpen] = useState(false);
@@ -288,6 +289,23 @@ export default function ShopAdminView({ shop, name }: Props) {
     () => (open && data ? itemFlags(data as Store, open).waitAs : []),
     [open, data],
   );
+  /** Cancelled claims whose items are free again and still have back-ups: next in line, in order. */
+  const backups = useMemo(() => {
+    if (!data) return [];
+    const its = new Map(data.items.map((it) => [it.id, it]));
+    const st = new Map(data.claims.map((c) => [c.id, c.status]));
+    return data.claims.flatMap((c) => {
+      if (c.status !== "cancelled" || !c.waiters?.length) return [];
+      const free = c.itemIds.filter((id) => {
+        const it = its.get(id);
+        if (!it || it.paused) return false;
+        const hold = it.claimId ? st.get(it.claimId) : "";
+        return !hold || hold === "requested" || hold === "cancelled";
+      });
+      const plan = planPromotion(c, free);
+      return plan ? [{ c, plan, items: plan.itemIds.map((id) => its.get(id)!) }] : [];
+    });
+  }, [data]);
   const requests = claims.filter((c) => c.status === "requested");
   const pending = claims.filter((c) => c.status === "booked" || (showDone && c.status === "picked_up"));
   const hasDone = claims.some((c) => c.status === "picked_up");
@@ -300,6 +318,10 @@ export default function ShopAdminView({ shop, name }: Props) {
   );
   const rsDays = data ? pickupDays(data as Store) : [];
   const rsOpts = rsDay && !rsDays.includes(rsDay) ? [rsDay, ...rsDays] : rsDays;
+  /** Soft warning only: owner may still pick an overlapping time. */
+  const rsClash = !!(claimOpen && rsDay && rsSlot && (data?.claims || []).some((c) =>
+    c.id !== claimOpen.id && c.day === rsDay && (c.status === "requested" || c.status === "booked")
+    && slotsOverlap(c.slot, rsSlot)));
 
   async function act(payload: Record<string, unknown>, okMsg?: string) {
     setErr(null);
@@ -797,6 +819,30 @@ export default function ShopAdminView({ shop, name }: Props) {
   function toggleKeep(id: string) {
     setKeep((k) => (k.includes(id) ? (k.length <= 1 ? k : k.filter((x) => x !== id)) : [...k, id]));
   }
+  /** 品目を追加: stays open so several can be added; snapshot refreshes the list. */
+  const [adding, setAdding] = useState(false);
+  async function addToClaim(it: Item, opts: { force: boolean; cancelEmpty: boolean } = { force: false, cancelEmpty: false }) {
+    if (!claimOpen || adding) return;
+    setAdding(true);
+    try {
+      await adminAct(shop, { action: "addItems", id: claimOpen.id, itemIds: [it.id], ...opts });
+      setKeep((k) => (k.includes(it.id) ? k : [...k, it.id]));
+      show(`${itemLabel(it)}を追加しました`, "ok");
+    } catch (e) {
+      show(e instanceof Error ? e.message : "失敗しました", "err");
+    } finally { setAdding(false); }
+  }
+  /** Book the next back-up of a cancelled claim. The snapshot brings the new 引き取り予定 row. */
+  function promote(c: Claim, winner: Waiter) {
+    void adminAct(shop, { action: "promote", id: c.id }).then((r) => {
+      const nc = r as Claim | undefined;
+      if (winner.lineUid && nc) notifyLine(winner.lineUid, "confirm", { day: nc.day, slot: nc.slot, code: nc.code });
+      show(`${winner.account}さんを繰り上げました`, "ok");
+    }).catch((e) => {
+      const msg = e instanceof Error ? e.message : "失敗しました";
+      setErr(msg); show(msg, "err");
+    });
+  }
   /** Like publish / photo-delete: dismiss + snack first; local patch then snap. */
   function claimAct(payload: Record<string, unknown>, okMsg: string) {
     const id = String(payload.id || "");
@@ -804,7 +850,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     const prev = data;
     const nextIds = Array.isArray(payload.itemIds) ? payload.itemIds.map(String) : null;
     if (payload.action === "reschedule") {
-      const day = String(payload.day || ""), slot = String(payload.slot || "");
+      const day = String(payload.day || ""), slot = slotTime(payload.slot);
       setData((d) => d && { ...d, claims: d.claims.map((c) => (c.id === id ? { ...c, day, slot } : c)) });
     } else {
       const st = payload.action === "items" ? null
@@ -826,7 +872,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     void adminAct(shop, payload).then(() => {
       if (!snap) return;
       const day = String(payload.day || snap.day || "");
-      const slot = String(payload.slot || snap.slot || "");
+      const slot = slotTime(payload.slot || snap.slot);
       const act = String(payload.action || "");
       if (snap.lineUid && act === "confirm") {
         notifyLine(snap.lineUid, "confirm", { day, slot, code: snap.code });
@@ -834,11 +880,6 @@ export default function ShopAdminView({ shop, name }: Props) {
         notifyLine(snap.lineUid, "reschedule", { day, slot });
       } else if (snap.lineUid && act === "cancel") {
         notifyLine(snap.lineUid, "decline", { reason: String(payload.reason || "") });
-      }
-      if (act === "cancel" && snap.status === "booked") {
-        for (const w of snap.waiters || []) {
-          if (w.lineUid) notifyLine(w.lineUid, "wait_open");
-        }
       }
     }).catch((e) => {
       const msg = e instanceof Error ? e.message : "失敗しました";
@@ -862,7 +903,6 @@ export default function ShopAdminView({ shop, name }: Props) {
   return (
     <main className="buy admin">
       <header className="bar admin-bar">
-        <span className="shop" aria-label="ショップ名">{label || "Admin"}</span>
         <label className="area-float" aria-label="区">
             <input value={addrDraft} disabled={!data} size={areaN}
             style={{ width: `${areaN}em` }}
@@ -895,6 +935,26 @@ export default function ShopAdminView({ shop, name }: Props) {
 
       {err && <div className="err">{err}</div>}
       {!data && !err && <p className="text-sm text-muted pad">読み込み中…</p>}
+
+      {backups.length > 0 && (
+        <section className="claims">
+          <div className="claims-h">バックアップ</div>
+          <ol className="timeline">
+            {backups.map(({ c, plan, items: its }) => (
+              <li key={c.id}>
+                <div className="tl-r" style={{ cursor: "default" }}>
+                  <span className="tl-when">{dayLbl(c.day)} {slotTime(c.slot) || "—"} · キャンセル済み</span>
+                  <span className="tl-sum">{its.map(itemLabel).join("、")}</span>
+                  <span className="tl-sum">{[plan.winner, ...plan.moved].map((w, i) => `${i + 1}.${w.account}`).join(" → ")}</span>
+                  <div className="claim-acts">
+                    <button type="button" onClick={() => promote(c, plan.winner)}>{plan.winner.account}さんを繰り上げ</button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
 
       {([["依頼", requests], ["引き取り予定", pending]] as const).map(([title, list]) => (list.length > 0 || (title === "引き取り予定" && hasDone)) && (
         <section key={title} className="claims">
@@ -1185,6 +1245,9 @@ export default function ShopAdminView({ shop, name }: Props) {
                   : claimOpen.spotName}
               </p>
             ) : null}
+            {claimOpen.status === "booked" && claimOpen.waiters?.length ? (
+              <p className="hint">バックアップ {claimOpen.waiters.map((w, i) => `${i + 1}.${w.account}`).join(" → ")}</p>
+            ) : null}
             <ul className="claim-items" aria-label="依頼の品目">
               {claimList.map((it) => (
                 <li key={it.id}>
@@ -1198,6 +1261,9 @@ export default function ShopAdminView({ shop, name }: Props) {
                 </li>
               ))}
             </ul>
+            {data && !pane && (claimOpen.status === "requested" || claimOpen.status === "booked") ? (
+              <ClaimAddItems claim={claimOpen} shop={data as Store} busy={adding} onAdd={(it, o) => void addToClaim(it, o)} />
+            ) : null}
             {claimOpen.status === "requested" && pane === "decline" ? (
               <div className="decline-list" role="group" aria-label="お断り理由">
                 <p className="hint">丁寧なお断り文を選んでください</p>
@@ -1211,7 +1277,7 @@ export default function ShopAdminView({ shop, name }: Props) {
               <div className="decline-list" role="group" aria-label="日程変更">
                 <div className="when">
                   <span className="date-ctl"><select value={rsDay} aria-label="日付"
-                    onChange={(e) => { setRsDay(e.target.value); setRsSlot(null); }}>
+                    onChange={(e) => setRsDay(e.target.value)}>
                     {rsOpts.map((d) => <option key={d} value={d}>{dayLbl(d)}</option>)}
                   </select></span>
                   <div className="slots" role="group" aria-label="時間帯">
@@ -1220,6 +1286,10 @@ export default function ShopAdminView({ shop, name }: Props) {
                         className={rsSlot === s ? "slot on" : "slot"} onClick={() => setRsSlot(s)}>{s}</button>
                     ))}
                   </div>
+                  {/* Any minute, not just the quick picks (e.g. 10:30, 14:45). */}
+                  <input className="tp-input rs-time" type="time" step={60} value={rsSlot || ""}
+                    aria-label="時間" onChange={(e) => setRsSlot(slotTime(e.target.value) || null)} />
+                  {rsClash ? <p className="hint">同じ時間帯に別の依頼があります</p> : null}
                 </div>
                 <label className="late-check"><input type="checkbox" checked={rsOk}
                   onChange={(e) => setRsOk(e.target.checked)} />チャットで合意済み</label>
@@ -1297,7 +1367,7 @@ export default function ShopAdminView({ shop, name }: Props) {
             <DateField label="この日以降" optional value={editAfter}
               onChange={(v) => { if (!busyOpen) patchEdit("after", v); }} />
             {openWaiters.length > 0 ? (
-              <p className="sw">待ち {openWaiters.map((a, i) => `${i + 1}.${a}`).join(" → ")}</p>
+              <p className="sw">バックアップ {openWaiters.map((a, i) => `${i + 1}.${a}`).join(" → ")}</p>
             ) : null}
             <button type="button" className="cta soft" disabled={busyOpen}
               onClick={() => void togglePause(open)}>

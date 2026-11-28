@@ -8,10 +8,10 @@ import { dayLbl } from "@/lib/days";
 import { getSavedLang, langLabel, offerLang, setLang, t, useLang } from "@/lib/lang";
 import { buyerClaimAct, fetchBuyHistory, loadBuyerPickup } from "@/lib/live";
 import {
-  getFacebookName, getJimotyName, getLineName, getLineUid, getName, logout, subscribeAuth,
+  getFacebookName, getJimotyName, getLineName, getLineUid, getName, listBuys, logout, subscribeAuth,
   type BuyRow,
 } from "@/lib/shop";
-import { slotTime } from "@/lib/store";
+import { slotTaken, slotTime } from "@/lib/store";
 
 const pts = (names: (string | undefined | null)[]) => {
   const n = names.map((x) => x?.trim() || "無題");
@@ -47,8 +47,9 @@ export function AccountView({
   useEffect(() => {
     let dead = false;
     setBuys(null);
+    const finish = (rows: BuyRow[]) => { if (!dead) setBuys(rows); };
     const sync = () => {
-      void fetchBuyHistory().then((rows) => { if (!dead) setBuys(rows); });
+      void fetchBuyHistory().then(finish, () => finish(listBuys()));
     };
     sync();
     const unsub = subscribeAuth(sync);
@@ -81,7 +82,7 @@ export function AccountView({
       });
       show(t(action === "cancel" ? "me.cancelOk" : "me.reschedOk", lang), "ok");
       setOpenKey(""); setPane("acts"); setBusy(false);
-      void fetchBuyHistory().then(setBuys);
+      void fetchBuyHistory().then(setBuys, () => setBuys(listBuys()));
     } catch (e) {
       setBusy(false);
       show(e instanceof Error ? e.message : "失敗しました", "err");
@@ -93,15 +94,11 @@ export function AccountView({
   const cur = getSavedLang() || "ja";
   const langVal = cur === "ja" ? "ja" : offer;
   const rsOpts = rsDay && days.length && !days.includes(rsDay) ? [rsDay, ...days] : days;
-  const free = slots.filter((s) => !taken.includes(s) || s === rsSlot);
+  // The booking's own custom time (e.g. 10:30 after an owner reschedule) stays selectable.
+  const free = (rsSlot && !slots.includes(rsSlot) ? [...slots, rsSlot].sort() : slots)
+    .filter((s) => !slotTaken(taken, s) || s === rsSlot);
 
-  if (buys === null) {
-    return (
-      <div className="account-view" aria-busy="true">
-        <p className="av-load">{t("home.loading", lang)}</p>
-      </div>
-    );
-  }
+  const loading = buys === null;
 
   return (
     <div className="account-view ready">
@@ -135,7 +132,9 @@ export function AccountView({
       </section>
       <section className="claims">
         <div className="claims-h">{t("me.buys", lang)}</div>
-        {buys.length ? (
+        {loading ? (
+          <p className="av-load" aria-busy="true">{t("home.loading", lang)}</p>
+        ) : buys && buys.length ? (
           <ul className="timeline">{buys.map((b) => {
             const on = rowKey(b) === openKey;
             return (
@@ -182,7 +181,9 @@ export function AccountView({
               </li>
             );
           })}</ul>
-        ) : null}
+        ) : (
+          <p className="hint">{t("me.buysEmpty", lang)}</p>
+        )}
       </section>
       <Snack snack={snack} />
     </div>

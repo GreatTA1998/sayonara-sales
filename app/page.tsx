@@ -15,11 +15,18 @@ export default function HomePage() {
   const [cards, setCards] = useState<Card[]>([]);
   const [selected, setSelected] = useState<string>(ELTON_ID);
   const [readyShop, setReadyShop] = useState<string | null>(null);
+  const [tabsReady, setTabsReady] = useState(false);
   const { snack, show } = useSnack();
 
   const refresh = useCallback(async () => {
-    try { setCards(await listPublishedShops()); }
-    catch { setCards([]); }
+    try {
+      const rows = await Promise.race([
+        listPublishedShops(),
+        new Promise<Card[]>((_, reject) => setTimeout(() => reject(new Error("timeout")), 8000)),
+      ]);
+      setCards(rows);
+    } catch { setCards([]); }
+    finally { setTabsReady(true); }
   }, []);
 
   // Defer so embedded listenShop wins the cold Firebase connection.
@@ -33,7 +40,8 @@ export default function HomePage() {
   const active = cards.find((c) => c.id === selected) || cards[0];
   const shopId = active?.id || ELTON_ID;
   // Sun-ray until both shop-tab nav and selected shop are ready.
-  const panelReady = cards.length > 0 && readyShop !== null;
+  // Tabs may be empty (query error / none published); don't hang the panel on that.
+  const panelReady = tabsReady && readyShop !== null;
   const copyUrl = (e: { stopPropagation(): void }) => {
     e.stopPropagation();
     const url = `${SITE_URL}/s/${shopId}`;

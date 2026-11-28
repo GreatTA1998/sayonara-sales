@@ -6,10 +6,15 @@
     "build": "next build",
     "start": "next start",
     "test:rules": "npx firebase-tools emulators:exec --only firestore --project demo-sayonara \"node scripts/firestore-rules.test.mjs\"",
+    "test:line": "tsx --test scripts/line-login.test.ts",
+    "test:slots": "tsx --test scripts/slots.test.ts",
     "test:prospect": "node --test scripts/prospect.test.mjs",
+    "test:claim-items": "tsx scripts/claim-items.test.ts",
+    "test:claim-move": "npx firebase-tools emulators:exec --only firestore --project demo-sayonara \"tsx scripts/claim-move.test.ts\"",
     "test:shop-builder-spec": "tsx scripts/shop-builder-spec.test.ts",
     "test:shop-builder": "npx firebase-tools emulators:exec --only firestore,auth --project demo-sayonara \"tsx scripts/shop-builder.contract.test.ts\"",
-    "test": "npm run test:prospect && npm run test:shop-builder-spec && npm run test:rules && npm run test:shop-builder"
+    "test:waitlist": "tsx scripts/waitlist.test.ts",
+    "test": "npm run test:line && npm run test:slots && npm run test:prospect && npm run test:claim-items && npm run test:claim-move && npm run test:waitlist && npm run test:shop-builder-spec && npm run test:rules && npm run test:shop-builder"
   },
   "dependencies": {
     "@vercel/blob": "^2.9.0",

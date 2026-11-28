@@ -1,4 +1,6 @@
 export const PICKUP_SLOTS = ["10:00", "14:00", "20:00"];
+/** Pickup window length (minutes): a slot is 10:00–10:15. Also the shop slot-picker step. */
+export const SLOT_MIN = 15;
 export const DEF_LEAD = 2;
 /** Yen off per cart item (progressive bulk reward). 0 = off. */
 export const DEF_OFF = 100;

@@ -136,35 +136,50 @@ export const openShop = (n: string, kind: "jimoty" | "line" | "facebook" = "jimo
 export const getLineUid = () =>
   typeof window === "undefined" ? "" : (hydrate(), stored(UID_KEY));
 
-/** Firestore shop stamped with this LINE uid (shops.*.ownerLineUid). */
-async function shopByOwnerLineUid(uid: string): Promise<string> {
-  if (!uid) return "";
+/** Firestore shop stamped with this LINE uid (shops.*.ownerLineUid). "error" ≠ "none". */
+async function shopByOwnerLineUid(uid: string): Promise<{ id: string; ok: boolean }> {
+  if (!uid) return { id: "", ok: true };
   try {
     const { getDb } = await import("./fb");
     const { collection, getDocs, limit, query, where } = await import("firebase/firestore");
     const snap = await getDocs(
-      query(collection(getDb(), "shops"), where("ownerLineUid", "==", uid), limit(1)),
+      query(collection(getDb(), "shops"), where("ownerLineUid", "==", uid), limit(5)),
     );
-    const id = snap.docs[0]?.id || "";
-    return isShop(id) ? id : "";
-  } catch { return ""; }
+    const ids = snap.docs.map((d) => d.id).filter(isShop);
+    return { id: ids.includes(ELTON_ID) ? ELTON_ID : ids.sort()[0] || "", ok: true };
+  } catch { return { id: "", ok: false }; }
 }
 
 /**
- * Bind LINE OAuth → shop. Firestore ownerLineUid stamp wins over stale
- * ss-shop-id / umap dig5. Else first bind: soft cur/hint → local umap.
+ * Bind LINE OAuth → shop. An existing LINE identity always lands on the shop it owns
+ * (`owned`: Firestore ownerLineUid stamp, resolved server-side and/or in the browser),
+ * overriding any stale local pointer. Otherwise: this device's uid→shop map, the current
+ * shop, the pre-login hint, a reserved name. A brand-new shop is minted only when we
+ * *know* the LINE uid owns nothing (`lookupOk`); if the ownership lookup failed we leave
+ * the pointer alone so a flaky lookup can never create a duplicate account.
  */
-export const bindLineUser = (uid: string, displayName: string, shopHint = "", stamped = "") => {
+export const bindLineUser = (
+  uid: string, displayName: string, shopHint = "", owned = "", lookupOk = true,
+) => {
   if (typeof window === "undefined" || !uid.trim()) return "";
   const umap = readUidMap();
   const map = readMap();
   const cur = getId();
   const hint = isShop(shopHint) ? shopHint : "";
-  const stamp = isShop(stamped) ? stamped : "";
+  const own = isShop(owned) ? owned : "";
   const name = displayName.trim();
-  let id = stamp || (isShop(cur) ? cur : "") || hint || umap[uid] || knownId(name) || "";
+  let id = own || (isShop(umap[uid]) ? umap[uid] : "") || (isShop(cur) ? cur : "")
+    || hint || knownId(name) || "";
   localStorage.setItem(UID_KEY, uid);
-  if (!isShop(id)) id = ensureShopId();
+  if (!isShop(id)) {
+    if (!lookupOk) {
+      // Unknown ownership: sign in (uid + name) but do not mint a shop.
+      if (name) localStorage.setItem(LINE_KEY, name);
+      notifyAuth();
+      return "";
+    }
+    id = ensureShopId();
+  }
   if (name) {
     map[norm(name)] = id;
     localStorage.setItem(MAP_KEY, JSON.stringify(map));
@@ -183,10 +198,16 @@ export const applyLineSession = async () => {
   if (typeof window === "undefined") return null;
   const res = await fetch("/api/auth/session", { cache: "no-store", credentials: "same-origin" });
   if (!res.ok) return null;
-  const body = await res.json() as { ok?: boolean; uid?: string; name?: string; shop?: string };
+  const body = await res.json() as {
+    ok?: boolean; uid?: string; name?: string; shop?: string; owned?: boolean; lookup?: string;
+  };
   if (!body.ok || !body.uid || !body.name) return null;
-  const stamped = await shopByOwnerLineUid(body.uid);
-  const id = bindLineUser(body.uid, body.name, body.shop || "", stamped);
+  const srv = body.owned ? body.shop || "" : "";
+  // Server says "none"/"found" definitively; only ask the browser SDK when the server lookup failed.
+  const cli = srv || body.lookup !== "error" ? { id: "", ok: true } : await shopByOwnerLineUid(body.uid);
+  const known = srv || cli.id;
+  const lookupOk = !!known || (body.lookup !== "error" || cli.ok);
+  const id = bindLineUser(body.uid, body.name, body.owned ? "" : body.shop || "", known, lookupOk);
   return { ...body, shop: id };
 };
 
