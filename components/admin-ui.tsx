@@ -144,7 +144,6 @@ export default function ShopAdminView({ shop, name }: Props) {
   const lineUid = useSyncExternalStore(subscribeAuth, getLineUid, () => "");
   const logged = !!(softName || lineUid);
   const lang = useLang();
-  const label = softName || (/^\d{5}$/.test(name) ? "" : name);
   const [ownOpen, setOwnOpen] = useState(false);
   const [ownBusy, setOwnBusy] = useState(false);
   const [camOpen, setCamOpen] = useState(false);
@@ -904,7 +903,6 @@ export default function ShopAdminView({ shop, name }: Props) {
   return (
     <main className="buy admin">
       <header className="bar admin-bar">
-        <span className="shop" aria-label="ショップ名">{label || "Admin"}</span>
         <label className="area-float" aria-label="区">
             <input value={addrDraft} disabled={!data} size={areaN}
             style={{ width: `${areaN}em` }}

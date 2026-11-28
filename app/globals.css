@@ -19,3 +19,14 @@
 .legal{max-width:36rem}.legal section{margin:1.25rem 0 0}.legal h2{font-size:var(--t-lg);font-weight:var(--fw-bold);margin:0 0 6px;line-height:var(--lh-tight)}.legal p{margin:0 0 8px;font-size:var(--t-sm);line-height:1.55}
 
 .claim-add-open{width:100%;margin-top:6px;padding:8px 10px;border:1px dashed #888;border-radius:2px;background:#fff;color:var(--c);cursor:pointer;font:inherit;font-size:var(--t-sm)}.claim-add{margin-top:6px}.claim-add-bar{display:flex;gap:6px}.claim-add-bar input{flex:1;min-width:0;padding:8px 10px;border:1px solid #ccc;border-radius:8px;font:inherit;box-sizing:border-box}.claim-add-bar button{flex:0 0 auto;padding:0 12px;border:1px solid #ccc;border-radius:8px;background:#fff;color:var(--c-muted);cursor:pointer;font:inherit}.claim-add-list{list-style:none;margin:4px 0 0;padding:0;max-height:13rem;overflow:auto}.claim-add-list button{display:flex;align-items:center;gap:8px;width:100%;padding:8px 2px;border:0;border-bottom:1px solid #eee;background:transparent;color:var(--c);cursor:pointer;font:inherit;font-size:var(--t-sm);text-align:left}.claim-add-list button:disabled{color:var(--c-muted);cursor:default}.claim-add-list .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.claim-add-list .p,.claim-add-list .s{flex:0 0 auto;color:var(--c-muted)}.claim-add-list button:not(:disabled) .s{color:var(--c-go)}
+
+/* Bottom nav: every label stays on one line; only the username truncates (min-width:0 chain). */
+.app-nav-inner{gap:clamp(8px,3vw,22px)}
+.app-nav .nav-start{flex:0 0 auto;gap:clamp(6px,2vw,10px);min-width:0}
+.app-nav .nav-end{flex:1 1 0;min-width:0;justify-content:flex-end;gap:clamp(8px,3vw,22px)}
+.app-nav .brand,.app-nav .nav-a{white-space:nowrap}
+.app-nav .brand span{white-space:nowrap}
+.app-nav .nav-start .nav-a,.app-nav .nav-help{flex:0 0 auto}
+.app-nav .nav-me{flex:0 1 auto;min-width:0}
+.app-nav .nav-me>.nav-a{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:359px){.app-nav .logo{width:40px;height:21px}.app-nav .nav-a,.app-nav .brand{font-size:var(--t-sm)}}
