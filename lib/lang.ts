@@ -21,6 +21,7 @@ const S: Record<string, [string, string]> = {
   "me.jimotyName": ["ジモティー名", "Jimoty name"],
   "me.facebookName": ["Facebook名", "Facebook name"],
   "me.buys": ["買う · 引き取り履歴", "Buys · pickup history"],
+  "me.buysEmpty": ["依頼はありません", "No requests"],
   "me.cancel": ["キャンセル", "Cancel"],
   "me.resched": ["日程変更", "Reschedule"],
   "me.reschedGo": ["変更する", "Confirm"],

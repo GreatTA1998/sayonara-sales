@@ -758,8 +758,27 @@ async function promoteBackup(shop: string, claimId: string, ownerUid: string) {
   return booked;
 }
 
+
+/** Reject if `p` has not settled in `ms` (clears the timer either way). */
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  let t: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    p.finally(() => { if (t) clearTimeout(t); }),
+    new Promise<T>((_, reject) => { t = setTimeout(() => reject(new Error("timeout")), ms); }),
+  ]);
+}
+
 /** Soft-name / LINE uid → buys (published+elton claims match contact, else local ss-buys). */
 export async function fetchBuyHistory(): Promise<BuyRow[]> {
+  try {
+    return await withTimeout(loadBuyHistory(), 8000);
+  } catch {
+    // Empty, missing docs, permission errors, or a hung getDocs: show local rows (maybe none).
+    return listBuys();
+  }
+}
+
+async function loadBuyHistory(): Promise<BuyRow[]> {
   const names = new Set(
     [getJimotyName(), getLineName(), getFacebookName(), getName()].map((s) => s.trim()).filter(Boolean),
   );
@@ -769,14 +788,16 @@ export async function fetchBuyHistory(): Promise<BuyRow[]> {
   const db = getDb();
   const shops = new Set<string>([ELTON_SHOP, ...local.map((b) => b.shop)]);
   try {
-    for (const d of (await getDocs(query(collection(db, "shops"), where("published", "==", true)))).docs) {
-      shops.add(d.id);
-    }
-  } catch { /* offline */ }
+    const published = await withTimeout(
+      getDocs(query(collection(db, "shops"), where("published", "==", true))),
+      4000,
+    );
+    for (const d of published.docs) shops.add(d.id);
+  } catch { /* offline / timeout — keep elton + local shops */ }
   const byKey = new Map<string, BuyRow>(local.map((b) => [`${b.shop}|${b.code}|${b.day}|${b.slot}`, b]));
   for (const shop of shops) {
     let snap;
-    try { snap = await getDocs(collection(db, "shops", shop, "claims")); }
+    try { snap = await withTimeout(getDocs(collection(db, "shops", shop, "claims")), 4000); }
     catch { continue; }
     const mine = snap.docs.filter((d) => {
       const r = d.data();

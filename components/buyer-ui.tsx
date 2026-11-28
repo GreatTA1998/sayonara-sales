@@ -334,7 +334,13 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
     );
   }
 
-  if (!state) return <main className={`buy${embed ? " embed" : ""}`} aria-busy="true" />;
+  if (!state) {
+    return (
+      <main className={`buy${embed ? " embed" : ""}`} aria-busy={!err || undefined}>
+        {err ? <div className="err">{err}</div> : null}
+      </main>
+    );
+  }
 
   const soldOpen = !!open?.sold;
   const takenOpen = !!open?.taken && !soldOpen;
