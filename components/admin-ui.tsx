@@ -1287,7 +1287,7 @@ export default function ShopAdminView({ shop, name }: Props) {
                     ))}
                   </div>
                   {/* Any minute, not just the quick picks (e.g. 10:30, 14:45). */}
-                  <input className="tp-input" style={{ margin: 0 }} type="time" step={60} value={rsSlot || ""}
+                  <input className="tp-input rs-time" type="time" step={60} value={rsSlot || ""}
                     aria-label="時間" onChange={(e) => setRsSlot(slotTime(e.target.value) || null)} />
                   {rsClash ? <p className="hint">同じ時間帯に別の依頼があります</p> : null}
                 </div>
