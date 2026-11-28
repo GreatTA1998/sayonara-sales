@@ -15,7 +15,7 @@ import {
   type BuyRow,
 } from "./shop";
 import {
-  applyDates, applyItemOff, bookableDays, cartAfter, cartDiscount, claimFields, pickupDays, priceOf,
+  applyDates, applyItemOff, bookableDays, cartAfter, cartDiscount, claimAddBlock, claimFields, pickupDays, priceOf,
   ELTON_SHOP, hasBuyerContact, itemFields, normalizeSlots, normalizeSpots, parseShop, shortCode,
   shopFields, shopItemOff, shopSlots, slotTime, storeFromDocs, takenSlots, uid, type Claim, type Item, type Store,
 } from "./store";
@@ -317,6 +317,52 @@ async function setClaimItems(
   return asClaim(id, { ...csnap.data(), ...patch });
 }
 
+/**
+ * Add free items to a claim (requested / booked) and bind item.claimId,
+ * so they read as held under that request. Re-checks every item in the tx; any
+ * item held by another open claim, paused, or not yet available on claim.day aborts.
+ */
+async function addClaimItems(shop: string, id: string, addRaw: string[]) {
+  const db = getDb();
+  const add = [...new Set(addRaw.map(String).filter(Boolean))];
+  if (!add.length) throw new Error("品目を選んでください");
+  const cref = doc(db, "shops", shop, "claims", id);
+  return runTransaction(db, async (tx) => {
+    const csnap = await tx.get(cref);
+    const c = csnap.data();
+    if (!csnap.exists() || !c || !["requested", "booked"].includes(String(c.status))) throw new Error("No claim");
+    const cur: string[] = Array.isArray(c.itemIds) ? c.itemIds.map(String) : [];
+    const day = String(c.day || "");
+    const isnaps = await Promise.all(add.map((iid) => tx.get(doc(db, "shops", shop, "items", iid))));
+    const holders = new Map<string, string>();
+    for (const s of isnaps) {
+      const h = s.exists() && s.data()!.claimId ? String(s.data()!.claimId) : "";
+      if (h && h !== id && !holders.has(h)) {
+        const hs = await tx.get(doc(db, "shops", shop, "claims", h));
+        holders.set(h, hs.exists() ? String(hs.data()!.status || "") : "");
+      }
+    }
+    const fresh: string[] = [];
+    isnaps.forEach((s, i) => {
+      if (!s.exists()) throw new Error("品目が見つかりません");
+      const r = s.data()!;
+      const why = claimAddBlock(
+        { id: add[i], claimId: r.claimId ? String(r.claimId) : null, paused: !!r.paused, availableAfter: String(r.availableAfter || "") },
+        { id, day, itemIds: cur },
+        holders.get(String(r.claimId || "")) || "",
+      );
+      if (why === "追加済み") return;
+      if (why) throw new Error(`${String(r.name || "無題")}: ${why}`);
+      fresh.push(add[i]);
+    });
+    if (!fresh.length) return asClaim(id, c);
+    const next = [...cur, ...fresh];
+    tx.update(cref, { itemIds: next });
+    for (const iid of fresh) tx.update(doc(db, "shops", shop, "items", iid), { claimId: id });
+    return asClaim(id, { ...c, itemIds: next });
+  });
+}
+
 /** Admin mutations — same action surface as old /api/admin. */
 export async function adminAct(shopRaw: string, body: Record<string, unknown>): Promise<unknown> {
   const shop = parseShop(shopRaw);
@@ -537,6 +583,9 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       return setClaimItems(shop, String(body.id), body.itemIds.map(String), {
         from: ["requested", "booked", "picked_up"],
       });
+    case "addItems":
+      if (!Array.isArray(body.itemIds)) throw new Error("品目を選んでください");
+      return addClaimItems(shop, String(body.id), body.itemIds.map(String));
     case "reschedule": {
       // day+slot + agreed checkbox; no buyer lead; pending or confirmed.
       if (!body.agreed) throw new Error("チャットで合意が必要です");
