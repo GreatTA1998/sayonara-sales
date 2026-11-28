@@ -342,6 +342,21 @@ export function claimAddBlock(
   return null;
 }
 
+/**
+ * Never addable, even with the owner's confirm: already on this request, or sold (引取済).
+ * Everything else claimAddBlock reports (取引中 / paused / not yet available) is a soft block
+ * the owner can override after a confirm.
+ */
+export function claimAddHard(
+  item: Pick<Item, "id" | "claimId">,
+  claim: Pick<Claim, "id" | "itemIds">,
+  holder: string,
+): string | null {
+  if (claim.itemIds.includes(item.id)) return "追加済み";
+  if (item.claimId && item.claimId !== claim.id && holder === "picked_up") return "受付終了";
+  return null;
+}
+
 /** Status of the claim holding `item` ("" if none). */
 export const holderStatus = (s: Pick<Store, "claims">, item: Pick<Item, "claimId">) =>
   (item.claimId && s.claims.find((c) => c.id === item.claimId)?.status) || "";

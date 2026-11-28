@@ -821,11 +821,11 @@ export default function ShopAdminView({ shop, name }: Props) {
   }
   /** 品目を追加: stays open so several can be added; snapshot refreshes the list. */
   const [adding, setAdding] = useState(false);
-  async function addToClaim(it: Item) {
+  async function addToClaim(it: Item, opts: { force: boolean; cancelEmpty: boolean } = { force: false, cancelEmpty: false }) {
     if (!claimOpen || adding) return;
     setAdding(true);
     try {
-      await adminAct(shop, { action: "addItems", id: claimOpen.id, itemIds: [it.id] });
+      await adminAct(shop, { action: "addItems", id: claimOpen.id, itemIds: [it.id], ...opts });
       setKeep((k) => (k.includes(it.id) ? k : [...k, it.id]));
       show(`${itemLabel(it)}を追加しました`, "ok");
     } catch (e) {
@@ -1262,7 +1262,7 @@ export default function ShopAdminView({ shop, name }: Props) {
               ))}
             </ul>
             {data && !pane && (claimOpen.status === "requested" || claimOpen.status === "booked") ? (
-              <ClaimAddItems claim={claimOpen} shop={data as Store} busy={adding} onAdd={(it) => void addToClaim(it)} />
+              <ClaimAddItems claim={claimOpen} shop={data as Store} busy={adding} onAdd={(it, o) => void addToClaim(it, o)} />
             ) : null}
             {claimOpen.status === "requested" && pane === "decline" ? (
               <div className="decline-list" role="group" aria-label="お断り理由">

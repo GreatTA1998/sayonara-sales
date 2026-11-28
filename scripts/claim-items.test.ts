@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { claimAddBlock, holderStatus, searchItems } from "../lib/store";
+import { claimAddBlock, claimAddHard, holderStatus, searchItems } from "../lib/store";
 
 const claim = { id: "c1", day: "2026-12-01", itemIds: ["a"] };
 assert.equal(claimAddBlock({ id: "a" }, claim, ""), "追加済み");
@@ -22,4 +22,11 @@ assert.equal(searchItems(items, "").length, 0);
 assert.deepEqual(searchItems(items, "本棚").map((i) => i.name), ["本棚 木製"]);
 assert.deepEqual(searchItems(items, "ikea 木製").map((i) => i.name), ["本棚 木製"]);
 assert.deepEqual(searchItems(items, "tv").map((i) => i.name), ["ＴＶ台"]);
+// Owner override: 取引中 / paused / early stay soft blocks; only this-request and sold items are hard.
+assert.equal(claimAddHard({ id: "a" }, claim, ""), "追加済み");
+assert.equal(claimAddHard({ id: "b", claimId: "c2" }, claim, "picked_up"), "受付終了");
+assert.equal(claimAddHard({ id: "b", claimId: "c2" }, claim, "booked"), null);
+assert.equal(claimAddHard({ id: "b", claimId: "c2" }, claim, "requested"), null);
+assert.equal(claimAddHard({ id: "b" }, claim, ""), null);
+assert.equal(claimAddHard({ id: "b", claimId: "c1" }, { id: "c1", itemIds: [] }, "picked_up"), null);
 console.log("claim-items ok");

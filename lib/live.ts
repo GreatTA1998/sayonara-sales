@@ -15,7 +15,7 @@ import {
   type BuyRow,
 } from "./shop";
 import {
-  applyDates, applyItemOff, bookableDays, cartAfter, cartDiscount, claimAddBlock, claimFields, pickupDays, priceOf,
+  applyDates, applyItemOff, bookableDays, cartAfter, cartDiscount, claimAddBlock, claimAddHard, claimFields, pickupDays, priceOf,
   ELTON_SHOP, hasBuyerContact, itemFields, normalizeSlots, normalizeSpots, parseShop, shortCode,
   shopFields, shopItemOff, shopSlots, slotTaken, slotTime, storeFromDocs, takenSlots, uid, type Claim, type Item, type Store,
 } from "./store";
@@ -321,10 +321,14 @@ async function setClaimItems(
 /**
  * Add free items to a claim (requested / booked) and bind item.claimId,
  * so they read as held under that request. Re-checks every item in the tx; any
- * item held by another open claim, paused, or not yet available on claim.day aborts.
+ * item held by another open claim, paused, or not yet available on claim.day aborts,
+ * unless `force` (owner confirmed): then 取引中 items move over from the other open request
+ * (which is cancelled if left empty and `cancelEmpty`), paused / not-yet-available items are added.
+ * Sold (引取済) items never move.
  */
-async function addClaimItems(shop: string, id: string, addRaw: string[]) {
-  const db = getDb();
+export async function addClaimItems(
+  shop: string, id: string, addRaw: string[], opts: { force?: boolean; cancelEmpty?: boolean } = {}, db = getDb(),
+) {
   const add = [...new Set(addRaw.map(String).filter(Boolean))];
   if (!add.length) throw new Error("品目を選んでください");
   const cref = doc(db, "shops", shop, "claims", id);
@@ -344,20 +348,37 @@ async function addClaimItems(shop: string, id: string, addRaw: string[]) {
       }
     }
     const fresh: string[] = [];
+    /** Items taken over from another open request (force only): holder claim id → item ids. */
+    const moved = new Map<string, string[]>();
     isnaps.forEach((s, i) => {
       if (!s.exists()) throw new Error("品目が見つかりません");
       const r = s.data()!;
-      const why = claimAddBlock(
-        { id: add[i], claimId: r.claimId ? String(r.claimId) : null, paused: !!r.paused, availableAfter: String(r.availableAfter || "") },
-        { id, day, itemIds: cur },
-        holders.get(String(r.claimId || "")) || "",
-      );
-      if (why === "追加済み") return;
-      if (why) throw new Error(`${String(r.name || "無題")}: ${why}`);
+      const item = { id: add[i], claimId: r.claimId ? String(r.claimId) : null, paused: !!r.paused, availableAfter: String(r.availableAfter || "") };
+      const holder = holders.get(String(r.claimId || "")) || "";
+      const name = String(r.name || "無題");
+      const hard = claimAddHard(item, { id, itemIds: cur }, holder);
+      if (hard === "追加済み") return;
+      if (hard) throw new Error(`${name}: ${hard}`);
+      const why = claimAddBlock(item, { id, day, itemIds: cur }, holder);
+      if (why && !opts.force) throw new Error(`${name}: ${why}`);
+      if (item.claimId && item.claimId !== id && (holder === "requested" || holder === "booked")) {
+        moved.set(item.claimId!, [...(moved.get(item.claimId!) || []), add[i]]);
+      }
       fresh.push(add[i]);
     });
     if (!fresh.length) return asClaim(id, c);
+    // Reads first: the other requests we take items from.
+    const others = await Promise.all([...moved.keys()].map((h) => tx.get(doc(db, "shops", shop, "claims", h))));
+    const plans = others.map((hs, k) => {
+      const hid = [...moved.keys()][k];
+      const left = (Array.isArray(hs.data()?.itemIds) ? hs.data()!.itemIds.map(String) : []).filter((x: string) => !moved.get(hid)!.includes(x));
+      return { hid, left, ref: hs.ref };
+    });
+    if (plans.some((p) => !p.left.length) && !opts.cancelEmpty) throw new Error("移動元の依頼が空になります。確認が必要です");
     const next = [...cur, ...fresh];
+    for (const p of plans) {
+      tx.update(p.ref, p.left.length ? { itemIds: p.left } : { itemIds: [], status: "cancelled" });
+    }
     tx.update(cref, { itemIds: next });
     for (const iid of fresh) tx.update(doc(db, "shops", shop, "items", iid), { claimId: id });
     return asClaim(id, { ...c, itemIds: next });
@@ -586,7 +607,7 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       });
     case "addItems":
       if (!Array.isArray(body.itemIds)) throw new Error("品目を選んでください");
-      return addClaimItems(shop, String(body.id), body.itemIds.map(String));
+      return addClaimItems(shop, String(body.id), body.itemIds.map(String), { force: !!body.force, cancelEmpty: !!body.cancelEmpty });
     case "promote":
       return promoteBackup(shop, String(body.id), user.uid);
     case "reschedule": {
