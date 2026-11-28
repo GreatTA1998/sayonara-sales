@@ -220,6 +220,27 @@ await testEnv.clearFirestore();
   check("owner deletes spam", (await outcome(deleteDoc(cref(owner.db, "cb1")))) === "ALLOW");
   check("cooldown stamp unreadable by others", (await outcome(getDoc(meta(buyer2.db, buyer.uid)))).startsWith("DENY"));
 }
+{
+  // Back-up waitlist: cancelling keeps waiters on the cancelled claim so the owner can promote.
+  const buyer = user("buyer-w", "anonymous");
+  const waiter = user("waiter-w", "anonymous");
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const fs = ctx.firestore();
+    await setDoc(doc(fs, "shops", "10005"), { address: "目黒区", published: true, ownerUid: "seller-w" });
+    await setDoc(doc(fs, "shops", "10005", "items", "i1"), { name: "傘", price: 100, claimId: "c1", pos: 0 });
+    await setDoc(doc(fs, "shops", "10005", "claims", "c1"), {
+      code: "WAIT", day: "2026-11-27", slot: "10:00", itemIds: ["i1"],
+      status: "booked", buyerUid: buyer.uid, contact: "みるく", waiters: [],
+    });
+  });
+  const cref = doc(buyer.db, "shops", "10005", "claims", "c1");
+  check("any signed-in user can join back-up list", (await outcome(updateDoc(doc(waiter.db, "shops", "10005", "claims", "c1"), {
+    waiters: [{ account: "はな", at: "2026-11-27T00:00:00.000Z", itemIds: ["i1"] }],
+  }))) === "ALLOW");
+  check("buyer cancel keeps back-ups on the claim", (await outcome(updateDoc(cref, {
+    status: "cancelled",
+  }))) === "ALLOW");
+}
 
 await testEnv.cleanup();
 if (fails.length) {

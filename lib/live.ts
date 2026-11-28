@@ -19,6 +19,7 @@ import {
   ELTON_SHOP, hasBuyerContact, itemFields, normalizeSlots, normalizeSpots, parseShop, shortCode,
   shopFields, shopItemOff, shopSlots, slotTime, storeFromDocs, takenSlots, uid, type Claim, type Item, type Store,
 } from "./store";
+import { planPromotion, waiterCovers, type Waiter } from "./waitlist";
 
 const asClaim = (id: string, data: Record<string, unknown>): Claim =>
   storeFromDocs({}, [], [{ id, data }]).claims[0];
@@ -586,6 +587,8 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
     case "addItems":
       if (!Array.isArray(body.itemIds)) throw new Error("品目を選んでください");
       return addClaimItems(shop, String(body.id), body.itemIds.map(String));
+    case "promote":
+      return promoteBackup(shop, String(body.id), user.uid);
     case "reschedule": {
       // day+slot + agreed checkbox; no buyer lead; pending or confirmed.
       if (!body.agreed) throw new Error("チャットで合意が必要です");
@@ -606,7 +609,8 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
       if (!csnap.exists() || !open(String(csnap.data().status))) throw new Error("No claim");
       const c = csnap.data();
       const reason = String(body.reason || "").trim();
-      const patch: Record<string, unknown> = { status: "cancelled", waiters: [] };
+      // Waiters stay on the cancelled claim so the owner can promote the next back-up.
+      const patch: Record<string, unknown> = { status: "cancelled" };
       if (reason) patch.declineReason = reason;
       await updateDoc(cref, patch);
       await Promise.all((Array.isArray(c.itemIds) ? c.itemIds.map(String) : []).map(async (iid) => {
@@ -621,11 +625,10 @@ export async function adminAct(shopRaw: string, body: Record<string, unknown>): 
   }
 }
 
-type Waiter = { account?: string; at?: string; lineUid?: string };
 const waitersOf = (data: Record<string, unknown> | undefined) =>
   Array.isArray(data?.waiters) ? data!.waiters as Waiter[] : [];
 
-/** Buyer waitlist — transactional append (FIFO; no stale waiters RMW). */
+/** Buyer back-up list — transactional append (FIFO; one row per account, rows carry the items they queued for). */
 export async function joinWaitLive(
   shopRaw: string, itemId: string, account: string, aliases: string[] = [], lineUid = "",
 ) {
@@ -645,15 +648,21 @@ export async function joinWaitLive(
     const st = csnap.exists() ? String(csnap.data()!.status || "") : "";
     if (st !== "booked") throw new Error("待機できません");
     const prev = waitersOf(csnap.data());
-    if (prev.some((w) => keys.includes(String(w.account || "")))) return { ok: true as const };
-    const row: Waiter = { account: a, at: new Date().toISOString() };
+    const at = prev.findIndex((w) => keys.includes(String(w.account || "")));
+    if (at >= 0) {
+      if (waiterCovers(prev[at], itemId)) return { ok: true as const };
+      const next = prev.map((w, i) => (i === at ? { ...w, itemIds: [...(w.itemIds || []), itemId] } : w));
+      tx.update(cref, { waiters: next });
+      return { ok: true as const };
+    }
+    const row: Waiter = { account: a, at: new Date().toISOString(), itemIds: [itemId] };
     if (lineUid) row.lineUid = lineUid;
     tx.update(cref, { waiters: [...prev, row] });
     return { ok: true as const };
   });
 }
 
-/** Leave waitlist — drop matching accounts (name and/or soft shop id). */
+/** Leave the back-up list for one item (a legacy all-items row leaves entirely). */
 export async function leaveWaitLive(shopRaw: string, itemId: string, accounts: string[]) {
   const shop = parseShop(shopRaw);
   const keys = [...new Set(accounts.map((a) => a.trim()).filter(Boolean))];
@@ -671,11 +680,61 @@ export async function leaveWaitLive(shopRaw: string, itemId: string, accounts: s
       throw new Error("待機していません");
     }
     const prev = waitersOf(csnap.data());
-    const next = prev.filter((w) => !keys.includes(String(w.account || "")));
-    if (next.length === prev.length) return { ok: true as const };
+    const next: Waiter[] = [];
+    for (const w of prev) {
+      if (!keys.includes(String(w.account || ""))) { next.push(w); continue; }
+      const left = (w.itemIds || []).filter((id) => id !== itemId);
+      if (w.itemIds && left.length) next.push({ ...w, itemIds: left });
+    }
+    if (next.length === prev.length && next.every((w, i) => w === prev[i])) return { ok: true as const };
     tx.update(cref, { waiters: next });
     return { ok: true as const };
   });
+}
+
+/**
+ * Owner promotes the next back-up on a cancelled claim: a new 予約済 claim for them, same day/time,
+ * on the items that are free again. Other back-ups for those items move onto it, in order.
+ */
+async function promoteBackup(shop: string, claimId: string, ownerUid: string) {
+  const db = getDb();
+  const oref = doc(db, "shops", shop, "claims", claimId);
+  const osnap = await getDoc(oref);
+  if (!osnap.exists() || String(osnap.data().status || "") !== "cancelled") throw new Error("No claim");
+  const old = storeFromDocs({}, [], [{ id: claimId, data: osnap.data() }]).claims[0];
+  const isnaps = await Promise.all(old.itemIds.map((iid) => getDoc(doc(db, "shops", shop, "items", iid))));
+  const holders = new Map<string, string>();
+  for (const s of isnaps) {
+    const cid = s.exists() && s.data().claimId ? String(s.data().claimId) : "";
+    if (cid && cid !== claimId && !holders.has(cid)) {
+      const cs = await getDoc(doc(db, "shops", shop, "claims", cid));
+      holders.set(cid, cs.exists() ? String(cs.data().status || "") : "");
+    }
+  }
+  const free = old.itemIds.filter((iid, i) => {
+    const cid = isnaps[i].exists() && isnaps[i].data()!.claimId ? String(isnaps[i].data()!.claimId) : "";
+    if (!isnaps[i].exists() || isnaps[i].data()!.paused) return false;
+    const st = holders.get(cid) || "";
+    return !cid || cid === claimId || (st !== "booked" && st !== "picked_up");
+  });
+  const plan = planPromotion(old, free);
+  if (!plan) throw new Error("繰り上げできるバックアップがありません");
+  const id = uid("c");
+  const claim: Claim = {
+    id, code: shortCode(), day: old.day, slot: old.slot, itemIds: plan.itemIds,
+    contact: plan.winner.account,
+    status: "requested", createdAt: new Date().toISOString(), buyerUid: ownerUid,
+    waiters: plan.moved,
+    ...(plan.winner.lineUid ? { lineUid: plan.winner.lineUid } : {}),
+    ...(old.spotId ? { spotId: old.spotId, spotName: old.spotName, spotMapsUrl: old.spotMapsUrl } : {}),
+  };
+  const batch = writeBatch(db);
+  batch.set(doc(db, "shops", shop, "claims", id), claimFields(claim));
+  batch.update(oref, { waiters: plan.left });
+  await batch.commit();
+  // Same path as 確認する: books the claim and binds the items.
+  const booked = await setClaimItems(shop, id, plan.itemIds, { from: "requested", status: "booked" });
+  return booked;
 }
 
 /** Soft-name / LINE uid → buys (published+elton claims match contact, else local ss-buys). */
@@ -759,7 +818,8 @@ export async function buyerClaimAct(shopRaw: string, body: {
     await updateDoc(cref, { day, slot });
     return asClaim(id, { ...c, day, slot });
   }
-  const patch = { status: "cancelled" as const, waiters: [] as [] };
+  // Waiters stay on the cancelled claim so the owner can promote the next back-up.
+  const patch = { status: "cancelled" as const };
   await updateDoc(cref, patch);
   await Promise.all((Array.isArray(c.itemIds) ? c.itemIds.map(String) : []).map(async (iid) => {
     const iref = doc(db, "shops", shop, "items", iid);

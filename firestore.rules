@@ -50,11 +50,11 @@ service cloud.firestore {
     function openClaim() {
       return resource.data.status == 'requested' || resource.data.status == 'booked';
     }
-    // Buyer cancel: status→cancelled + clear waiters (+ optional declineReason).
+    // Buyer cancel: status→cancelled (+ optional declineReason). Back-up waiters stay on the
+    // cancelled claim so the owner can promote the next one.
     function buyerCancel() {
       return ownsClaim() && openClaim()
         && request.resource.data.status == 'cancelled'
-        && request.resource.data.waiters.size() == 0
         && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['status', 'waiters', 'declineReason']);
     }

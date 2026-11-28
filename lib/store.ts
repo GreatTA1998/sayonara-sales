@@ -1,4 +1,5 @@
 import { addDays, dayLbl, daysBetween, tokyoYmd } from "./days";
+import { waitersFor, type Waiter } from "./waitlist";
 import { CANON_LINE, CANON_PHONE, DEF_LEAD, DEF_OFF, PICKUP_SLOTS, ytUrl } from "./sale";
 
 export type Item = {
@@ -19,7 +20,8 @@ export type Claim = {
   spotId?: string; spotName?: string; spotMapsUrl?: string;
   /** requested = pending; booked = 予約済; picked_up = 引取済 (sold). */
   status: "requested" | "booked" | "picked_up" | "cancelled"; createdAt: string;
-  waiters?: { account: string; at: string; lineUid?: string }[];
+  /** Back-up buyers (キャンセル待ち), join order. Kept on a cancelled claim so the owner can promote. */
+  waiters?: Waiter[];
   buyerUid?: string;
   /** LINE Login userId (OA push). Soft Jimoty-only = absent → no push. */
   lineUid?: string;
@@ -296,7 +298,7 @@ export function itemFlags(s: Store, item: Item) {
   const c = claimOf(s, item);
   const sold = c?.status === "picked_up";
   const taken = c?.status === "booked" || sold;
-  const waitAs = c?.status === "booked" ? (c.waiters || []).map((w) => w.account).filter(Boolean) : [];
+  const waitAs = c?.status === "booked" ? waitersFor(c.waiters, item.id).map((w) => w.account) : [];
   return {
     taken, sold,
     reqN: taken ? 0 : s.claims.reduce((n, x) => n + (x.status === "requested" && x.itemIds.includes(item.id) ? 1 : 0), 0),
@@ -429,11 +431,12 @@ export function storeFromDocs(
         if (r.declineReason) c.declineReason = String(r.declineReason);
         if (Array.isArray(r.waiters)) {
           c.waiters = r.waiters.map((w) => {
-            const row = w as { account?: string; at?: string; lineUid?: string };
-            const out: { account: string; at: string; lineUid?: string } = {
+            const row = w as { account?: string; at?: string; lineUid?: string; itemIds?: unknown };
+            const out: Waiter = {
               account: String(row.account || ""), at: String(row.at || ""),
             };
             if (row.lineUid) out.lineUid = String(row.lineUid);
+            if (Array.isArray(row.itemIds) && row.itemIds.length) out.itemIds = row.itemIds.map(String);
             return out;
           }).filter((w) => w.account);
         }
