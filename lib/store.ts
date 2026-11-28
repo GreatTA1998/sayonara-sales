@@ -308,6 +308,41 @@ export function itemFlags(s: Store, item: Item) {
   };
 }
 
+/** Claim statuses that hold an item (cancelled / missing claims do not). */
+const HOLDING = ["requested", "booked", "picked_up"];
+
+/**
+ * Why `item` can't be added to `claim` (null = addable). `holder` = status of the
+ * claim `item.claimId` points to ("" when unset / missing / cancelled).
+ */
+export function claimAddBlock(
+  item: Pick<Item, "id" | "claimId" | "paused" | "availableAfter">,
+  claim: Pick<Claim, "id" | "day" | "itemIds">,
+  holder: string,
+): string | null {
+  if (claim.itemIds.includes(item.id)) return "追加済み";
+  if (item.paused) return "一時停止中";
+  if (item.claimId && item.claimId !== claim.id && HOLDING.includes(holder)) return "取引中";
+  const after = asYmd(item.availableAfter);
+  if (after && claim.day && claim.day < after) return `${dayLbl(after)}以降`;
+  return null;
+}
+
+/** Status of the claim holding `item` ("" if none). */
+export const holderStatus = (s: Pick<Store, "claims">, item: Pick<Item, "claimId">) =>
+  (item.claimId && s.claims.find((c) => c.id === item.claimId)?.status) || "";
+
+const fold = (v: string) => v.normalize("NFKC").toLowerCase();
+/** Admin 品目検索: every space-separated token must appear in name or note. */
+export function searchItems<T extends { name: string; note?: string }>(items: T[], q: string): T[] {
+  const toks = fold(q).split(/\s+/).filter(Boolean);
+  if (!toks.length) return [];
+  return items.filter((it) => {
+    const hay = fold(`${it.name} ${it.note || ""}`);
+    return toks.every((t) => hay.includes(t));
+  });
+}
+
 export function shopFields(s: Store): Record<string, unknown> {
   return {
     address: s.address || "",

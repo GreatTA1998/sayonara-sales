@@ -10,6 +10,7 @@ import { TimePicker } from "@/components/time-picker";
 import { compressImage, ensureImageFile, isImageFile } from "@/lib/compress";
 import { dayLbl, daysBetween, tokyoYmd } from "@/lib/days";
 import { DECLINE_PRESETS, DEF_LEAD, DEF_OFF, PICKUP_SLOTS, ytUrl } from "@/lib/sale";
+import { ClaimAddItems } from "@/components/claim-add-items";
 import { SoftLoginForm } from "@/components/soft-login";
 import { CLAIM_KEY } from "@/components/line-oauth";
 import { adminAct, claimShop, listenShop } from "@/lib/live";
@@ -797,6 +798,19 @@ export default function ShopAdminView({ shop, name }: Props) {
   function toggleKeep(id: string) {
     setKeep((k) => (k.includes(id) ? (k.length <= 1 ? k : k.filter((x) => x !== id)) : [...k, id]));
   }
+  /** 品目を追加: stays open so several can be added; snapshot refreshes the list. */
+  const [adding, setAdding] = useState(false);
+  async function addToClaim(it: Item) {
+    if (!claimOpen || adding) return;
+    setAdding(true);
+    try {
+      await adminAct(shop, { action: "addItems", id: claimOpen.id, itemIds: [it.id] });
+      setKeep((k) => (k.includes(it.id) ? k : [...k, it.id]));
+      show(`${itemLabel(it)}を追加しました`, "ok");
+    } catch (e) {
+      show(e instanceof Error ? e.message : "失敗しました", "err");
+    } finally { setAdding(false); }
+  }
   /** Like publish / photo-delete: dismiss + snack first; local patch then snap. */
   function claimAct(payload: Record<string, unknown>, okMsg: string) {
     const id = String(payload.id || "");
@@ -1198,6 +1212,9 @@ export default function ShopAdminView({ shop, name }: Props) {
                 </li>
               ))}
             </ul>
+            {data && !pane && (claimOpen.status === "requested" || claimOpen.status === "booked") ? (
+              <ClaimAddItems claim={claimOpen} shop={data as Store} busy={adding} onAdd={(it) => void addToClaim(it)} />
+            ) : null}
             {claimOpen.status === "requested" && pane === "decline" ? (
               <div className="decline-list" role="group" aria-label="お断り理由">
                 <p className="hint">丁寧なお断り文を選んでください</p>
