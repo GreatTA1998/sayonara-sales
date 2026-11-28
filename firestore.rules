@@ -120,6 +120,40 @@ service cloud.firestore {
         );
       }
 
+      // Public Q&A under an item. Anyone reads. Signed-in (anonymous ok) posts as
+      // themselves with a name; `seller: true` only from the shop admin (canAdmin).
+      // 15s cooldown per uid via commentMeta, written in the same batch (at == request.time).
+      match /items/{itemId}/comments/{commentId} {
+        allow read: if true;
+        allow create: if signedIn()
+          && exists(/databases/$(database)/documents/shops/$(shopId)/items/$(itemId))
+          && request.resource.data.keys().hasOnly(['authorUid', 'name', 'text', 'seller', 'at'])
+          && request.resource.data.authorUid == request.auth.uid
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 40
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 500
+          && request.resource.data.seller is bool
+          && (request.resource.data.seller == false || canAdmin(shopId))
+          && request.resource.data.at == request.time
+          && getAfter(/databases/$(database)/documents/shops/$(shopId)/commentMeta/$(request.auth.uid)).data.at == request.time
+          && (!exists(/databases/$(database)/documents/shops/$(shopId)/commentMeta/$(request.auth.uid))
+              || get(/databases/$(database)/documents/shops/$(shopId)/commentMeta/$(request.auth.uid)).data.at
+                  < request.time - duration.value(15, 's'));
+        allow update: if false;
+        // Author removes their own; shop admin (or anyone on an unclaimed shop, as elsewhere) removes spam.
+        allow delete: if signedIn() && (resource.data.authorUid == request.auth.uid || canEdit(shopId));
+      }
+
+      // Comment cooldown stamp, one doc per uid. Only writable alongside a comment.
+      match /commentMeta/{uid} {
+        allow read: if signedIn() && request.auth.uid == uid;
+        allow create, update: if signedIn() && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['at'])
+          && request.resource.data.at == request.time;
+        allow delete: if false;
+      }
+
       match /claims/{claimId} {
         allow read: if true;
         allow create: if signedIn()
