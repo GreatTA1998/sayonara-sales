@@ -1,6 +1,6 @@
 import { addDays, dayLbl, daysBetween, tokyoYmd } from "./days";
 import { waitersFor, type Waiter } from "./waitlist";
-import { CANON_LINE, CANON_PHONE, DEF_LEAD, DEF_OFF, PICKUP_SLOTS, ytUrl } from "./sale";
+import { CANON_LINE, CANON_PHONE, DEF_LEAD, DEF_OFF, PICKUP_SLOTS, SLOT_MIN, ytUrl } from "./sale";
 
 export type Item = {
   id: string; name: string; price: number | null; note?: string; claimId?: string | null;
@@ -119,6 +119,18 @@ export function slotTime(raw: unknown): string {
   if (!m) return "";
   return `${String(Math.min(23, +m[1])).padStart(2, "0")}:${String(Math.min(59, +m[2])).padStart(2, "0")}`;
 }
+
+const slotMins = (raw: unknown) => {
+  const t = slotTime(raw);
+  return t ? +t.slice(0, 2) * 60 + +t.slice(3) : -1;
+};
+/** Two pickup times clash when their SLOT_MIN-minute windows overlap (custom times like 10:10 vs 10:00). */
+export const slotsOverlap = (a: unknown, b: unknown) => {
+  const x = slotMins(a), y = slotMins(b);
+  return x >= 0 && y >= 0 && Math.abs(x - y) < SLOT_MIN;
+};
+/** True when `slot` overlaps any already-taken time (exact match is the 0-minute case). */
+export const slotTaken = (taken: string[], slot: unknown) => taken.some((t) => slotsOverlap(t, slot));
 
 export const shopSlots = (s: Store) => {
   const u = s.slots?.length ? [...new Set(s.slots.map(slotTime).filter(Boolean))].sort() : [];

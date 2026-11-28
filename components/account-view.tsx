@@ -11,7 +11,7 @@ import {
   getFacebookName, getJimotyName, getLineName, getLineUid, getName, logout, subscribeAuth,
   type BuyRow,
 } from "@/lib/shop";
-import { slotTime } from "@/lib/store";
+import { slotTaken, slotTime } from "@/lib/store";
 
 const pts = (names: (string | undefined | null)[]) => {
   const n = names.map((x) => x?.trim() || "無題");
@@ -93,7 +93,9 @@ export function AccountView({
   const cur = getSavedLang() || "ja";
   const langVal = cur === "ja" ? "ja" : offer;
   const rsOpts = rsDay && days.length && !days.includes(rsDay) ? [rsDay, ...days] : days;
-  const free = slots.filter((s) => !taken.includes(s) || s === rsSlot);
+  // The booking's own custom time (e.g. 10:30 after an owner reschedule) stays selectable.
+  const free = (rsSlot && !slots.includes(rsSlot) ? [...slots, rsSlot].sort() : slots)
+    .filter((s) => !slotTaken(taken, s) || s === rsSlot);
 
   if (buys === null) {
     return (

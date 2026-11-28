@@ -17,7 +17,7 @@ import {
 import {
   applyDates, applyItemOff, bookableDays, cartAfter, cartDiscount, claimAddBlock, claimFields, pickupDays, priceOf,
   ELTON_SHOP, hasBuyerContact, itemFields, normalizeSlots, normalizeSpots, parseShop, shortCode,
-  shopFields, shopItemOff, shopSlots, slotTime, storeFromDocs, takenSlots, uid, type Claim, type Item, type Store,
+  shopFields, shopItemOff, shopSlots, slotTaken, slotTime, storeFromDocs, takenSlots, uid, type Claim, type Item, type Store,
 } from "./store";
 import { planPromotion, waiterCovers, type Waiter } from "./waitlist";
 
@@ -876,7 +876,7 @@ export async function bookShop(shopRaw: string, body: {
   );
   if (!bookableDays(pre).includes(day)) throw new Error("その日は選べません");
   if (!shopSlots(pre).includes(slot)) throw new Error("その時間帯は選べません");
-  if (takenSlots(pre, day).includes(slot)) throw new Error("その時間帯は埋まっています");
+  if (slotTaken(takenSlots(pre, day), slot)) throw new Error("その時間帯は埋まっています");
 
   return runTransaction(db, async (tx) => {
     const itemSnaps = await Promise.all(itemIds.map((id) => tx.get(doc(db, "shops", shop, "items", id))));

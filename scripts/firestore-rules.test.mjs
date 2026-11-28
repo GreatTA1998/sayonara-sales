@@ -242,6 +242,26 @@ await testEnv.clearFirestore();
   }))) === "ALLOW");
 }
 
+{
+  // Owner reschedule to an arbitrary time (10:30, 14:45); rules never restricted slot values.
+  const owner = user("owner-t", "anonymous");
+  const buyer = user("buyer-t", "anonymous");
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const fs = ctx.firestore();
+    await setDoc(doc(fs, "shops", "10030"), { address: "目黒区", published: true, ownerUid: owner.uid });
+    await setDoc(doc(fs, "shops", "10030", "claims", "c1"), {
+      code: "TIME", day: "2026-11-27", slot: "10:00", itemIds: [],
+      status: "booked", buyerUid: buyer.uid, contact: "みるく", waiters: [],
+    });
+  });
+  const oref = doc(owner.db, "shops", "10030", "claims", "c1");
+  check("owner reschedules to custom time 10:30", (await outcome(updateDoc(oref, { day: "2026-11-28", slot: "10:30" }))) === "ALLOW");
+  check("owner reschedules to custom time 14:45", (await outcome(updateDoc(oref, { slot: "14:45" }))) === "ALLOW");
+  check("buyer can still reschedule to a custom time", (await outcome(updateDoc(doc(buyer.db, "shops", "10030", "claims", "c1"), {
+    day: "2026-11-29", slot: "10:30",
+  }))) === "ALLOW");
+}
+
 await testEnv.cleanup();
 if (fails.length) {
   console.error(`\n${fails.length} failed`);

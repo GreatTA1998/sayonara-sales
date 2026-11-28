@@ -159,7 +159,10 @@ export function linePushText(
   kind: LinePushKind,
   p: { day?: string; slot?: string; code?: string; reason?: string } = {},
 ) {
-  const when = [p.day, p.slot].filter(Boolean).join(" ");
+  // Legacy "10:00–10:15" and custom "10:30" both read as a single HH:mm.
+  const hhmm = (p.slot || "").match(/^(\d{1,2}):(\d{2})/);
+  const slot = hhmm ? `${hhmm[1].padStart(2, "0")}:${hhmm[2]}` : (p.slot || "");
+  const when = [p.day, slot].filter(Boolean).join(" ");
   if (kind === "confirm") {
     return `【サヨナラセール】受取が確定しました。\n${when}${p.code ? `\n受付コード ${p.code}` : ""}`.trim();
   }

@@ -15,7 +15,7 @@ import {
 } from "@/lib/shop";
 import {
   bookableDays, cartAfter, cartDiscount, cartRule, itemFlags, shopContact, shopItemOff,
-  shopPublished, shopSlots, slotTime, takenSlots, type Store,
+  shopPublished, shopSlots, slotTaken, slotTime, takenSlots, type Store,
 } from "@/lib/store";
 import { extHref, telHref, ytUrl } from "@/lib/sale";
 
@@ -222,9 +222,9 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
     if (!next.length) { if (day) setDay(""); return; }
     if (!next.includes(day)) { setDay(next[0]); setSlot(null); }
   }, [state?.days, after, day]);
-  const freeSlots = (state?.slots || []).filter((s) => !(state?.taken?.[day] || []).includes(s));
+  const freeSlots = (state?.slots || []).filter((s) => !slotTaken(state?.taken?.[day] || [], s));
   useEffect(() => {
-    if (slot && (!(state?.slots || []).includes(slot) || (state?.taken?.[day] || []).includes(slot))) setSlot(null);
+    if (slot && (!(state?.slots || []).includes(slot) || slotTaken(state?.taken?.[day] || [], slot))) setSlot(null);
   }, [state, day, slot]);
   const cartSub = pickedItems.reduce((n, i) => n + (i.price ?? 0), 0);
   const itemOff = Number(state?.itemOff) || 0;

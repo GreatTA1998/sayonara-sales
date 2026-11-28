@@ -20,7 +20,7 @@ import {
   adoptShop, forgetShop, getLineUid, getName, openShop, subscribeAuth,
 } from "@/lib/shop";
 import {
-  ELTON_SHOP, itemFlags, pickupDays, shopItemOff, shopPublished, shopSlots, slotTime, uid,
+  ELTON_SHOP, itemFlags, pickupDays, shopItemOff, shopPublished, shopSlots, slotTime, slotsOverlap, uid,
   wardAddress as kuFull, wardStem as kuStem,
   type Store,
 } from "@/lib/store";
@@ -319,6 +319,10 @@ export default function ShopAdminView({ shop, name }: Props) {
   );
   const rsDays = data ? pickupDays(data as Store) : [];
   const rsOpts = rsDay && !rsDays.includes(rsDay) ? [rsDay, ...rsDays] : rsDays;
+  /** Soft warning only: owner may still pick an overlapping time. */
+  const rsClash = !!(claimOpen && rsDay && rsSlot && (data?.claims || []).some((c) =>
+    c.id !== claimOpen.id && c.day === rsDay && (c.status === "requested" || c.status === "booked")
+    && slotsOverlap(c.slot, rsSlot)));
 
   async function act(payload: Record<string, unknown>, okMsg?: string) {
     setErr(null);
@@ -847,7 +851,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     const prev = data;
     const nextIds = Array.isArray(payload.itemIds) ? payload.itemIds.map(String) : null;
     if (payload.action === "reschedule") {
-      const day = String(payload.day || ""), slot = String(payload.slot || "");
+      const day = String(payload.day || ""), slot = slotTime(payload.slot);
       setData((d) => d && { ...d, claims: d.claims.map((c) => (c.id === id ? { ...c, day, slot } : c)) });
     } else {
       const st = payload.action === "items" ? null
@@ -869,7 +873,7 @@ export default function ShopAdminView({ shop, name }: Props) {
     void adminAct(shop, payload).then(() => {
       if (!snap) return;
       const day = String(payload.day || snap.day || "");
-      const slot = String(payload.slot || snap.slot || "");
+      const slot = slotTime(payload.slot || snap.slot);
       const act = String(payload.action || "");
       if (snap.lineUid && act === "confirm") {
         notifyLine(snap.lineUid, "confirm", { day, slot, code: snap.code });
@@ -1275,7 +1279,7 @@ export default function ShopAdminView({ shop, name }: Props) {
               <div className="decline-list" role="group" aria-label="日程変更">
                 <div className="when">
                   <span className="date-ctl"><select value={rsDay} aria-label="日付"
-                    onChange={(e) => { setRsDay(e.target.value); setRsSlot(null); }}>
+                    onChange={(e) => setRsDay(e.target.value)}>
                     {rsOpts.map((d) => <option key={d} value={d}>{dayLbl(d)}</option>)}
                   </select></span>
                   <div className="slots" role="group" aria-label="時間帯">
@@ -1284,6 +1288,10 @@ export default function ShopAdminView({ shop, name }: Props) {
                         className={rsSlot === s ? "slot on" : "slot"} onClick={() => setRsSlot(s)}>{s}</button>
                     ))}
                   </div>
+                  {/* Any minute, not just the quick picks (e.g. 10:30, 14:45). */}
+                  <input className="tp-input" style={{ margin: 0 }} type="time" step={60} value={rsSlot || ""}
+                    aria-label="時間" onChange={(e) => setRsSlot(slotTime(e.target.value) || null)} />
+                  {rsClash ? <p className="hint">同じ時間帯に別の依頼があります</p> : null}
                 </div>
                 <label className="late-check"><input type="checkbox" checked={rsOk}
                   onChange={(e) => setRsOk(e.target.checked)} />チャットで合意済み</label>
