@@ -148,6 +148,18 @@ export const authorizeUrl = (state: string, redirectUri: string) => {
   return `https://access.line.me/oauth2/v2.1/authorize?${q}`;
 };
 
+/**
+ * One LINE login attempt: signed (cookie-independent) state + the final authorize URL.
+ * Shared by /api/auth/line (redirect fallback) and /api/auth/line/url (pre-signed href so the
+ * button can be a plain top-level <a> straight to access.line.me → iOS can hand off to the
+ * LINE app via universal link).
+ */
+export function buildLogin(req: Request, ret: string, shop: string) {
+  const nonce = newState();
+  const state = signState({ n: nonce, ret, ...(shop ? { shop } : {}), exp: Date.now() + 600_000 });
+  return { nonce, url: authorizeUrl(state, callbackUrl(req)) };
+}
+
 /** Messaging API long-lived token (Vercel only). Missing → push no-ops. */
 export const messagingToken = () => process.env.LINE_CHANNEL_ACCESS_TOKEN?.trim() || "";
 export const lineUidOk = (to: string) => /^U[0-9a-f]{32}$/i.test(to);

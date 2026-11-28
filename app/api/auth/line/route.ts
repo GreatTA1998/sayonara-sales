@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {
-  STATE_COOKIE, RET_COOKIE, SHOP_COOKIE, authorizeUrl, callbackUrl, cookieOpts,
-  lineConfigured, newState, requestOrigin, safeReturn, safeShop, signState,
+  STATE_COOKIE, RET_COOKIE, SHOP_COOKIE, buildLogin, cookieOpts,
+  lineConfigured, requestOrigin, safeReturn, safeShop,
 } from "@/lib/line";
 
 export const dynamic = "force-dynamic";
@@ -15,11 +15,10 @@ export async function GET(req: Request) {
   if (!lineConfigured()) {
     return NextResponse.redirect(new URL(`${ret}${ret.includes("?") ? "&" : "?"}line_err=config`, origin));
   }
-  const nonce = newState();
   // State is self-contained + signed, so the callback does not depend on cookies surviving
   // the iOS LINE-app hand-off (the callback may open in a different browser context).
-  const state = signState({ n: nonce, ret, ...(shop ? { shop } : {}), exp: Date.now() + 600_000 });
-  const res = NextResponse.redirect(authorizeUrl(state, callbackUrl(req)));
+  const { nonce, url: to } = buildLogin(req, ret, shop);
+  const res = NextResponse.redirect(to);
   // Cookies stay as a best-effort fallback/extra check where the same browser returns.
   res.cookies.set(STATE_COOKIE, nonce, cookieOpts(600));
   res.cookies.set(RET_COOKIE, ret, cookieOpts(600));

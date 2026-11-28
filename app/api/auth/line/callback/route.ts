@@ -7,10 +7,12 @@ import {
 
 export const dynamic = "force-dynamic";
 
-function bounce(origin: string, ret: string, err?: string) {
+function bounce(origin: string, ret: string, err?: string, otherCtx = false) {
   const u = new URL(ret, origin);
   if (err) u.searchParams.set("line_err", err);
-  else u.searchParams.set("line_ok", "1");
+  // "2": login finished in a browser that did not start it (LINE app / in-app browser hand-off),
+  // so the Safari tab that started it has no session. The page tells the user.
+  else u.searchParams.set("line_ok", otherCtx ? "2" : "1");
   return u;
 }
 
@@ -52,7 +54,7 @@ export async function GET(req: Request) {
     // it owns (e.g. /s/elton), never on a hint from a fresh browser.
     const owned = await lookupOwnedShop(profile.userId);
     const sessShop = owned.status === "found" ? owned.shop : shop;
-    const res = clear(NextResponse.redirect(bounce(origin, ret)));
+    const res = clear(NextResponse.redirect(bounce(origin, ret, undefined, !expect)));
     res.cookies.set(SESS_COOKIE, signSess({
       uid: profile.userId,
       name: profile.displayName,

@@ -1,9 +1,10 @@
 /** LINE login: signed state (cookie-independent) + server-side owned-shop lookup. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { lookupOwnedShop, readState, signState } from "../lib/line";
+import { buildLogin, lookupOwnedShop, readState, signState } from "../lib/line";
 
 process.env.LINE_CHANNEL_SECRET = "test-secret";
+process.env.LINE_CHANNEL_ID = "123";
 
 test("signed state round-trips without any cookie", () => {
   const s = signState({ n: "abc", ret: "/s/elton/admin", shop: "elton", exp: Date.now() + 60_000 });
@@ -53,4 +54,18 @@ test("bindLineUser: owned shop wins; failed lookup never mints a shop", async ()
   assert.equal(store.get("ss-line-uid"), "U2");
   // lookup definitively none → first-time user gets a guest shop
   assert.match(bindLineUser("U3", "Someone", "", "", true), /^\d{5}$/);
+});
+
+test("pre-signed login URL goes straight to LINE with auto login left enabled", () => {
+  const req = new Request("https://beta.sayonara.tokyo/api/auth/line/url", { headers: { host: "beta.sayonara.tokyo" } });
+  const { nonce, url } = buildLogin(req, "/s/elton/admin", "elton");
+  const u = new URL(url);
+  assert.equal(u.origin + u.pathname, "https://access.line.me/oauth2/v2.1/authorize");
+  assert.equal(u.searchParams.get("redirect_uri"), "https://beta.sayonara.tokyo/api/auth/line/callback");
+  for (const k of ["disable_auto_login", "disable_ios_auto_login", "prompt", "switch_amr"]) {
+    assert.equal(u.searchParams.has(k), false, k);
+  }
+  const st = readState(u.searchParams.get("state"));
+  assert.equal(st?.n, nonce);
+  assert.equal(st?.ret, "/s/elton/admin");
 });

@@ -6,7 +6,7 @@ import { ItemComments } from "@/components/item-comments";
 import { PhotoLightbox } from "@/components/photo-lightbox";
 import { useBodyScrollLock, useMaskDismiss } from "@/components/snack";
 import { afterLbl, dayLbl, moveOutLeft, tokyoYmd } from "@/lib/days";
-import { lineLoginHref, WL_KEY } from "@/components/line-oauth";
+import { LineLoginAnchor, WL_KEY } from "@/components/line-oauth";
 import { bookShop, findOwnedShop, joinWaitLive, leaveWaitLive, listenShop } from "@/lib/live";
 import { t, useLang } from "@/lib/lang";
 import { notifyLine } from "@/lib/notify";
@@ -425,10 +425,10 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
                     <button type="button" className="cta go" disabled={busy}
                       onClick={() => void joinWait(open.id)}>{t("wait.join", lang)}</button>
                   ) : (
-                    <a className="cta line" href={lineLoginHref()}
+                    <LineLoginAnchor
                       onClick={() => { try { sessionStorage.setItem(WL_KEY, `${shop}|${open.id}`); } catch { /* */ } }}>
                       {t("wait.line", lang)}
-                    </a>
+                    </LineLoginAnchor>
                   )}
                 </>
               ) : (
@@ -515,7 +515,7 @@ export default function ShopBuyerView({ shop, embed, onReady }: Props) {
             {method === "jimoty" && !hardLine && (
               <>
                 <p className="hint">{t("buy.lineOpt", lang)}</p>
-                <a className="cta line" href={lineLoginHref()}>{t("buy.lineLogin", lang)}</a>
+                <LineLoginAnchor>{t("buy.lineLogin", lang)}</LineLoginAnchor>
               </>
             )}
           </div>
