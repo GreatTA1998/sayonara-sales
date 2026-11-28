@@ -32,6 +32,6 @@
 @media (max-width:359px){.app-nav .logo{width:40px;height:21px}.app-nav .nav-a,.app-nav .brand{font-size:var(--t-sm)}}
 
 /* 日程変更 time field: same width/height/border as the .slot quick picks (iOS gives time inputs an intrinsic min-width). */
-.tp-input.rs-time{display:block;box-sizing:border-box;width:100%;max-width:100%;min-width:0;margin:0;padding:10px 6px;height:auto;-webkit-appearance:none;appearance:none;border:1px solid #ddd;border-radius:8px;background:#fff;font:inherit;font-size:var(--t-base);font-weight:var(--fw);line-height:1.25;text-align:center;color:var(--c)}
+.tp-input.rs-time{display:block;box-sizing:border-box;width:100%;max-width:100%;min-width:0;margin:0;padding:10px 6px;height:calc(var(--t-base) * 1.25 + 22px);-webkit-appearance:none;appearance:none;border:1px solid #ddd;border-radius:8px;background:#fff;font:inherit;font-size:var(--t-base);font-weight:var(--fw);line-height:1.25;text-align:center;color:var(--c)}
 .tp-input.rs-time::-webkit-date-and-time-value{min-width:0;margin:0 auto;text-align:center;line-height:1.25;min-height:1.25em}
 .tp-input.rs-time::-webkit-datetime-edit{padding:0;margin:0 auto}
